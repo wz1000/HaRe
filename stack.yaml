@@ -1,0 +1,13 @@
+resolver: nightly-2016-01-16
+packages:
+- .
+- location:
+    git: https://github.com/DanielG/ghc-mod.git
+    commit: 566dbebe298f1e75254a4c3aa07d7410612659d4
+  extra-dep: true
+- location:
+    git: https://github.com/DanielG/cabal-helper.git
+    commit: d3c1e454e376d0f30c280276c6d620b1aff50228
+extra-deps:
+- djinn-ghc-0.0.2.3
+- ghc-syb-utils-0.2.3
