@@ -3,12 +3,16 @@ sudo: false
 # Caching so the next build will be fast too.
 cache:
   directories:
+  - $HOME/.cabal
+  - $HOME/.ghc
+  - $HOME/.ghc-mod
   - $HOME/.stack
 
 matrix:
   include:
   # - env: GHCVER=7.10.3 STACK_YAML=stack-7.10.yaml
   - env: GHCVER=7.10.3 CABALVER=1.22 STACK_CONFIG=/home/travis/build/alanz/HaRe/stack.yaml
+  # - env: GHCVER=7.10.3 CABALVER=1.24 STACK_CONFIG=/home/travis/build/alanz/HaRe/stack.yaml
     addons:
       apt:
         sources:
@@ -17,6 +21,7 @@ matrix:
         packages:
         - libgmp-dev
         - cabal-install-1.22
+        # - cabal-install-1.24
         - happy-1.19.4
         - alex-3.1.3
         - ghc-7.10.3
@@ -36,19 +41,29 @@ before_install:
   - mkdir -p ~/.local/bin
   - export PATH=$HOME/.local/bin:$PATH
   - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+  - stack --version
+  - stack upgrade --git
+  - stack --version
 
   # ghc
-  - export PATH=/opt/ghc/$GHCVER/bin:$PATH
-  - export PATH=/opt/alex/3.1.3/bin:/opt/happy/1.19.4/bin:$PATH
+  # - export PATH=/opt/ghc/$GHCVER/bin:$PATH
+  # - export PATH=/opt/alex/3.1.3/bin:/opt/happy/1.19.4/bin:$PATH
   - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
 
 script:
+  - cabal --version
   - cabal update
   - ./configure_tests.sh  # cabal configure the various test projects
   - ls -als
   - pwd
-  - ./travis_long stack --stack-yaml $STACK_CONFIG --no-terminal --skip-ghc-check haddock --no-haddock-deps 
-  - ./travis_long stack --stack-yaml $STACK_CONFIG --no-terminal --skip-ghc-check test
+  - echo $STACK_CONFIG
+  - stack --version
+  - stack install cabal-helper
+  - stack install ghc-mod
+  # - ./travis_long stack --stack-yaml $STACK_CONFIG --no-terminal --skip-ghc-check haddock --no-haddock-deps 
+  # - ./travis_long stack --stack-yaml $STACK_CONFIG --no-terminal --skip-ghc-check test
+  # - ./travis_long stack --no-terminal haddock --no-haddock-deps 
+  - ./travis_long stack test
   - cabal check
   - cabal sdist   # tests that a source-distribution can be generated
   - emacs --version
