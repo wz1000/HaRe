@@ -46,6 +46,8 @@ data-files:                     elisp/*.el
                                 configure.sh
                                 test/testdata/*.cabal
                                 test/testdata/*.hs
+                                test/testdata/AddCon/*.expected.hs
+                                test/testdata/AddCon/*.hs
                                 test/testdata/AddOneParameter/*.hs
                                 test/testdata/AddOneParameter/*.expected.hs
                                 test/testdata/Case/*.hs
@@ -147,6 +149,7 @@ Library
         Exposed-modules:
              Language.Haskell.Refact.API
            , Language.Haskell.Refact.HaRe
+           , Language.Haskell.Refact.Refactoring.AddCon
            , Language.Haskell.Refact.Refactoring.AddRmParam
            , Language.Haskell.Refact.Refactoring.Case
            , Language.Haskell.Refact.Refactoring.DupDef
@@ -239,7 +242,8 @@ test-suite spec
     src
     test
   other-modules:
-      AddRmParamSpec
+      AddConSpec
+    , AddRmParamSpec
     , CaseSpec
     , DupDefSpec
     , GhcUtilsSpec
