@@ -724,11 +724,31 @@ definingDeclsRdrNames nameMap pns ds _incTypeSig recursive = concatMap defining 
       definesDecl decl'@(GHC.L _l (GHC.ValD (GHC.PatBind _p _rhs _ty _fvs _)))
         | any (\n -> definesDeclRdr nameMap n decl') pns = [decl']
 
+      definesDecl decl'@(GHC.L _ (GHC.TyClD (GHC.DataDecl ln bndrs (GHC.HsDataDefn _ _cxt _ _ cons _) _fvs)))
+       = if checkCons cons then [decl']
+                           else []
+             where
+               checkCons [] = False
+               checkCons ((GHC.L _ (GHC.ConDecl {GHC.con_names = cns})):ms)
+                 -- | isJust (find (==pname) pns) = True
+                 | not (null (intersect (map (rdrName2NamePure nameMap) cns) pns)) = True
+                 | otherwise = checkCons ms
       definesDecl _ = []
 
       definesBind :: (GHC.LHsBind GHC.RdrName) -> [GHC.LHsDecl GHC.RdrName]
       definesBind (GHC.L l b) = definesDecl (GHC.L l (GHC.ValD b))
 
+{-
+
+      defines' decl@(TiDecorate.Dec (HsDataDecl loc c tp cons i))
+       = if checkCons cons == True then [decl]
+                                   else []
+             where
+               checkCons [] = False
+               checkCons ((HsConDecl loc i c (PNT pname _ _) t):ms)
+                 | isJust (find (==pname) pns) = True
+                 | otherwise = checkCons ms
+-}
 -- ---------------------------------------------------------------------
 
 -- |Find those declarations(function\/pattern binding) which define

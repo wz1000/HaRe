@@ -34,6 +34,7 @@ import Language.Haskell.Refact.API
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Transform
 
+import Data.Generics.Strafunski.StrategyLib.StrategyLib hiding (liftIO,MonadPlus,mzero)
 import System.Directory
 -- import PrettyPrint
 -- import PrettyPrint
@@ -50,9 +51,9 @@ import System.Directory
 -- import MUtils (( # ))
 -- import RefacLocUtils
 -- --import System
--- import System.IO
+import System.IO
 -- import System.IO.Unsafe
--- import Data.Char
+import Data.Char
 
 -- | An argument list for a function which of course is a list of patterns.
 type FunctionPats = [GHC.Pat GHC.RdrName]
@@ -73,7 +74,83 @@ addConstructor settings opts fileName ans (row,col) = do
 
 compAddConstructor :: FilePath -> [String] -> SimpPos -> RefactGhc [ApplyRefacResult]
 compAddConstructor fileName ans (row, col) = do
-  error "compAddConstructor"
+  logm "compAddConstructor"
+
+  parseSourceFileGhc fileName
+  parsed  <- getRefactParsed
+  nm <- getRefactNameMap
+
+  -- let modName = convertModName modName1            -- Parse the input file.
+  -- modInfo@(inscps, exps, mod, tokList) <- parseSourceFile (fileName)
+  -- let res1 = locToPNT fileName (row, col) mod
+  --     res2 = locToPN fileName (row, col) mod
+  --     decs = hsDecls mod
+  --     datDec = definingDecls [res2] decs False True
+  --     datName = (declToName (ghead "datName" datDec))
+  --     datPNT = (declToPNT (ghead "datPNT" datDec))
+
+       -- add any new type params...
+
+  let maybePn = locToRdrName (row,col) parsed
+  case maybePn of
+    Just lr@(GHC.L l _) ->
+      do
+        let datName = rdrName2NamePure nm lr
+        let pn = GHC.L l datName
+        logm $ "AddCon.compAddConstructor:about to applyRefac for:pn=" ++ SYB.showData SYB.Parser 0 pn
+        decs <- liftT $ hsDecls parsed
+        let datDec = ghead "compAddConstructor" $ definingDeclsRdrNames nm [datName] decs False True
+        (refactoredMod,_) <- applyRefac (addField datDec pn (tail ans) parsed) RSAlreadyLoaded
+        return [refactoredMod]
+
+  -- ((_,m), (newToks, newMod)) <- applyRefac (addField (ghead "applyRefac" datDec) datPNT datName res1 (drop 1 (tail first)) tokList)
+  --                                          (Just (inscps, exps, mod, tokList)) fileName
+
+  -- writeRefactoredFiles False [((fileName, m), (newToks, newMod))]
+{-
+  (s, col', row', inf) <- doFileStuff fileName row col ans
+  modName1 <- fileNameToModName fileName
+
+  let modName = convertModName modName1            -- Parse the input file.
+  modInfo@(inscps, exps, mod, tokList) <- parseSourceFile (fileName)
+  -- Find the datatype that's been highlighted as the refactree
+
+  {- case checkCursor fileName row col mod of
+    Left errMsg -> do AbstractIO.removeFile (fileName ++ ".temp.hs")
+                      error errMsg
+    Right dat ->
+      do
+
+      -}
+
+  let res' = locToPNT fileName (row, col) mod
+      res = pNTtoPN res'
+       -- Parse the input file.
+  AbstractIO.putStrLn ("parsing ..." ++ fileName ++ ".temp.hs")
+  modInfo2@(inscps', exps', mod', tokList') <- parseSourceFileOld (fileName ++ ".temp.hs")
+  AbstractIO.putStrLn "parsed."
+  let decs = hsDecls mod'
+      -- datDec = definingDecls [res] decs False True
+       -- get the list of constructors from the data type
+      decs' = hsDecls mod
+      datDec'' = definingDecls [res2] decs False True
+      datDec' = ghead "datDec'" datDec''
+      -- datName = getDataName [datDec']
+      pnames = definedPNs datDec'
+      newPN = locToPN (fileName ++ ".temp.hs") (row', col') mod'
+      newPNT = locToPNT (fileName ++ ".temp.hs") (row', col') mod'
+  numParam <- getParams datDec' newPNT
+  let oldPnames = filter (/= newPN) pnames
+      position = findPos 0 newPN pnames
+
+  ((_,m), (newToks, newMod)) <- applyRefac (addCon (fileName) datName pnames newPN newPNT numParam oldPnames position inf (tail first) modName)
+                                                       (Just (inscps', exps', mod', tokList')) (fileName++"temp.hs")
+  writeRefactoredFiles True [((fileName, m), (newToks, newMod))]
+  AbstractIO.removeFile (fileName ++ ".temp.hs")
+  AbstractIO.putStrLn "Completed.\n"
+-}
+
+-- ---------------------------------------------------------------------
 
 {-
 refacAddCon args
@@ -146,12 +223,25 @@ refacAddCon args
             AbstractIO.putStrLn "Completed.\n"
          else do
             error "refacAddCon must take a new constructor and a list of arguments."
+-}
 
+-- ---------------------------------------------------------------------
+
+addField :: (SYB.Data t) => GHC.LHsDecl GHC.RdrName -> GHC.Located GHC.Name -> [String] -> t -> RefactGhc t
+addField datDec datPNT fType t = do
+  logm $ "addField:(datDec,datPNT,fType)=" ++ showGhc (datDec,datPNT,fType)
+  newMod <- addTypeVar datDec datPNT fType t
+  return newMod
+{-
 addField datDec datPNT pnt fName fType tok (_, _, t)
  = do
       newMod <- addTypeVar datDec datPNT pnt fType tok t
       return newMod
+-}
 
+-- ---------------------------------------------------------------------
+
+{-
 addingField pnt fName fType t
  = applyTP (stop_tdTP (failTP `adhocTP` inDat)) t
     where
@@ -180,7 +270,91 @@ addingField pnt fName fType t
 
      newTypes xs [] = xs
      newTypes xs (a:as) = HsUnBangedType (Typ (HsTyCon (nameToPNT a))) : (newTypes xs as)
+-}
 
+-- ---------------------------------------------------------------------
+
+addTypeVar :: (Monad m,SYB.Data t) => GHC.LHsDecl GHC.RdrName -> GHC.Located GHC.Name -> [String] -> t -> m t
+addTypeVar datDec datName fType t
+  = applyTP (full_buTP (idTP `adhocTP` (inDatDeclaration datDec))) t
+    where
+      inDatDeclaration :: (Monad m) => GHC.LHsDecl GHC.RdrName -> GHC.LHsDecl GHC.RdrName -> m (GHC.LHsDecl GHC.RdrName)
+      -- inDatDeclaration _ (dat@(Dec (HsDataDecl a b tp c d))::HsDeclP)
+      -- inDatDeclaration _ (dat@(Dec (HsDataDecl a b tp c d))::HsDeclP)
+      --   | (defineLoc datName == (defineLoc.typToPNT.(ghead "inDatDeclaration").flatternTApp) tp) &&
+      --     checkIn fType tp
+      --     = update dat (Dec (HsDataDecl a b (createTypFunc ((typToPNT.(ghead "inDatDeclaration").flatternTApp) tp)
+      --                                         ( ((map nameToTyp fType') ++ (tail (flatternTApp tp))) )) c d)) dat
+
+      --        where
+      --         fType' = checkInOne2 tp [" "] fType
+
+      -- inDatDeclaration (Dec (HsDataDecl _ _ tp _ _)) (dat@(Dec (HsTypeSig s is c t))::HsDeclP)
+      --   | (pNTtoName datName) `elem` (map (pNTtoName.typToPNT) (flatternTApp t) )
+      --     = do
+
+      --          let res = changeType t tp
+      --          if res == t
+      --            then return dat
+      --            else update dat (Dec (HsTypeSig s is c res)) dat
+
+      inDatDeclaration _ t = return t
+
+      checkIn [] tp = True
+      -- checkIn (fType:fTypes) tp =
+      --  (fType `elem` (map (pNTtoName.typToPNT) (flatternTApp tp))) == False &&
+      --       isLower (ghead "checkIn" fType) || (checkIn fTypes tp)
+
+      checkInOne t tp n [] = []
+      -- checkInOne t tp n (f:fs)
+      --   | (f `elem` (map (pNTtoName.typToPNT) (flatternTApp tp))) &&
+      --         isLower (ghead "checkInOne" f) = checkInOne t tp n fs
+      --   | (f `elem` (map (pNTtoName.typToPNT) (flatternTApp t))) &&
+      --         isLower (ghead "checkInOne" f)  = newName : checkInOne t tp (n ++ [newName]) fs
+      --   | (f `elem` (map (pNTtoName.typToPNT) (flatternTApp t))) == False &&
+      --        isLower (ghead "checkInOne" f) = f : (checkInOne t tp n fs)
+      --   | otherwise = checkInOne t tp n fs
+
+      --       where
+      --         newName = (mkNewName f (n ++ (map (pNTtoName.typToPNT) (flatternTApp tp))) 1)
+
+      checkInOne2 tp n [] = []
+      -- checkInOne2 tp n (f:fs)
+      --   | (f `elem` (map (pNTtoName.typToPNT) (flatternTApp tp))) == False &&
+      --        isLower (ghead "checkInOne" f) = f : (checkInOne2 tp n fs)
+      --   | otherwise = checkInOne2 tp n fs
+
+
+      -- changeType :: HsTypeP -> HsTypeP -> HsTypeP
+      changeType :: GHC.LHsType GHC.RdrName -> GHC.LHsType GHC.RdrName -> GHC.LHsType GHC.RdrName
+      changeType t@(GHC.L l (GHC.HsFunTy t1 t2)) tp
+            = (GHC.L l (GHC.HsFunTy (changeType t1 tp) (changeType t2 tp)))
+      -- changeType t@(GHC.L l (HsAppTy (GHC.L l1 (HsTyCon p)) t2)) tp
+      --   | (defineLoc datName) == (defineLoc p) &&
+      --     checkIn fType t
+      --       = createTypFunc ((typToPNT.(ghead "inDatDeclaration").flatternTApp) t)
+      --                                         ( ((map nameToTyp fType') ++ (tail (flatternTApp t))))
+      --        where
+      --         fType' = checkInOne t tp [" "] fType
+      changeType t@(GHC.L l (GHC.HsAppTy t1 t2)) tp
+            = (GHC.L l (GHC.HsAppTy (changeType t1 tp) (changeType t2 tp)))
+
+              -- fType'' = checkNames ftype' t
+      -- changeType t@(Typ (HsTyCon p)) tp
+      --   | (defineLoc datName) == (defineLoc p) &&
+      --        checkIn fType t
+      --          = createTypFunc ((typToPNT.(ghead "inDatDeclaration").flatternTApp) t)
+      --                                         ( ((map nameToTyp fType') ++ (tail (flatternTApp t))))
+      --       where
+      --         fType' = checkInOne t tp [" "] fType
+      changeType t tp = t
+
+      flatternTApp :: GHC.LHsType GHC.RdrName -> [GHC.LHsType GHC.RdrName]
+      flatternTApp (GHC.L _ (GHC.HsFunTy t1 t2)) = flatternTApp t1 ++ flatternTApp t2
+      flatternTApp (GHC.L _ (GHC.HsAppTy t1 t2)) = flatternTApp t1 ++ flatternTApp t2
+      flatternTApp x = [x]
+
+{-
 addTypeVar datDec datName pnt fType toks t
  = applyTP (full_buTP (idTP `adhocTP` (inDatDeclaration datDec))) t
     where
@@ -256,8 +430,11 @@ addTypeVar datDec datName pnt fType toks t
       flatternTApp (Typ (HsTyFun t1 t2)) = flatternTApp t1 ++ flatternTApp t2
       flatternTApp (Typ (HsTyApp t1 t2)) = flatternTApp t1 ++ flatternTApp t2
       flatternTApp x = [x]
+-}
 
+-- ---------------------------------------------------------------------
 
+{-
 
 checkCursor :: String -> Int -> Int -> HsModuleP -> Either String HsDeclP
 checkCursor fileName row col mod

@@ -260,57 +260,19 @@ spec = do
       -}
       pending -- "Convert to definingDeclsNames"
 
-  -- -------------------------------------------------------------------
-{-
-  describe "definingDeclsNames" $ do
-    it "returns [] if not found" $ do
-      t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let renamed = fromJust $ GHC.tm_renamed_source t
+    -- ---------------------------------
+
+    it "finds in a data decl" $ do
+      t <- ct $ parsedFileGhc "./AddCon/A1.hs"
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
-          nm = initRdrNameMap t
+      let nm = initRdrNameMap t
 
-      let Just n = locToNameRdrPure nm (16,6) parsed
-      let res = definingDeclsNames [n] (hsBinds renamed) False False
-      showGhcQual res `shouldBe` "[]"
-
-    it "finds declarations at the top level" $ do
-      t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let renamed = fromJust $ GHC.tm_renamed_source t
-      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
-          nm = initRdrNameMap t
-
-      let Just n = locToNameRdrPure nm (3,3) parsed
-      let res = definingDeclsNames [n] (hsBinds renamed) False False
-      showGhcQual res `shouldBe` "[DupDef.Dd1.toplevel x = DupDef.Dd1.c GHC.Num.* x]"
+      let Just n = locToNameRdrPure nm (3,12) parsed
+      let decls = GHC.hsmodDecls $ GHC.unLoc parsed
+      let res = definingDeclsRdrNames nm [n] decls False False
+      showGhcQual res `shouldBe`"[data T a = C1 a]"
 
 
-    it "finds in a patbind" $ do
-      t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let renamed = fromJust $ GHC.tm_renamed_source t
-      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
-          nm = initRdrNameMap t
-
-      let Just n = locToNameRdrPure nm (14,1) parsed
-      let res = definingDeclsNames [n] (hsBinds renamed) False False
-      showGhcQual res `shouldBe` "[DupDef.Dd1.tup@(DupDef.Dd1.h, DupDef.Dd1.t)\n   = GHC.List.head GHC.Base.$ GHC.List.zip [1 .. 10] [3 .. ff]\n   where\n       ff :: GHC.Types.Int\n       ff = 15]"
-
-
-    it "finds recursively in sub-binds" $ do
-      {-
-      modInfo@((_, _, mod@(GHC.L l (GHC.HsModule name exps imps ds _ _))), toks) <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let res = definingDecls [(PN (mkRdrName "zz"))] ds False True
-      showGhcQual res `shouldBe` "[zz n = n + 1]" -- TODO: Currently fails, will come back to it
-      -}
-      pending -- "Currently fails, will come back to it"
-
-    it "only finds recursively in sub-binds if asked" $ do
-      {-
-      modInfo@((_, _, mod@(GHC.L l (GHC.HsModule name exps imps ds _ _))), toks) <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let res = definingDecls [(PN (mkRdrName "zz"))] ds False False
-      showGhcQual res `shouldBe` "[]"
-      -}
-      pending -- "Convert to definingDeclsNames"
--}
   -- -------------------------------------------------------------------
 
   describe "definingSigsRdrNames" $ do
