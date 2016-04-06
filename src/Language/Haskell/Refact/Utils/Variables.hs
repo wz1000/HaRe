@@ -686,6 +686,7 @@ definedPNsRdr (GHC.L _ (GHC.ValD (GHC.FunBind pname _ _ _ _)))   = [pname]
 definedPNsRdr (GHC.L _ (GHC.ValD (GHC.PatBind p _rhs _ty _fvs _))) = (hsNamessRdr p)
 -- VarBind will never occur in ParsedSource
 -- TODO: what about GHC.AbsBinds?
+definedPNsRdr (GHC.L _ (GHC.TyClD (GHC.DataDecl pname _ _ _ ))) = [pname]
 definedPNsRdr  _ = []
 
 -- ---------------------------------------------------------------------

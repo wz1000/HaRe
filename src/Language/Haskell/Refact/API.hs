@@ -229,6 +229,7 @@ module Language.Haskell.Refact.API
   , copyAnn
   , clearPriorComments
   , balanceAllComments
+  , appendToSortKey
 
  ) where
 

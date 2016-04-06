@@ -22,6 +22,7 @@ import qualified Data.Generics as SYB
 import qualified GHC.SYB.Utils as SYB
 
 import qualified GHC
+import qualified Name                  as GHC
 import qualified RdrName               as GHC
 
 import Data.List
@@ -95,12 +96,13 @@ compAddConstructor fileName ans (row, col) = do
   case maybePn of
     Just lr@(GHC.L l _) ->
       do
-        let datName = rdrName2NamePure nm lr
-        let pn = GHC.L l datName
+        let aName = rdrName2NamePure nm lr
+        let pn = GHC.L l aName
         logm $ "AddCon.compAddConstructor:about to applyRefac for:pn=" ++ SYB.showData SYB.Parser 0 pn
         decs <- liftT $ hsDecls parsed
-        let datDec = ghead "compAddConstructor" $ definingDeclsRdrNames nm [datName] decs False True
-        (refactoredMod,_) <- applyRefac (addField datDec pn (tail ans) parsed) RSAlreadyLoaded
+        let datDec  = ghead "compAddConstructor.2" $ definingDeclsRdrNames nm [aName] decs False True
+        let datName = ghead "compAddConstructor.1" $ definedNamesRdr nm datDec
+        (refactoredMod,_) <- applyRefac (addField datDec datName (tail ans) parsed) RSAlreadyLoaded
         return [refactoredMod]
 
   -- ((_,m), (newToks, newMod)) <- applyRefac (addField (ghead "applyRefac" datDec) datPNT datName res1 (drop 1 (tail first)) tokList)
@@ -227,17 +229,13 @@ refacAddCon args
 
 -- ---------------------------------------------------------------------
 
-addField :: (SYB.Data t) => GHC.LHsDecl GHC.RdrName -> GHC.Located GHC.Name -> [String] -> t -> RefactGhc t
+addField :: GHC.LHsDecl GHC.RdrName -> GHC.Name -> [String] -> GHC.ParsedSource
+         -> RefactGhc GHC.ParsedSource
 addField datDec datPNT fType t = do
   logm $ "addField:(datDec,datPNT,fType)=" ++ showGhc (datDec,datPNT,fType)
   newMod <- addTypeVar datDec datPNT fType t
+  putRefactParsed newMod mempty
   return newMod
-{-
-addField datDec datPNT pnt fName fType tok (_, _, t)
- = do
-      newMod <- addTypeVar datDec datPNT pnt fType tok t
-      return newMod
--}
 
 -- ---------------------------------------------------------------------
 
@@ -274,11 +272,30 @@ addingField pnt fName fType t
 
 -- ---------------------------------------------------------------------
 
-addTypeVar :: (Monad m,SYB.Data t) => GHC.LHsDecl GHC.RdrName -> GHC.Located GHC.Name -> [String] -> t -> m t
-addTypeVar datDec datName fType t
-  = applyTP (full_buTP (idTP `adhocTP` (inDatDeclaration datDec))) t
+addTypeVar :: (SYB.Data t)
+           => GHC.LHsDecl GHC.RdrName -> GHC.Name -> [String] -> t -> RefactGhc t
+addTypeVar datDec datName fType t = do
+  logm $ "addTypeVar:(datDec,datName,fType)=" ++ showGhc (datDec,datName,fType)
+  logDataWithAnns "addTypeVar:datDec" datDec
+  nm <- getRefactNameMap
+  applyTP (full_buTP (idTP `adhocTP` (inDatDeclaration nm datDec))) t
     where
-      inDatDeclaration :: (Monad m) => GHC.LHsDecl GHC.RdrName -> GHC.LHsDecl GHC.RdrName -> m (GHC.LHsDecl GHC.RdrName)
+      inDatDeclaration :: NameMap -> GHC.LHsDecl GHC.RdrName -> GHC.LHsDecl GHC.RdrName -> RefactGhc (GHC.LHsDecl GHC.RdrName)
+      inDatDeclaration nm _ d@(GHC.L l (GHC.TyClD (GHC.DataDecl ln bndrs (GHC.HsDataDefn nd cxt mc mks cons derivs) fvs)))
+        | GHC.nameUnique datName == (GHC.nameUnique $ rdrName2NamePure nm ln) && checkIn fType (flattenBndrs bndrs)
+        = do
+            let
+              newTyVarBndr v = do
+                ss <- liftT $ uniqueSrcSpanT
+                let nv = GHC.L ss (GHC.UserTyVar $ mkRdrName v)
+                liftT $ addSimpleAnnT nv (DP (0,1)) [((G GHC.AnnVal),DP (0,0))]
+                liftT $ appendToSortKey d ss
+                return nv
+              updateTVs (GHC.HsQTvs kvs tvs) ntvs = GHC.HsQTvs kvs (tvs ++ ntvs)
+            ntvs <- mapM newTyVarBndr fType
+            let bndrs' = updateTVs bndrs ntvs
+            return (GHC.L l (GHC.TyClD (GHC.DataDecl ln bndrs' (GHC.HsDataDefn nd cxt mc mks cons derivs) fvs)))
+
       -- inDatDeclaration _ (dat@(Dec (HsDataDecl a b tp c d))::HsDeclP)
       -- inDatDeclaration _ (dat@(Dec (HsDataDecl a b tp c d))::HsDeclP)
       --   | (defineLoc datName == (defineLoc.typToPNT.(ghead "inDatDeclaration").flatternTApp) tp) &&
@@ -292,15 +309,25 @@ addTypeVar datDec datName fType t
       -- inDatDeclaration (Dec (HsDataDecl _ _ tp _ _)) (dat@(Dec (HsTypeSig s is c t))::HsDeclP)
       --   | (pNTtoName datName) `elem` (map (pNTtoName.typToPNT) (flatternTApp t) )
       --     = do
-
       --          let res = changeType t tp
       --          if res == t
       --            then return dat
       --            else update dat (Dec (HsTypeSig s is c res)) dat
 
-      inDatDeclaration _ t = return t
+      inDatDeclaration _ _ t = return t
 
-      checkIn [] tp = True
+      -- AZ: extract just the names used in the tyvars
+      flattenBndrs (GHC.HsQTvs kvs tvs) = map go tvs
+        where go (GHC.L l (GHC.UserTyVar n))               = showGhc n
+              go (GHC.L l (GHC.KindedTyVar (GHC.L _ n) _)) = showGhc n
+
+      -- AZ: for each new type/type variable to be added, if it is a type
+      -- variable check that it is not already present. Return True if there is
+      -- no problem.
+      checkIn [] _ = True
+      checkIn (fType:fTypes) tp =
+       (fType `elem` tp) == False &&
+            isLower (ghead "checkIn" fType) || (checkIn fTypes tp)
       -- checkIn (fType:fTypes) tp =
       --  (fType `elem` (map (pNTtoName.typToPNT) (flatternTApp tp))) == False &&
       --       isLower (ghead "checkIn" fType) || (checkIn fTypes tp)

@@ -12,6 +12,8 @@ module Language.Haskell.Refact.Utils.ExactPrint
   , setAnnKeywordDP
   , clearPriorComments
   , balanceAllComments
+
+  , appendToSortKey
   ) where
 
 import qualified GHC           as GHC
@@ -158,5 +160,18 @@ balanceAllComments la
       -- replaceDecls t decls'
       unless (null decls) $ moveTrailingComments t (last decls)
       return t
+
+-- ---------------------------------------------------------------------
+
+appendToSortKey :: (SYB.Data a) => GHC.Located a -> GHC.SrcSpan -> Transform ()
+appendToSortKey parent ss = modifyAnnsT f
+  where
+    f ans = ans'
+      where
+        parentKey = mkAnnKey parent
+        updateList Nothing = Just [ss]
+        updateList (Just ls) = Just (ls++[ss])
+        reList = Map.adjust (\an -> an {annSortKey = updateList (annSortKey an) }) parentKey
+        ans' = reList ans
 
 -- ---------------------------------------------------------------------

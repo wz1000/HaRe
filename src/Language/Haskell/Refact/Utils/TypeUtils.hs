@@ -86,8 +86,8 @@ module Language.Haskell.Refact.Utils.TypeUtils
 
     -- ** Identifiers, expressions, patterns and declarations
     , expToNameRdr
-    ,nameToString
-    ,patToNameRdr
+    , nameToString
+    , patToNameRdr
     , pNtoPat
     , usedWithoutQualR
 
