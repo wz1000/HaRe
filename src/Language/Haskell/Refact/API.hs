@@ -230,6 +230,7 @@ module Language.Haskell.Refact.API
   , clearPriorComments
   , balanceAllComments
   , appendToSortKey
+  , addTrailingAnnT
 
  ) where
 

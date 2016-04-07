@@ -14,6 +14,7 @@ module Language.Haskell.Refact.Utils.ExactPrint
   , balanceAllComments
 
   , appendToSortKey
+  , addTrailingAnnT
   ) where
 
 import qualified GHC           as GHC
@@ -21,6 +22,7 @@ import qualified GHC           as GHC
 import qualified Data.Generics as SYB
 
 import Control.Monad
+import Data.List
 
 import Language.Haskell.GHC.ExactPrint.Transform
 import Language.Haskell.GHC.ExactPrint.Types
@@ -175,3 +177,21 @@ appendToSortKey parent ss = modifyAnnsT f
         ans' = reList ans
 
 -- ---------------------------------------------------------------------
+
+-- |Add a trailing annotation, unless there is already one
+addTrailingAnnT :: (SYB.Data a) => KeywordId -> GHC.Located a -> Transform ()
+addTrailingAnnT kw ast = do
+  modifyAnnsT (addTrailingAnn kw ast (DP (0,1)))
+
+addTrailingAnn :: (SYB.Data a) => KeywordId -> GHC.Located a -> DeltaPos -> Anns -> Anns
+addTrailingAnn kw a dp anns =
+  case Map.lookup (mkAnnKey a) anns of
+    Nothing -> anns
+    Just an ->
+      case find isAnn (annsDP an) of
+        Nothing -> Map.insert (mkAnnKey a) (an { annsDP = annsDP an ++ [(kw,dp)]}) anns
+        Just _  -> anns
+      where
+        isAnn (kw,_) = True
+        isAnn _      = False
+

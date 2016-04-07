@@ -25,6 +25,7 @@ import qualified GHC
 import qualified Name                  as GHC
 import qualified RdrName               as GHC
 
+import Control.Exception
 import Data.List
 import Data.Maybe
 
@@ -32,8 +33,9 @@ import qualified Language.Haskell.GhcMod as GM
 import Language.Haskell.GhcMod.Internal  as GM
 import Language.Haskell.Refact.API
 
-import Language.Haskell.GHC.ExactPrint.Types
+import Language.Haskell.GHC.ExactPrint.Parsers
 import Language.Haskell.GHC.ExactPrint.Transform
+import Language.Haskell.GHC.ExactPrint.Types
 
 import Data.Generics.Strafunski.StrategyLib.StrategyLib hiding (liftIO,MonadPlus,mzero)
 import System.Directory
@@ -102,7 +104,8 @@ compAddConstructor fileName ans (row, col) = do
         decs <- liftT $ hsDecls parsed
         let datDec  = ghead "compAddConstructor.2" $ definingDeclsRdrNames nm [aName] decs False True
         let datName = ghead "compAddConstructor.1" $ definedNamesRdr nm datDec
-        (refactoredMod,_) <- applyRefac (addField datDec datName (tail ans) parsed) RSAlreadyLoaded
+        -- (refactoredMod,_) <- applyRefac (addField datDec datName (tail ans) parsed) RSAlreadyLoaded
+        (refactoredMod,_) <- applyRefac (doRefactoring datDec datName (head ans) (tail ans) parsed) RSAlreadyLoaded
         return [refactoredMod]
 
   -- ((_,m), (newToks, newMod)) <- applyRefac (addField (ghead "applyRefac" datDec) datPNT datName res1 (drop 1 (tail first)) tokList)
@@ -229,12 +232,26 @@ refacAddCon args
 
 -- ---------------------------------------------------------------------
 
-addField :: GHC.LHsDecl GHC.RdrName -> GHC.Name -> [String] -> GHC.ParsedSource
+doRefactoring datDec datName fName fType t = do
+  t2 <- addField datDec datName fName fType t
+  let
+    fileName = assert False undefined
+    pnames   = assert False undefined
+    newPN    = assert False undefined
+    newPNT   = assert False undefined
+    numParam = assert False undefined
+    oldPnames = assert False undefined
+  t3 <- addCon fileName datName pnames newPN newPNT numParam oldPnames (assert False undefined) (assert False undefined) fType (assert False undefined) t2
+  putRefactParsed t3 mempty
+
+-- ---------------------------------------------------------------------
+
+addField :: GHC.LHsDecl GHC.RdrName -> GHC.Name -> String -> [String] -> GHC.ParsedSource
          -> RefactGhc GHC.ParsedSource
-addField datDec datPNT fType t = do
+addField datDec datPNT fName fType t = do
   logm $ "addField:(datDec,datPNT,fType)=" ++ showGhc (datDec,datPNT,fType)
-  newMod <- addTypeVar datDec datPNT fType t
-  putRefactParsed newMod mempty
+  newMod <- addTypeVar datDec datPNT fName fType t
+  -- putRefactParsed newMod mempty
   return newMod
 
 -- ---------------------------------------------------------------------
@@ -272,9 +289,33 @@ addingField pnt fName fType t
 
 -- ---------------------------------------------------------------------
 
+mkConDecl :: String -> [String] -> RefactGhc (GHC.LConDecl GHC.RdrName)
+mkConDecl _ [] = error "mkConDecl called for []"
+mkConDecl n ss = do
+  l <- liftT uniqueSrcSpanT
+  ln <- liftT uniqueSrcSpanT
+  let
+    mkArg s = do
+      la <- liftT uniqueSrcSpanT
+      let nv = (GHC.L la (GHC.HsTyVar (mkRdrName s)))
+      liftT $ addSimpleAnnT nv (DP (0,1)) [((G GHC.AnnVal),DP (0,0))]
+      return nv
+  args <- mapM mkArg ss
+
+  let
+    nn = GHC.L ln (mkRdrName n)
+    conNames = [nn]
+    details  = GHC.PrefixCon args
+    con = GHC.L l (GHC.ConDecl conNames GHC.Explicit (GHC.HsQTvs [] []) (GHC.noLoc []) details GHC.ResTyH98 Nothing False)
+  liftT $ addSimpleAnnT nn (DP (0,0)) [((G GHC.AnnVal),DP (0,0))]
+  liftT $ addSimpleAnnT con (DP (0,1)) []
+  return con
+
+-- ---------------------------------------------------------------------
+
 addTypeVar :: (SYB.Data t)
-           => GHC.LHsDecl GHC.RdrName -> GHC.Name -> [String] -> t -> RefactGhc t
-addTypeVar datDec datName fType t = do
+           => GHC.LHsDecl GHC.RdrName -> GHC.Name -> String -> [String] -> t -> RefactGhc t
+addTypeVar datDec datName fName fType t = do
   logm $ "addTypeVar:(datDec,datName,fType)=" ++ showGhc (datDec,datName,fType)
   logDataWithAnns "addTypeVar:datDec" datDec
   nm <- getRefactNameMap
@@ -286,7 +327,7 @@ addTypeVar datDec datName fType t = do
         = do
             let
               newTyVarBndr v = do
-                ss <- liftT $ uniqueSrcSpanT
+                ss <- liftT uniqueSrcSpanT
                 let nv = GHC.L ss (GHC.UserTyVar $ mkRdrName v)
                 liftT $ addSimpleAnnT nv (DP (0,1)) [((G GHC.AnnVal),DP (0,0))]
                 liftT $ appendToSortKey d ss
@@ -294,17 +335,10 @@ addTypeVar datDec datName fType t = do
               updateTVs (GHC.HsQTvs kvs tvs) ntvs = GHC.HsQTvs kvs (tvs ++ ntvs)
             ntvs <- mapM newTyVarBndr fType
             let bndrs' = updateTVs bndrs ntvs
-            return (GHC.L l (GHC.TyClD (GHC.DataDecl ln bndrs' (GHC.HsDataDefn nd cxt mc mks cons derivs) fvs)))
-
-      -- inDatDeclaration _ (dat@(Dec (HsDataDecl a b tp c d))::HsDeclP)
-      -- inDatDeclaration _ (dat@(Dec (HsDataDecl a b tp c d))::HsDeclP)
-      --   | (defineLoc datName == (defineLoc.typToPNT.(ghead "inDatDeclaration").flatternTApp) tp) &&
-      --     checkIn fType tp
-      --     = update dat (Dec (HsDataDecl a b (createTypFunc ((typToPNT.(ghead "inDatDeclaration").flatternTApp) tp)
-      --                                         ( ((map nameToTyp fType') ++ (tail (flatternTApp tp))) )) c d)) dat
-
-      --        where
-      --         fType' = checkInOne2 tp [" "] fType
+            newCon <- mkConDecl fName fType
+            liftT $ addTrailingAnnT (G GHC.AnnVbar ) (last cons)
+            let cons' = cons ++ [newCon]
+            return (GHC.L l (GHC.TyClD (GHC.DataDecl ln bndrs' (GHC.HsDataDefn nd cxt mc mks cons' derivs) fvs)))
 
       -- inDatDeclaration (Dec (HsDataDecl _ _ tp _ _)) (dat@(Dec (HsTypeSig s is c t))::HsDeclP)
       --   | (pNTtoName datName) `elem` (map (pNTtoName.typToPNT) (flatternTApp t) )
@@ -506,11 +540,27 @@ getBeforePN _ _ [] = 0
 getBeforePN c newPN (x:xs)
   | newPN /= x = (c + 1) + (getBeforePN (c + 1)newPN xs)
   | otherwise = c
+-}
+
+-- ---------------------------------------------------------------------
+
+
+createFun (x:xs) newPN datName = do
+  let str = "added" ++ x ++ " = error \"added " ++ (concat (map ( ++ " ") (x:xs))) ++ "to " ++ datName ++ "\""
+  -- addedC2 = error "added C2 c to T"
+
+  parseDeclWithAnns str
+
+{-
 
 createFun (x:xs) newPN datName
  = Dec ( HsPatBind loc0 (pNtoPat funPName) (HsBody (nameToExp ("error \"added " ++ (concat (map ( ++ " ") (x:xs))) ++ "to " ++ datName ++ "\"") )) [] )
     where funPName= PN (UnQual ("added" ++ x)) (S loc0)
 
+-}
+
+-- ---------------------------------------------------------------------
+{-
 
 getParams (Dec (HsDataDecl _ _ _ cons _)) newPNT
  = numParam cons
@@ -544,8 +594,25 @@ countCon' co
     where
       inCon a@((x, _)::([PNT], HsBangType HsTypeP)) = return $ replicate (length x) 0
       -- inCon _ = return []
+-}
 
+-- ---------------------------------------------------------------------
 
+addCon :: a -> GHC.Name -> c -> d -> e -> f -> g -> h -> i -> [String] -> k -> GHC.ParsedSource -> RefactGhc GHC.ParsedSource
+addCon fileName datName pnames newPn newPNT numParam oldPnames  position inf xs modName parsed
+ = do
+      newFun <- createFun xs newPn (showGhc datName)
+      logm $ "addCom:newFun=" ++ showGhc newFun
+      logDataWithAnns "addCom:newFun=" newFun
+      newMod <- addDecl parsed Nothing ([newFun], Nothing)
+      logm $ "addCon:newMod=[" ++ showGhc newMod ++ "]"
+      res <- findFuncs fileName datName newMod pnames newPn newPNT numParam oldPnames position inf xs modName
+
+   --   res2 <- findPatterns ses datName res pnames newPn newPNT numParam oldPnames position inf xs
+      -- putRefactParsed res mempty
+      -- putRefactParsed newMod mempty
+      return res
+{-
 addCon fileName datName pnames newPn newPNT numParam oldPnames  position inf xs modName (inscps, exps, mod)
  = do
       newMod <- addDecl mod Nothing ([createFun xs newPn datName], Nothing) True
@@ -555,7 +622,11 @@ addCon fileName datName pnames newPn newPNT numParam oldPnames  position inf xs 
    --   res2 <- findPatterns ses datName res pnames newPn newPNT numParam oldPnames position inf xs
 
       return res
+-}
 
+-- ---------------------------------------------------------------------
+
+{-
 getPNs (Dec (HsFunBind _ (m:ms) ))
  = checkMatch (m:ms)
     where checkMatch [] = []
@@ -584,8 +655,14 @@ findPosBefore newPN (x:[]) = [x]
 findPosBefore newPN (x:y:ys)
  | newPN == y = [x]
  | otherwise  = findPosBefore newPN (y:ys)
+-}
 
+-- ---------------------------------------------------------------------
 
+findFuncs fileName datName t pnames newPn newPNT numParam oldPnames position inf (x:xs) modName = do
+  logm "findFuncs is a nop"
+  return t
+{-
 findFuncs fileName datName t pnames newPn newPNT numParam oldPnames position inf (x:xs) modName
   =  applyTP (stop_tdTP (failTP `adhocTP` inFun)) t
     where
@@ -780,6 +857,10 @@ findFuncs fileName datName t pnames newPn newPNT numParam oldPnames position inf
                    -- inPat e = error (show e) -- Nothing
                  -- inExp _ = Nothing
     findCase pat@(_) _ =  return (False, defaultExp)
+-}
+
+-- ---------------------------------------------------------------------
+{-
 flatternPat :: HsPatP -> [HsPatP]
 flatternPat (Pat (HsPAsPat i p)) = flatternPat p
 flatternPat (Pat (HsPApp i p)) = (Pat (HsPId (HsCon i))) : (concatMap flatternPat p)
