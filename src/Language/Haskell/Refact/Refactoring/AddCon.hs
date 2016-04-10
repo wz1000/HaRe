@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  RefacAddCon
@@ -241,7 +242,7 @@ doRefactoring datDec datName fName fType t = do
     newPNT   = assert False undefined
     numParam = assert False undefined
     oldPnames = assert False undefined
-  t3 <- addCon fileName datName pnames newPN newPNT numParam oldPnames (assert False undefined) (assert False undefined) fType (assert False undefined) t2
+  t3 <- addCon fileName datName pnames newPN newPNT numParam oldPnames (assert False undefined) (assert False undefined) fType t2
   putRefactParsed t3 mempty
 
 -- ---------------------------------------------------------------------
@@ -250,9 +251,7 @@ addField :: GHC.LHsDecl GHC.RdrName -> GHC.Name -> String -> [String] -> GHC.Par
          -> RefactGhc GHC.ParsedSource
 addField datDec datPNT fName fType t = do
   logm $ "addField:(datDec,datPNT,fType)=" ++ showGhc (datDec,datPNT,fType)
-  newMod <- addTypeVar datDec datPNT fName fType t
-  -- putRefactParsed newMod mempty
-  return newMod
+  addTypeVar datDec datPNT fName fType t
 
 -- ---------------------------------------------------------------------
 
@@ -307,7 +306,7 @@ mkConDecl n ss = do
     conNames = [nn]
     details  = GHC.PrefixCon args
     con = GHC.L l (GHC.ConDecl conNames GHC.Explicit (GHC.HsQTvs [] []) (GHC.noLoc []) details GHC.ResTyH98 Nothing False)
-  liftT $ addSimpleAnnT nn (DP (0,0)) [((G GHC.AnnVal),DP (0,0))]
+  liftT $ addSimpleAnnT nn  (DP (0,0)) [(G GHC.AnnVal,DP (0,0))]
   liftT $ addSimpleAnnT con (DP (0,1)) []
   return con
 
@@ -598,15 +597,14 @@ countCon' co
 
 -- ---------------------------------------------------------------------
 
-addCon :: a -> GHC.Name -> c -> d -> e -> f -> g -> h -> i -> [String] -> k -> GHC.ParsedSource -> RefactGhc GHC.ParsedSource
-addCon fileName datName pnames newPn newPNT numParam oldPnames  position inf xs modName parsed
+addCon :: FilePath -> GHC.Name -> GHC.Name -> d -> e -> f -> [GHC.Name] -> h -> i -> [String] -> GHC.ParsedSource -> RefactGhc GHC.ParsedSource
+addCon fileName datName pnames newPn newPNT numParam oldPnames  position inf xs parsed
  = do
       newFun <- createFun xs newPn (showGhc datName)
       logm $ "addCom:newFun=" ++ showGhc newFun
-      logDataWithAnns "addCom:newFun=" newFun
       newMod <- addDecl parsed Nothing ([newFun], Nothing)
-      logm $ "addCon:newMod=[" ++ showGhc newMod ++ "]"
-      res <- findFuncs fileName datName newMod pnames newPn newPNT numParam oldPnames position inf xs modName
+      nm <- getRefactNameMap
+      res <- findFuncs nm fileName datName newMod pnames newPn newPNT numParam oldPnames position inf xs
 
    --   res2 <- findPatterns ses datName res pnames newPn newPNT numParam oldPnames position inf xs
       -- putRefactParsed res mempty
@@ -659,9 +657,238 @@ findPosBefore newPN (x:y:ys)
 
 -- ---------------------------------------------------------------------
 
-findFuncs fileName datName t pnames newPn newPNT numParam oldPnames position inf (x:xs) modName = do
+findFuncs :: (SYB.Data t) => NameMap -> FilePath -> GHC.Name -> t -> b -> c -> d -> e -> [GHC.Name] -> g -> h -> [i] -> RefactGhc t
+findFuncs nm fileName datName t pnames newPn newPNT numParam oldPnames position inf (x:xs) = do
   logm "findFuncs is a nop"
-  return t
+  applyTP (stop_tdTP (failTP `adhocTP` inFun
+                             `adhocTP` inFunDecl
+                     )) t
+    where
+    inFunDecl :: GHC.LHsDecl GHC.RdrName -> RefactGhc (GHC.LHsDecl GHC.RdrName)
+    inFunDecl (GHC.L l (GHC.ValD f@(GHC.FunBind{}))) = do
+      logm "findFuncs.inFunDecl"
+      (GHC.L l' f') <- inFun (GHC.L l f)
+      logm "findFuncs.inFunDecl ending"
+      return (GHC.L l' (GHC.ValD f'))
+
+    inFun :: GHC.LHsBind GHC.RdrName -> RefactGhc (GHC.LHsBind GHC.RdrName)
+    inFun dec1
+        = do
+            -- logm "findFuncs.inFun"
+            logDataWithAnns "findFuncs.inFun:dec1" dec1
+            mexp <- findCase dec1
+            logm $ "findFuncs.inFun:mexp=" ++ showGhc mexp
+            case mexp of
+              Just exp1 -> do
+                error "findFuncs: still need if leg"
+                    -- let altPNs = getPNPats exp1
+                    -- if oldPnames /= altPNs
+                    --  then do
+                    --   let posBefore = findPosBefore newPn pnames
+                    --   update exp1 (newPat3 exp1 (head posBefore)) dec1
+                    --  else do
+                    --   update exp1 (newPat2 exp1) dec1
+
+              Nothing -> do
+                error "findFuncs: still need else leg"
+              {-
+              do ((match,arity), patar) <- findFun dec1 modName
+                 if match == False
+                   then do  --error "not found"
+                       fail ""
+                   else
+                     do  let funPNs = getPNs dec1
+                         if oldPnames /= funPNs
+                           then do
+                            let posBefore = findPosBefore newPn pnames
+                            if length posBefore > 1
+                             then do
+                              update dec1 (newMatch3 dec1 (head posBefore) arity patar) dec1
+                             else do
+                              update dec1 (newMatch dec1 arity patar) dec1
+                           else do
+                           update dec1 (newMatch2 dec1 arity patar) dec1
+                       where
+                        newMatch (Dec (HsFunBind loc1 matches@((HsMatch _ pnt p e ds):ms)))  arity patar
+                          =  Dec (HsFunBind loc1 (newMatches matches pnt arity patar (length p)))
+
+                        newMatch2 (Dec (HsFunBind loc1 matches@((HsMatch _ pnt p e ds):ms) )) arity patar
+                          = Dec (HsFunBind loc1 (fst ++ (newMatch' pnt arity patar(length p)) ++ snd) )
+                            where
+                              (fst, snd) = splitAt position matches
+
+                        newMatch3 (Dec (HsFunBind loc1 matches@((HsMatch _ pnt p e ds):ms))) posBefore arity patar
+                          = Dec (HsFunBind loc1 (newMatches' matches pnt posBefore arity patar (length p)))
+
+
+                        newMatches [] pnt position arity patar = newMatch' pnt position arity patar
+                        newMatches (m@(HsMatch _ _ pats _ _):ms) pnt position arity patar
+                         | or (map wildOrID pats) = (newMatch' pnt position arity patar) ++ (m : ms)
+                         | otherwise                     = m : (newMatches ms pnt position arity patar)
+
+                        newMatches' [] pnt posBefore position arity patar = newMatch' pnt position arity patar
+                        newMatches' (m@(HsMatch _ _ pats _ _):ms) pnt posBefore position arity patar
+                         | (getPN pats) == posBefore = m : ((newMatch' pnt position arity patar) ++ ms)
+                         | or (map wildOrID pats) = (newMatch' pnt position arity patar) ++ (m : ms)
+      --                   | (TiDecorate.Pat HsPWildCard) `elem` pats = (newMatch' pnt) ++ (m : ms)
+                         | otherwise      = m : (newMatches' ms pnt posBefore position arity patar)
+
+                        newMatch' pnt arity  patar position
+                  --       | numParam == 0  =  [HsMatch loc0 pnt [pNtoPat newPn] (HsBody (nameToExp ("added" ++ x))) []  ]
+                          = createMatch arity ['a'..'z'] patar
+                            where
+                              createMatch arity alpha patar
+                               | elem 1 arity
+                                   = (HsMatch loc0 pnt (createPat arity patar alpha) (HsBody (nameToExp ("added" ++ x))) []) : (createMatch (mutatearity arity) alpha patar)
+                               | otherwise = []
+
+                              mutatearity [] = []
+                              mutatearity (x:xs)
+                               | x == 1 = 0 : xs
+                               | otherwise = x : (mutatearity xs)
+
+                              createPat [] _ alpha= []
+                              createPat (x:xs) ((y,n):ys) alpha
+                               | x == 1    =  newPatt' : (createPat (replicate (length xs) 0) ys ((res4')))
+                               | elem 1 y  = (conApps n) : (createPat xs ys (res3))
+                               | otherwise = (createNames 1 alpha) ++ (createPat xs ys (tail alpha))
+                                  where
+                                    (_, res2) = splitAt numParam alpha
+                                    conApps n = conApp y alpha n
+                                    (_, res3) = splitAt ((myLength (conApps n)) * numParam -1) alpha
+
+                                    (_, res4') = splitAt ((myLength newPatt') ) alpha
+                                    newPatt' = patt alpha
+
+                                    patt alpha
+                                     | inf == False = (Pat (HsPParen (Pat (HsPApp newPNT (createNames numParam alpha))))::HsPatP)
+                                     | otherwise    = (Pat (HsPInfixApp (nameToPat [alpha!!0]) newPNT (nameToPat [alpha!!1]))::HsPatP)
+
+                                    conApp xs alpha name
+                                      = (Pat (HsPParen (Pat (HsPApp (nameToPNT name) (createPats xs alpha)))))
+
+                                    myLength (Pat (HsPParen (Pat (HsPApp _ xs)))) = length xs
+                                    myLength _ = 0
+
+
+                                    createPats [] alpha = []
+                                    createPats (x:xs) alpha
+                                     | x == 1 = newPatt : (createPats xs (res4))
+                                     | otherwise = (createNames 1 alpha) ++ (createPats xs (tail alpha))
+                                        where
+                                         (_, res4) = splitAt ((myLength newPatt)) alpha
+                                         newPatt = patt alpha
+
+                                    createNames 0 _ = []
+                                    createNames count (x:xs)
+                                     = (nameToPat [x]) : (createNames (count-1) xs)
+
+                        newPat (Exp (HsCase e pats@((HsAlt loc p e2 ds):ps)))
+                          = Exp (HsCase e (newPats pats))
+
+                        newPat2 (Exp (HsCase e pats))
+                          = Exp (HsCase e (fst ++ newPat' ++ snd))
+                             where
+                              (fst, snd) = splitAt position pats
+
+
+                        newPat3 (Exp (HsCase e pats)) posBefore
+                          = Exp (HsCase e (newPats' pats posBefore))
+
+                        newPats [] = newPat'
+                        newPats(pa@(HsAlt _ p _ _):ps)
+                         | wildOrID p = newPat' ++ (pa:ps)
+                         | otherwise              = pa : (newPats ps)
+
+                        newPats' [] posBefore = newPat'
+                        newPats' (pa@(HsAlt _ p _ _):ps) posBefore
+                         | (getPN p) == posBefore = pa : (newPat' ++ ps)
+                         | wildOrID p = newPat' ++ (pa:ps)
+                         | otherwise = pa : (newPats' ps posBefore)
+
+
+                        newPat'
+                         | numParam == 0 = [HsAlt loc0 (pNtoPat newPn) (HsBody (nameToExp ("added" ++ x))) [] ]
+                         | otherwise = [HsAlt loc0 patt (HsBody (nameToExp ("added" ++ x))) []]
+                            where
+                             patt
+                              | inf == False = (Pat (HsPParen (Pat (HsPApp newPNT  (createNames numParam ['a'..'z']))))::HsPatP)
+                              | otherwise    = (Pat (HsPInfixApp (nameToPat "a") newPNT (nameToPat "b"))::HsPatP)
+
+                             createNames 0 _ = []
+                             createNames count (x:xs)
+                               = (nameToPat [x]) : (createNames (count-1) xs)
+-}
+
+      --The selected sub-expression is in the argument list of a match
+      --and the function only takes 1 parameter
+    -- findFun dec@(Dec (HsFunBind loc matches)::HsDeclP) modName
+    findFun :: GHC.LHsBind GHC.RdrName -> RefactGhc ((Bool, [t4]), [([t5], [Char])])
+    findFun dec@(GHC.L _ (GHC.FunBind ln _ (GHC.MG matches _ _ _) _ _ _ )::GHC.LHsBind GHC.RdrName) = do
+        return $ findMatch matches
+           where findMatch match
+                   = fromMaybe ((False, []), [([], "")])
+                      (applyTU (once_tdTU (failTU `adhocTU` inMatch)) match)
+                 inMatch ((GHC.Match _ [pat] ty grhss ) :: GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+                   = Just ((True, []), [([], "")])
+                 -- inMatch (mat@(HsMatch loc1  pnt pats (HsBody e) ds)::HsMatchP)
+                 --  = do
+                 --       let (_, y) = checkTypesInPat datName pats modName fileName
+                 --      -- error $ show y
+
+                 --       Just ((checkTypes2 datName (pNTtoName pnt) modName fileName), y)
+
+                 inMatch x@(_) = Nothing
+
+    findFun a@(_) = return ((False, []), [([], "")])
+
+    findCase :: GHC.LHsBind GHC.RdrName -> RefactGhc (Maybe (GHC.HsExpr GHC.RdrName))
+    findCase dec@(GHC.L _ (GHC.FunBind ln _ (GHC.MG matches _ _ _) _ _ _ )::GHC.LHsBind GHC.RdrName) = do
+      logDataWithAnns "findCase" matches
+      -- logDataWithAnns "findCase" (findExp matches)
+      return (findExp matches)
+           where findExp alt
+                  = fromMaybe Nothing
+                     (applyTU (once_tdTU (failTU `adhocTU` inExp)) alt)
+                 inExp (exp@e::GHC.HsExpr GHC.RdrName)
+                  -- = Just ((findPat e), exp)
+                  = Just (if (findPat e) then Just exp else Nothing)
+
+                  where
+                   -- findPat :: (SYB.Data t) => t -> Bool
+                   findPat alt
+                    = fromMaybe False
+                      (applyTU (once_tdTU (failTU `adhocTU` inPat)) alt)
+                   -- inPat (pat@(HsAlt loc (Pat (HsPId (HsCon p))) e ds)::HsAltP)
+                   --   = (Just (checkTypes datName (pNTtoName p) modName fileName))
+                   inPat :: GHC.LPat GHC.RdrName -> Maybe Bool
+                   inPat (GHC.L lp (GHC.ConPatIn lx dets)) = do
+                     if rdrName2NamePure nm lx `elem` oldPnames
+                      then Just True
+                      else Nothing
+                   -- inPat e -- (pat@(HsAlt loc (Pat (HsPId (HsVar _))) e ds)::HsAltP)
+                   --   = do
+                   --       case exp of
+                   --        Exp (HsCase (Exp (HsId (HsVar x))) alts)
+                   --                                          -> do
+                   --                                               -- find where p is defined, and get the type
+                   --                                               let decs = hsDecls t
+                   --                                               -- error ( show (pNTtoPN x))
+                   --                                               let y = definingDecls [(pNTtoPN x)] decs False True
+                   --                                               -- error $ show y
+                   --                                               if length y /= 0
+                   --                                                then do
+                   --                                                 let b = definedPNs (head y)
+                   --                                                 Just (checkTypes datName (pNtoName (head b)) modName fileName)
+                   --                                                else  Nothing
+                   --        _ -> Nothing
+                   inPat e = error $ "findCase:inPat:" ++ (showGhc e) -- Nothing
+                 -- inExp _ = Nothing
+    findCase pat@(_) =  return Nothing
+
+
+
+  
 {-
 findFuncs fileName datName t pnames newPn newPNT numParam oldPnames position inf (x:xs) modName
   =  applyTP (stop_tdTP (failTP `adhocTP` inFun)) t
@@ -821,7 +1048,6 @@ findFuncs fileName datName t pnames newPn newPNT numParam oldPnames position inf
 
                        Just ((checkTypes2 datName (pNTtoName pnt) modName fileName), y)
                  inMatch x@(_) = Nothing
-
     findFun a@(_) _ = return ((False, []), [([], "")])
 
     findCase dec@(Dec (HsFunBind loc matches)::HsDeclP) modName
@@ -857,8 +1083,41 @@ findFuncs fileName datName t pnames newPn newPNT numParam oldPnames position inf
                    -- inPat e = error (show e) -- Nothing
                  -- inExp _ = Nothing
     findCase pat@(_) _ =  return (False, defaultExp)
--}
 
+    findCase dec@(Dec (HsFunBind loc matches)::HsDeclP) modName
+        = return (findExp matches)
+           where findExp alt
+                  = fromMaybe ((False, defaultExp))
+                     (applyTU (once_tdTU (failTU `adhocTU` inExp)) alt)
+                 inExp (exp@(Exp e)::HsExpP)
+                  = Just ((findPat e), exp)
+
+                  where
+                   findPat alt
+                    = fromMaybe (False)
+                      (applyTU (once_tdTU (failTU `adhocTU` inPat)) alt)
+                   inPat (pat@(HsAlt loc (Pat (HsPId (HsCon p))) e ds)::HsAltP)
+                     = (Just (checkTypes datName (pNTtoName p) modName fileName))
+                   inPat e -- (pat@(HsAlt loc (Pat (HsPId (HsVar _))) e ds)::HsAltP)
+                     = do
+                         case exp of
+                          Exp (HsCase (Exp (HsId (HsVar x))) alts)
+                                                            -> do
+                                                                 -- find where p is defined, and get the type
+                                                                 let decs = hsDecls t
+                                                                 -- error ( show (pNTtoPN x))
+                                                                 let y = definingDecls [(pNTtoPN x)] decs False True
+                                                                 -- error $ show y
+                                                                 if length y /= 0
+                                                                  then do
+                                                                   let b = definedPNs (head y)
+                                                                   Just (checkTypes datName (pNtoName (head b)) modName fileName)
+                                                                  else  Nothing
+                          _ -> Nothing
+                   -- inPat e = error (show e) -- Nothing
+                 -- inExp _ = Nothing
+    findCase pat@(_) _ =  return (False, defaultExp)
+-}
 -- ---------------------------------------------------------------------
 {-
 flatternPat :: HsPatP -> [HsPatP]
