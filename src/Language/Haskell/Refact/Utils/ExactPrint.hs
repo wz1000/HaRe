@@ -192,6 +192,5 @@ addTrailingAnn kw a dp anns =
         Nothing -> Map.insert (mkAnnKey a) (an { annsDP = annsDP an ++ [(kw,dp)]}) anns
         Just _  -> anns
       where
-        isAnn (kw,_) = True
-        isAnn _      = False
+        isAnn (kw',_) = kw == kw'
 

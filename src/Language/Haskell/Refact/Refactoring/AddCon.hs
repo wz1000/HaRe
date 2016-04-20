@@ -233,7 +233,14 @@ refacAddCon args
 
 -- ---------------------------------------------------------------------
 
+doRefactoring :: GHC.LHsDecl GHC.RdrName
+              -> GHC.Name
+              -> String
+              -> [String]
+              -> GHC.ParsedSource
+              -> RefactGhc ()
 doRefactoring datDec datName fName fType t = do
+  nm <- getRefactNameMap
   t2 <- addField datDec datName fName fType t
   let
     fileName = assert False undefined
@@ -241,9 +248,16 @@ doRefactoring datDec datName fName fType t = do
     newPN    = assert False undefined
     newPNT   = assert False undefined
     numParam = assert False undefined
-    oldPnames = assert False undefined
+    oldPnames = getConNames nm datDec
   t3 <- addCon fileName datName pnames newPN newPNT numParam oldPnames (assert False undefined) (assert False undefined) fType t2
   putRefactParsed t3 mempty
+
+-- ---------------------------------------------------------------------
+
+getConNames :: (SYB.Data t) => NameMap -> t -> [GHC.Name]
+getConNames nm t = SYB.everything (++) ([] `SYB.mkQ` inCon) t
+  where
+    inCon (GHC.ConDecl ns _ _ _ _ _ _ _) = map (rdrName2NamePure nm) ns
 
 -- ---------------------------------------------------------------------
 
@@ -597,7 +611,7 @@ countCon' co
 
 -- ---------------------------------------------------------------------
 
-addCon :: FilePath -> GHC.Name -> GHC.Name -> d -> e -> f -> [GHC.Name] -> h -> i -> [String] -> GHC.ParsedSource -> RefactGhc GHC.ParsedSource
+addCon :: FilePath -> GHC.Name -> GHC.Name -> d -> e -> Int -> [GHC.Name] -> h -> i -> [String] -> GHC.ParsedSource -> RefactGhc GHC.ParsedSource
 addCon fileName datName pnames newPn newPNT numParam oldPnames  position inf xs parsed
  = do
       newFun <- createFun xs newPn (showGhc datName)
@@ -657,7 +671,10 @@ findPosBefore newPN (x:y:ys)
 
 -- ---------------------------------------------------------------------
 
-findFuncs :: (SYB.Data t) => NameMap -> FilePath -> GHC.Name -> t -> b -> c -> d -> e -> [GHC.Name] -> g -> h -> [i] -> RefactGhc t
+-- |AZ: Seems to find all functions having multiple matches on the type having
+-- the new constructor, and adds one for the new constructor.
+-- TODO: maybe use the GHC exhaustiveness checker instead.
+findFuncs :: (SYB.Data t) => NameMap -> FilePath -> GHC.Name -> t -> b -> c -> d -> Int -> [GHC.Name] -> g -> h -> [i] -> RefactGhc t
 findFuncs nm fileName datName t pnames newPn newPNT numParam oldPnames position inf (x:xs) = do
   logm "findFuncs is a nop"
   applyTP (stop_tdTP (failTP `adhocTP` inFun
@@ -666,13 +683,12 @@ findFuncs nm fileName datName t pnames newPn newPNT numParam oldPnames position 
     where
     inFunDecl :: GHC.LHsDecl GHC.RdrName -> RefactGhc (GHC.LHsDecl GHC.RdrName)
     inFunDecl (GHC.L l (GHC.ValD f@(GHC.FunBind{}))) = do
-      logm "findFuncs.inFunDecl"
       (GHC.L l' f') <- inFun (GHC.L l f)
-      logm "findFuncs.inFunDecl ending"
       return (GHC.L l' (GHC.ValD f'))
+    inFunDecl x = return x
 
     inFun :: GHC.LHsBind GHC.RdrName -> RefactGhc (GHC.LHsBind GHC.RdrName)
-    inFun dec1
+    inFun dec1@(GHC.L l (GHC.FunBind ln f (GHC.MG matches tys ty o) co fvs ti))
         = do
             -- logm "findFuncs.inFun"
             logDataWithAnns "findFuncs.inFun:dec1" dec1
@@ -690,37 +706,45 @@ findFuncs nm fileName datName t pnames newPn newPNT numParam oldPnames position 
                     --   update exp1 (newPat2 exp1) dec1
 
               Nothing -> do
-                error "findFuncs: still need else leg"
-              {-
-              do ((match,arity), patar) <- findFun dec1 modName
+                 ((match,arity), patar) <- findFun dec1
                  if match == False
                    then do  --error "not found"
                        fail ""
-                   else
-                     do  let funPNs = getPNs dec1
+                   else do
+                         let funPNs = getPNs nm dec1
+                         logm $ "dec1=" ++ showGhc dec1
+                         logm $ "(oldPnames,funPNs)=" ++ showGhc (oldPnames,funPNs)
                          if oldPnames /= funPNs
                            then do
-                            let posBefore = findPosBefore newPn pnames
-                            if length posBefore > 1
-                             then do
-                              update dec1 (newMatch3 dec1 (head posBefore) arity patar) dec1
-                             else do
-                              update dec1 (newMatch dec1 arity patar) dec1
+                            error "findFuncs: still need else leg 1"
+                            -- let posBefore = findPosBefore newPn pnames
+                            -- if length posBefore > 1
+                            --  then do
+                            --   update dec1 (newMatch3 dec1 (head posBefore) arity patar) dec1
+                            --  else do
+                            --   update dec1 (newMatch dec1 arity patar) dec1
                            else do
-                           update dec1 (newMatch2 dec1 arity patar) dec1
+                            error "findFuncs: still need else leg 2"
+                           -- update dec1 (newMatch2 dec1 arity patar) dec1
                        where
-                        newMatch (Dec (HsFunBind loc1 matches@((HsMatch _ pnt p e ds):ms)))  arity patar
-                          =  Dec (HsFunBind loc1 (newMatches matches pnt arity patar (length p)))
+                        -- newMatch (Dec (HsFunBind loc1 matches@((HsMatch _ pnt p e ds):ms)))  arity patar
+                        --   =  Dec (HsFunBind loc1 (newMatches matches pnt arity patar (length p)))
 
-                        newMatch2 (Dec (HsFunBind loc1 matches@((HsMatch _ pnt p e ds):ms) )) arity patar
-                          = Dec (HsFunBind loc1 (fst ++ (newMatch' pnt arity patar(length p)) ++ snd) )
-                            where
-                              (fst, snd) = splitAt position matches
+                        newMatch2 (GHC.L l (GHC.FunBind ln i (GHC.MG matches tys rty o) co fvs t) ) arity
+                          = (GHC.L l (GHC.FunBind ln i (GHC.MG matches' tys rty o) co fvs t) )
+                          where
+                            matches' = matches ++ newMatch
+                            newMatch = newMatch' arity
+                        -- newMatch2 (Dec (HsFunBind loc1 matches@((HsMatch _ pnt p e ds):ms) )) arity patar
+                        --   = Dec (HsFunBind loc1 (fst ++ (newMatch' pnt arity patar(length p)) ++ snd) )
+                        --     where
+                        --       (fst, snd) = splitAt position matches
 
-                        newMatch3 (Dec (HsFunBind loc1 matches@((HsMatch _ pnt p e ds):ms))) posBefore arity patar
-                          = Dec (HsFunBind loc1 (newMatches' matches pnt posBefore arity patar (length p)))
+                        -- newMatch3 (Dec (HsFunBind loc1 matches@((HsMatch _ pnt p e ds):ms))) posBefore arity patar
+                        --   = Dec (HsFunBind loc1 (newMatches' matches pnt posBefore arity patar (length p)))
 
 
+              {-
                         newMatches [] pnt position arity patar = newMatch' pnt position arity patar
                         newMatches (m@(HsMatch _ _ pats _ _):ms) pnt position arity patar
                          | or (map wildOrID pats) = (newMatch' pnt position arity patar) ++ (m : ms)
@@ -732,7 +756,10 @@ findFuncs nm fileName datName t pnames newPn newPNT numParam oldPnames position 
                          | or (map wildOrID pats) = (newMatch' pnt position arity patar) ++ (m : ms)
       --                   | (TiDecorate.Pat HsPWildCard) `elem` pats = (newMatch' pnt) ++ (m : ms)
                          | otherwise      = m : (newMatches' ms pnt posBefore position arity patar)
+-}
 
+                        newMatch' arity = error "newMatch'"
+{-
                         newMatch' pnt arity  patar position
                   --       | numParam == 0  =  [HsMatch loc0 pnt [pNtoPat newPn] (HsBody (nameToExp ("added" ++ x))) []  ]
                           = createMatch arity ['a'..'z'] patar
@@ -1118,6 +1145,24 @@ findFuncs fileName datName t pnames newPn newPNT numParam oldPnames position inf
                  -- inExp _ = Nothing
     findCase pat@(_) _ =  return (False, defaultExp)
 -}
+-- ---------------------------------------------------------------------
+
+-- | getPNs take a declaration and returns all the PNames within that declaration
+-- getPNs :: HsDeclP -> [PName]
+getPNs nm (GHC.L _ (GHC.FunBind ln _ (GHC.MG ms _ _ _) _ _ _ )::GHC.LHsBind GHC.RdrName)
+ = checkMatch ms
+    where
+          checkMatch :: [GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName)] -> [GHC.Name]
+          checkMatch [] = []
+          checkMatch ((GHC.L _ (GHC.Match _ (p:ps) ty grhss )):ms)
+            = (getPN p) ++ checkMatch ms
+          getPN p = SYB.everything (++) ([] `SYB.mkQ` getCon) p
+            where
+              getCon :: GHC.LPat GHC.RdrName -> [GHC.Name]
+              getCon (GHC.L _ (GHC.ConPatIn ln _)) = [rdrName2NamePure nm ln]
+              getCon _                             = []
+getPNs _ _ = []
+
 -- ---------------------------------------------------------------------
 {-
 flatternPat :: HsPatP -> [HsPatP]

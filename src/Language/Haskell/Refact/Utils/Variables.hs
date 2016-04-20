@@ -725,7 +725,7 @@ definingDeclsRdrNames nameMap pns ds _incTypeSig recursive = concatMap defining 
       definesDecl decl'@(GHC.L _l (GHC.ValD (GHC.PatBind _p _rhs _ty _fvs _)))
         | any (\n -> definesDeclRdr nameMap n decl') pns = [decl']
 
-      definesDecl decl'@(GHC.L _ (GHC.TyClD (GHC.DataDecl ln bndrs (GHC.HsDataDefn _ _cxt _ _ cons _) _fvs)))
+      definesDecl decl'@(GHC.L _ (GHC.TyClD (GHC.DataDecl ln _bndrs (GHC.HsDataDefn _ _cxt _ _ cons _) _fvs)))
        = if checkCons cons then [decl']
                            else []
              where
