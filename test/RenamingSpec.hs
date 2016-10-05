@@ -465,6 +465,26 @@ spec = do
 
     -- ---------------------------------
 
+    it "renames in QualServer1 QualClient1" $ do
+     r <- ct $ rename defaultTestSettings testOptions  "./Renaming/QualServer1.hs" "field1" (4,15)
+     -- r <- ct $ rename logTestSettings testOptions  "./Renaming/QualServer1.hs" "field1" (4,15)
+
+     r' <- ct $ mapM makeRelativeToCurrentDirectory r
+
+     r' `shouldBe` ["Renaming/QualServer1.hs",
+                    "Renaming/QualClient1.hs"
+                  ]
+
+     diffD <- ct $ compareFiles "./Renaming/QualServer1.expected.hs"
+                                "./Renaming/QualServer1.refactored.hs"
+     diffD `shouldBe` []
+
+     diffC <- ct $ compareFiles "./Renaming/QualClient1.expected.hs"
+                                "./Renaming/QualClient1.refactored.hs"
+     diffC `shouldBe` []
+
+    -- ---------------------------------
+
     it "renames in lib and in main 1" $ do
      let ct4 = cdAndDo "./test/testdata/cabal/cabal4"
      r <- ct4 $ rename defaultTestSettings testOptions  "./src/Foo/Bar.hs" "baz1" (3,1)
