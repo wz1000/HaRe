@@ -12,6 +12,9 @@ Library
                         , syb
   GHC-Options:            -W
   default-language:    Haskell2010
+  exposed-modules:
+                  Renaming.QualClient1
+                , Renaming.QualServer1
 
 Executable RenamingMain
   Main-Is: ./Renaming/Main.hs

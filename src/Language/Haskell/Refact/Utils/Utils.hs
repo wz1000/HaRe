@@ -503,12 +503,11 @@ writeRefactoredFiles verbosity files
 -- module, say m, are those modules which directly or indirectly
 -- import module m.
 
--- clientModsAndFiles :: GHC.ModuleName -> RefactGhc [TargetModule]
 clientModsAndFiles :: GM.ModulePath -> RefactGhc [TargetModule]
 -- TODO: Use ghc-mod cache if there is a cabal file, else normal GHC modulegraph
 clientModsAndFiles m = do
   mgs <- cabalModuleGraphs
-  -- logm $ "clientModsAndFiles:mgs=" ++ show mgs
+  logm $ "clientModsAndFiles:mgs=" ++ show mgs
   -- mgs is [Map ModulePath (Set ModulePath)]
   --  where eack key imports the corresponding set.
   -- There are no cycles

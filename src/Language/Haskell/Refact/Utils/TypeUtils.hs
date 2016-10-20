@@ -2181,12 +2181,12 @@ renamePN oldPN newName useQual t = do
      nm <- getRefactNameMap
      if cond nm old
        then do
-          logDataWithAnns "renamePN:rename old :" old
+          -- logDataWithAnns "renamePN:rename old :" old
           -- let nn = newNameCalcBool useQual' n
           let nn = newNameCalc useQual' n
           new <- makeNewName old nn
-          logDataWithAnns "renamePN:rename new :" new
-          logDataWithAnns "renamePN:rename old2 :" old
+          -- logDataWithAnns "renamePN:rename new :" new
+          -- logDataWithAnns "renamePN:rename old2 :" old
           return new
        else return old
 
