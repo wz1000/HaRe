@@ -36,6 +36,8 @@ module Language.Haskell.Refact.Utils.Monad
        , canonicalizeModSummary
 
        , logm
+       , logt
+       , setupLogger
        ) where
 
 
@@ -57,7 +59,13 @@ import Language.Haskell.Refact.Utils.Types
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Utils
 import System.Directory
-import System.Log.Logger
+-- import System.Log.Logger
+import System.IO
+import qualified System.Log.Logger         as L
+import qualified System.Log.Formatter      as L
+import qualified System.Log.Handler        as LH
+import qualified System.Log.Handler.Simple as LHS
+
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -297,17 +305,52 @@ logm string = do
   let loggingOn = (rsetVerboseLevel settings == Debug)
              --     || (rsetVerboseLevel settings == Normal)
   when loggingOn $ do
-     -- ts <- liftIO timeStamp
-     -- liftIO $ warningM "HaRe" (ts ++ ":" ++ string)
-     liftIO $ warningM "HaRe" (string)
+     liftIO $ L.warningM _LOG_NAME (string)
   return ()
 
-{-
-timeStamp :: IO String
-timeStamp = do
-  k <- getCurrentTime
-  return (show k)
--}
+-- ---------------------------------------------------------------------
+
+-- |For logging timing info
+logt :: String -> RefactGhc ()
+logt string = do
+  settings <- getRefacSettings
+  let loggingOn = True
+  -- let loggingOn = (rsetVerboseLevel settings == Debug)
+             --     || (rsetVerboseLevel settings == Normal)
+  when loggingOn $ do
+     liftIO $ L.warningM _TIMING_LOG_NAME (string)
+  return ()
+
+-- ---------------------------------------------------------------------
+
+setupLogger :: FilePath -> L.Priority -> IO ()
+setupLogger logFile level = do
+
+  logStream <- openFile logFile AppendMode
+  hSetEncoding logStream utf8
+
+  logH <- LHS.streamHandler logStream level
+
+  let logHandle  = logH {LHS.closeFunc = hClose}
+      logFormat  = L.tfLogFormatter _LOG_FORMAT_DATE _LOG_FORMAT
+      logHandler = LH.setFormatter logHandle logFormat
+
+  L.updateGlobalLogger L.rootLoggerName $ L.setHandlers ([] :: [LHS.GenericHandler Handle])
+  L.updateGlobalLogger _LOG_NAME $ L.setHandlers [logHandler]
+  L.updateGlobalLogger _LOG_NAME $ L.setLevel level
+
+_LOG_NAME :: String
+_LOG_NAME = "HaRe"
+
+_TIMING_LOG_NAME :: String
+_TIMING_LOG_NAME = "HaRe"
+
+_LOG_FORMAT :: String
+_LOG_FORMAT = "$time [$tid] $prio $loggername - $msg"
+
+_LOG_FORMAT_DATE :: String
+-- _LOG_FORMAT_DATE = "%Y-%m-%d %H:%M:%S"
+_LOG_FORMAT_DATE = "%Y-%m-%d %H:%M:%S%Q"
 
 -- ---------------------------------------------------------------------
 

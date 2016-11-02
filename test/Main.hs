@@ -3,7 +3,9 @@
 
 module Main where
 
+import Language.Haskell.Refact.Utils.Monad
 import Control.Monad
+import System.Log.Logger
 import TestUtils
 import qualified Turtle as Tu
 import qualified Control.Foldl as Fold
@@ -15,6 +17,7 @@ import qualified Spec
 
 main :: IO ()
 main = do
+  setupLogger "./test-timing.log" DEBUG
   cleanupDirs (Tu.ends "/.stack-work")
   cleanupDirs (Tu.ends "/dist")
   setupStackFiles

@@ -40,10 +40,8 @@ import Data.List
 import Data.Maybe
 import Data.IORef
 
--- import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Preprocess
 import Language.Haskell.GHC.ExactPrint.Print
--- import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Utils
 
 import qualified Language.Haskell.GhcMod          as GM
@@ -64,7 +62,6 @@ import qualified Hooks         as GHC
 import qualified HscMain       as GHC
 import qualified HscTypes      as GHC
 import qualified TcRnMonad     as GHC
--- import qualified TcRnTypes     as GHC
 
 -- import qualified GHC.SYB.Utils as SYB
 -- import qualified Data.Generics as SYB
@@ -89,38 +86,26 @@ getTargetGhc :: TargetModule -> RefactGhc ()
 getTargetGhc (GM.ModulePath _mn fp) = parseSourceFileGhc fp
 
 -- ---------------------------------------------------------------------
-{-
--- | Parse a single source file into a GHC session
-parseSourceFileGhc' :: FilePath -> RefactGhc ()
-parseSourceFileGhc' targetFile = do
-  logm $ "parseSourceFileGhc:targetFile=" ++ show targetFile
-  setTargetSession targetFile
-  graph  <- GHC.getModuleGraph
-  cgraph <- canonicalizeGraph graph
-  cfileName <- liftIO $ canonicalizePath targetFile
-  let mm = filter (\(mfn,_ms) -> mfn == Just cfileName) cgraph
-  case mm of
-    [(_,modSum)] -> loadFromModSummary Nothing modSum
-    _ -> error $ "HaRe:unexpected error parsing " ++ targetFile
--}
--- ---------------------------------------------------------------------
 
 -- | Parse a single source file into a GHC session
 parseSourceFileGhc :: FilePath -> RefactGhc ()
 parseSourceFileGhc targetFile = do
+  logt "parseSourceFileGhc entered"
   logm $ "parseSourceFileGhc:targetFile=" ++ show targetFile
   cfileName <- liftIO $ canonicalizePath targetFile
   logm $ "parseSourceFileGhc:cfileName=" ++ show cfileName
   ref <- liftIO $ newIORef (cfileName,Nothing)
   let
     setTarget fileName = RefactGhc $ GM.runGmlT' [Left fileName] (installHooks ref) (return ())
-  -- setTarget targetFile
+  logt "parseSourceFileGhc calling setTarget"
   setTarget cfileName
+  logt "parseSourceFileGhc setTarget done"
   logm $ "parseSourceFileGhc:after setTarget"
   (_,mtm) <- liftIO $ readIORef ref
   logm $ "parseSourceFileGhc:isJust mtm:" ++ show (isJust mtm)
   graph  <- GHC.getModuleGraph
   cgraph <- canonicalizeGraph graph
+  logt "parseSourceFileGhc canonicalizeGraph done"
   let mm = filter (\(mfn,_ms) -> mfn == Just cfileName) cgraph
   case mm of
     [(_,modSum)] -> loadFromModSummary mtm modSum
@@ -229,6 +214,7 @@ tweakModSummaryDynFlags ms =
 -- into the RefactGhc monad
 loadFromModSummary :: Maybe TypecheckedModule -> GHC.ModSummary -> RefactGhc ()
 loadFromModSummary mtm modSum = do
+  logt "loadFromModSummary entered"
   logm $ "loadFromModSummary:modSum=" ++ show modSum
   t <- case mtm of
     Nothing -> do
@@ -288,6 +274,7 @@ loadFromModSummary mtm modSum = do
 
     Nothing -> putModule
 
+  logt "loadFromModSummary done"
   return ()
 
 -- ---------------------------------------------------------------------

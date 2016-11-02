@@ -18,7 +18,7 @@ module Language.Haskell.Refact.API
        , defaultSettings
        , logSettings
 
-       , logm
+       , logm, logt
        , logDataWithAnns
        , logExactprint
        , logParsedSource

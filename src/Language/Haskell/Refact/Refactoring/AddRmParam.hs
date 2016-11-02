@@ -48,6 +48,7 @@ addOneParameter settings opts fileName paramName (row,col) = do
 
 compAddOneParameter :: FilePath -> String -> SimpPos -> RefactGhc [ApplyRefacResult]
 compAddOneParameter fileName paramName (row, col) = do
+  logt "compAddOneParameter entered"
   if isVarId paramName
     then
       do
@@ -76,10 +77,12 @@ compAddOneParameter fileName paramName (row, col) = do
                      (refactoredMod,_) <- applyRefac (doAddingParam pn paramName (Just defaultArg) True) RSAlreadyLoaded
                      refactoredClients <- mapM (addArgInClientMod pn defaultArg) clients
                      -- let refactoredClients = []
+                     logt "compAddOneParameter done"
                      return $ refactoredMod:refactoredClients
                     else do
                      logm $ "compAdd:not exported"
                      (refactoredMod,_) <- applyRefac (doAddingParam pn paramName Nothing False) (RSFile fileName)
+                     logt "compAddOneParameter done"
                      return [refactoredMod]
 
                else error "Invalid cursor position or identifier is not a function/pattern name defined in this module!\n"
