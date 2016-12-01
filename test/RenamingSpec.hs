@@ -493,6 +493,20 @@ spec = do
 
     -- ---------------------------------
 
+    it "renames an import qualificaton" $ do
+     r <- ct $ rename defaultTestSettings testOptions  "./Renaming/QualClient.hs" "QS1" (7,41)
+     -- r <- ct $ rename logTestSettings testOptions  "./Renaming/QualClient.hs" "QS1" (7,41)
+
+     r' <- ct $ mapM makeRelativeToCurrentDirectory r
+
+     r' `shouldBe` ["Renaming/QualClient.hs"]
+
+     diffC <- ct $ compareFiles "./Renaming/QualClient.expected1.hs"
+                                "./Renaming/QualClient.refactored.hs"
+     diffC `shouldBe` []
+
+    -- ---------------------------------
+
     it "renames in lib and in main 1" $ do
      let ct4 = cdAndDo "./test/testdata/cabal/cabal4"
      r <- ct4 $ rename defaultTestSettings testOptions  "./src/Foo/Bar.hs" "baz1" (3,1)

@@ -142,6 +142,27 @@ Library
         -- real	0m36.427s
         -- user 0m41.448s
         -- sys 0m2.544s
+
+
+        -- Running tests, with and without -O0
+        -- With optimisation:
+
+           -- Finished in 405.8255 seconds
+           -- 392 examples, 0 failures, 44 pending
+
+           -- real	6m45.945s
+           -- user	6m28.504s
+           -- sys	0m23.356s
+
+        -- Without optimisation
+
+          -- Finished in 407.8639 seconds
+          -- 392 examples, 0 failures, 44 pending
+
+          -- real	6m47.976s
+          -- user	6m30.724s
+          -- sys	0m23.296s
+
         GHC-Options:            -O0
         Hs-Source-Dirs:         src
         -- Other-Modules:          Paths_HaRe
