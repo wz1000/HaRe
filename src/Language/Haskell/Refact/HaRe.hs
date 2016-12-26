@@ -25,6 +25,7 @@ module Language.Haskell.Refact.HaRe
 -- , introduceTypeSyn
 -- , unwrapTypeSyn
  , genApplicative
+ , hughesList
  )
 where
 
@@ -38,6 +39,7 @@ import Language.Haskell.Refact.Refactoring.DeleteDef
 --import Language.Haskell.Refact.Refactoring.UnwrapTypeSyn
 import Language.Haskell.Refact.Refactoring.GenApplicative
 -- import Language.Haskell.Refact.Refactoring.SwapArgs
+import Language.Haskell.Refact.Refactoring.HughesList
 import Language.Haskell.Refact.Refactoring.RoundTrip
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.Types

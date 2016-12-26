@@ -1,0 +1,8 @@
+module HList1 where
+
+data Tree a = Leaf
+            | Node (Tree a) a (Tree a)
+
+toList :: Tree a -> [a]
+toList Leaf = []
+toList Node left x right = [x] ++ (toList left) ++ (toList right)
