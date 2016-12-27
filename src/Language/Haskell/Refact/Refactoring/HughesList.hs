@@ -74,8 +74,7 @@ fixTypeSig = SYB.everywhereM (SYB.mkM replaceList)
         replaceList (GHC.L l (GHC.HsListTy innerTy)) = do
           let dlistFS = GHC.fsLit "DList"
               dlistUq = GHC.mkVarUnqual dlistFS
-          dlistTy <- constructLHsTy dlistUq
-          addAnnVal dlistTy
+          dlistTy <- constructLHsTy dlistUq          
           setDP (DP (0,1)) innerTy
           return (GHC.L l (GHC.HsAppTy dlistTy innerTy))
         replaceList x = return x
