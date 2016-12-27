@@ -274,6 +274,8 @@ module Language.Haskell.Refact.API
   , replaceTypeSig
   , replaceFunBind
   , addBackquotes
+  , constructLHsTy
+  , constructHsVar
 -- from Language.Haskell.Refact.Utils.Query
   , getVarAndRHS
   , getHsBind

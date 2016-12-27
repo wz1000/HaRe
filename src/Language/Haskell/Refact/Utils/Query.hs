@@ -51,7 +51,11 @@ getTypeSig pos funNm a =
     Nothing -> Nothing
     (Just (GHC.L _ rNm)) -> SYB.everything (<|>) (Nothing `SYB.mkQ` isSig) a
       where
+#if __GLASGOW_HASKELL__ <= 710
         isSig ty@(GHC.TypeSig [(GHC.L _ nm)] _ _) = if nm == rNm
+#else
+        isSig ty@(GHC.TypeSig [(GHC.L _ nm)] _) = if nm == rNm
+#endif
                                                     then (Just ty)
                                                     else Nothing
         isSig _ = Nothing

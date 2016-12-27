@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Language.Haskell.Refact.Refactoring.HughesList
        (hughesList, compHughesList) where
 
@@ -73,7 +74,7 @@ fixTypeSig = SYB.everywhereM (SYB.mkM replaceList)
         replaceList (GHC.L l (GHC.HsListTy innerTy)) = do
           let dlistFS = GHC.fsLit "DList"
               dlistUq = GHC.mkVarUnqual dlistFS
-          dlistTy <- locate (GHC.HsTyVar dlistUq)
+          dlistTy <- constructLHsTy dlistUq
           addAnnVal dlistTy
           setDP (DP (0,1)) innerTy
           return (GHC.L l (GHC.HsAppTy dlistTy innerTy))
@@ -84,16 +85,21 @@ fixFunBind :: GHC.RdrName -> GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC
 fixFunBind funRdr bind = do
   SYB.everywhereM (SYB.mkM comp) bind
   where comp :: ParsedLExpr -> RefactGhc ParsedLExpr
+#if __GLASGOW_HASKELL__ <= 710
         comp lVar@(GHC.L l (GHC.HsVar vNm))
+#else
+        comp lVar@(GHC.L l (GHC.HsVar (GHC.L _ vNm)))
+#endif
           | (GHC.isExact vNm) && (GHC.occNameString (GHC.rdrNameOcc vNm)) == "[]" =
             do
               let emptyRdr = GHC.mkVarUnqual (GHC.fsLit "empty")
-              newVar <- locate (GHC.HsVar emptyRdr)
+              newVar <- constructHsVar emptyRdr
               addAnnVal newVar
               return newVar
           | (GHC.occNameString (GHC.rdrNameOcc vNm)) == "++" =
             do
-              newVar <- locate (GHC.HsVar appendRdr)
+              
+              newVar <- constructHsVar appendRdr
               addAnnVal newVar
               addBackquotes newVar
               return newVar
@@ -101,14 +107,14 @@ fixFunBind funRdr bind = do
         comp lit@(GHC.L _ (GHC.ExplicitList _ _ exprs)) = do
           expr <- if (length exprs) == 1
                   then do
-                     singleton <- locate (GHC.HsVar singletonRdr)
+                     singleton <- constructHsVar singletonRdr
                      addAnnVal singleton
                      zeroDP singleton
                      let right = (exprs !! 0)
                      setDP (DP (0,1)) right
                      return (GHC.HsApp singleton right)
                   else do
-                     fList <- locate (GHC.HsVar fromListRdr)
+                     fList <- constructHsVar fromListRdr
                      addAnnVal fList
                      return (GHC.HsApp fList lit)
           lExpr <- locate expr
@@ -119,5 +125,4 @@ fixFunBind funRdr bind = do
         comp x = return x
         singletonRdr = GHC.mkVarUnqual (GHC.fsLit "singleton")
         fromListRdr = GHC.mkVarUnqual (GHC.fsLit "fromList")
-        appendRdr = GHC.mkVarUnqual (GHC.fsLit "append")
-                        
+        appendRdr = GHC.mkVarUnqual (GHC.fsLit "append")                        

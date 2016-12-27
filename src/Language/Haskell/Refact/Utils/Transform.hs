@@ -11,6 +11,8 @@ module Language.Haskell.Refact.Utils.Transform
   , replaceTypeSig
   , replaceFunBind
   , addBackquotes
+  , constructLHsTy
+  , constructHsVar
   ) where
 
 import qualified GHC as GHC
@@ -124,7 +126,11 @@ replaceTypeSig pos sig = do
   newParsed <- SYB.everywhereM (SYB.mkM (comp rdrNm)) parsed
   putRefactParsed newParsed emptyAnns
     where comp :: GHC.RdrName -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
+#if __GLASGOW_HASKELL__ <= 710
           comp nm oldTy@(GHC.TypeSig [(GHC.L _ oldNm)]  _ _)
+#else
+          comp nm oldTy@(GHC.TypeSig [(GHC.L _ oldNm)]  _)         
+#endif
             | oldNm == nm = return sig
             | otherwise = return oldTy
           comp _ x = return x
@@ -137,7 +143,11 @@ replaceFunBind pos bnd = do
   newParsed <- SYB.everywhereM (SYB.mkM (comp rdrNm)) parsed
   putRefactParsed newParsed emptyAnns
     where comp :: GHC.RdrName -> GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
+#if __GLASGOW_HASKELL__ <= 710          
           comp nm b@(GHC.FunBind (GHC.L _ id) _ _ _ _ _)
+#else
+          comp nm b@(GHC.FunBind (GHC.L _ id) _ _ _ _)
+#endif
             | id == nm = return bnd
             | otherwise = return b
           comp _ x = return x
@@ -153,4 +163,26 @@ addBackquotes var@(GHC.L l _) = do
       newLst = bqtAnn:(annsLst++[bqtAnn])
       newAnn = oldAnn {annsDP = newLst}
   addAnn var newAnn
-  
+
+
+--The next two functions construct variables and type variables respectively from RdrNames.
+--They keep the amount of CPP in refactoring code to a minimum.
+constructHsVar :: GHC.RdrName -> RefactGhc ParsedLExpr
+constructHsVar nm = do
+#if __GLASGOW_HASKELL__ <= 710
+  newVar <- locate (GHC.HsVar nm)
+#else
+  lNm <- locate nm
+  newVar <- locate (GHC.HsVar lNm)
+#endif
+  return newVar
+
+constructLHsTy :: GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
+constructLHsTy nm = do
+#if __GLASGOW_HASKELL__ <= 710
+  newTy <- locate (GHC.HsTyVar nm)
+#else
+  lNm <- locate nm
+  newTy <- locate (GHC.HsTyVar lNm)
+#endif
+  return newTy    
