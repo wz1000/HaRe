@@ -93,13 +93,10 @@ fixFunBind funRdr bind = do
             do
               let emptyRdr = GHC.mkVarUnqual (GHC.fsLit "empty")
               newVar <- constructHsVar emptyRdr
-              addAnnVal newVar
               return newVar
           | (GHC.occNameString (GHC.rdrNameOcc vNm)) == "++" =
-            do
-              
+            do              
               newVar <- constructHsVar appendRdr
-              addAnnVal newVar
               addBackquotes newVar
               return newVar
           | otherwise = return lVar
@@ -114,7 +111,6 @@ fixFunBind funRdr bind = do
                      return (GHC.HsApp singleton right)
                   else do
                      fList <- constructHsVar fromListRdr
-                     addAnnVal fList
                      return (GHC.HsApp fList lit)
           lExpr <- locate expr
           zeroDP lExpr

@@ -177,6 +177,7 @@ constructHsVar nm = do
   zeroDP lNm
   newVar <- locate (GHC.HsVar lNm)
 #endif
+  addAnnVal newVar
   return newVar
 
 constructLHsTy :: GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
@@ -189,4 +190,5 @@ constructLHsTy nm = do
   zeroDP lNm
   newTy <- locate (GHC.HsTyVar lNm)
 #endif
+  addAnnVal newTy
   return newTy    
