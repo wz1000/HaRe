@@ -173,6 +173,7 @@ constructHsVar nm = do
   newVar <- locate (GHC.HsVar nm)
 #else
   lNm <- locate nm
+  addAnnVal lNm
   newVar <- locate (GHC.HsVar lNm)
 #endif
   return newVar
@@ -183,6 +184,7 @@ constructLHsTy nm = do
   newTy <- locate (GHC.HsTyVar nm)
 #else
   lNm <- locate nm
+  addAnnVal lNm
   newTy <- locate (GHC.HsTyVar lNm)
 #endif
   return newTy    
