@@ -271,10 +271,15 @@ module Language.Haskell.Refact.API
   , addNewLines
   , wrapInParsWithDPs
   , locate
+  , replaceTypeSig
+  , replaceFunBind
+  , addBackquotes
 -- from Language.Haskell.Refact.Utils.Query
   , getVarAndRHS
   , getHsBind
+  , getTypeSig
   , isHsVar
+  , astCompare
  ) where
 
 import Language.Haskell.Refact.Utils.ExactPrint

@@ -283,6 +283,7 @@ test-suite spec
     , conversion
     , conversion-text
     , parsec
+    , dlist              
     , case-insensitive          
     , HaRe >= 0.8.2.1
   Extensions:      CPP

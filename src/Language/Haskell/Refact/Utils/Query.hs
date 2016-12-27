@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE Rank2Types #-}
 module Language.Haskell.Refact.Utils.Query where
 --This module contains functions that retrieve sections of the ast. It is fairly high level.
 
@@ -40,6 +41,21 @@ getHsBind pos funNm a =
             | name == rNm = (Just bnd)
         isBind _ = Nothing
 
+--This looks up the type signature of the given identifier.
+--The given position is assumed to be the location of where the identifier is defined
+--NOT the location of the type signature 
+getTypeSig :: (Data a) => SimpPos -> String -> a -> Maybe (GHC.Sig GHC.RdrName)
+getTypeSig pos funNm a =
+  let rdrNm = locToRdrName pos a in
+  case rdrNm of
+    Nothing -> Nothing
+    (Just (GHC.L _ rNm)) -> SYB.everything (<|>) (Nothing `SYB.mkQ` isSig) a
+      where
+        isSig ty@(GHC.TypeSig [(GHC.L _ nm)] _ _) = if nm == rNm
+                                                    then (Just ty)
+                                                    else Nothing
+        isSig _ = Nothing
+
 --It's common to want to know if an expression is just a certain var
 --This function takes a String of the var and returns true of the given expression represents that var
 isHsVar :: String -> ParsedExpr -> Bool
@@ -51,3 +67,15 @@ isHsVar str (GHC.HsVar (GHC.L _ rNm)) =
   let nm = mkVarUnqual (fsLit str) in
     rNm == nm
 isHsVar _ _ = False
+
+astCompare :: (Data a) => a -> a -> Bool
+astCompare = geq `extTwinQ` rdrComp
+  where rdrComp :: GHC.RdrName -> GHC.RdrName -> Bool
+        rdrComp = (==)
+
+extTwinQ :: (Typeable a, Typeable b) => (a -> a -> r) -> (b -> b -> r) -> a -> a -> r
+extTwinQ f g a1 a2 =
+  case mr of
+    Nothing -> f a1 a2
+    (Just r) -> r
+  where mr = cast a1 >>= (\b1 -> cast a2 >>= (\b2 -> Just $ g b1 b2))                        

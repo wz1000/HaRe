@@ -8,18 +8,24 @@ module Language.Haskell.Refact.Utils.Transform
   , addNewLines
   , locate
   , removePars
+  , replaceTypeSig
+  , replaceFunBind
+  , addBackquotes
   ) where
 
 import qualified GHC as GHC
 import qualified BasicTypes as GHC
 import qualified Data.Map as Map
 import Data.Data
+import qualified Data.Generics as SYB
 
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
 
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.MonadFunctions
+import Language.Haskell.Refact.Utils.Types
+import Language.Haskell.Refact.Utils.Utils
 import Language.Haskell.Refact.Utils.TypeUtils
 import Language.Haskell.Refact.Utils.Synonyms
 import Language.Haskell.Refact.Utils.ExactPrint
@@ -93,7 +99,6 @@ removePars (GHC.L _ (GHC.HsPar expr)) = do
   setDP (DP (0,1)) expr
   return expr
 removePars expr = return expr
-
   
 --Takes a piece of AST and adds an n row offset
 addNewLines :: (Data a) => Int -> GHC.Located a -> RefactGhc ()
@@ -109,3 +114,43 @@ addNewLines n ast = do
           newAnn = v {annEntryDelta = newDP}
           newAnns = Map.insert key newAnn currAnns
       setRefactAnns newAnns
+
+
+--This function replaces the type signature of the function that is defined at the simple position
+replaceTypeSig :: SimpPos -> GHC.Sig GHC.RdrName -> RefactGhc ()
+replaceTypeSig pos sig = do
+  parsed <- getRefactParsed
+  let (Just (GHC.L _ rdrNm)) = locToRdrName pos parsed
+  newParsed <- SYB.everywhereM (SYB.mkM (comp rdrNm)) parsed
+  putRefactParsed newParsed emptyAnns
+    where comp :: GHC.RdrName -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
+          comp nm oldTy@(GHC.TypeSig [(GHC.L _ oldNm)]  _ _)
+            | oldNm == nm = return sig
+            | otherwise = return oldTy
+          comp _ x = return x
+
+--Replaces the HsBind at the given position
+replaceFunBind :: SimpPos -> GHC.HsBind GHC.RdrName -> RefactGhc ()
+replaceFunBind pos bnd = do
+  parsed <- getRefactParsed
+  let (Just (GHC.L _ rdrNm)) = locToRdrName pos parsed
+  newParsed <- SYB.everywhereM (SYB.mkM (comp rdrNm)) parsed
+  putRefactParsed newParsed emptyAnns
+    where comp :: GHC.RdrName -> GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
+          comp nm b@(GHC.FunBind (GHC.L _ id) _ _ _ _ _)
+            | id == nm = return bnd
+            | otherwise = return b
+          comp _ x = return x
+              
+ 
+--Adds backquotes around a function call
+addBackquotes :: ParsedLExpr -> RefactGhc ()
+addBackquotes var@(GHC.L l _) = do
+  anns <- liftT getAnnsT
+  let (Just oldAnn) = Map.lookup (mkAnnKey var) anns
+      annsLst = annsDP oldAnn
+      bqtAnn = ((G GHC.AnnBackquote),DP (0,0))
+      newLst = bqtAnn:(annsLst++[bqtAnn])
+      newAnn = oldAnn {annsDP = newLst}
+  addAnn var newAnn
+  

@@ -6,4 +6,4 @@ data Tree a = Leaf
 
 enumerate :: Tree a -> DList a
 enumerate Leaf = empty
-enumerate (Node left x right) = (enumerate left) `append` (fromList [x]) `append` (enumerate right)
+enumerate (Node left x right) = (enumerate left) `append` (singleton x) `append` (enumerate right)

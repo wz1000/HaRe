@@ -6,4 +6,3 @@ data Tree a = Leaf
 enumerate :: Tree a -> [a]
 enumerate Leaf = []
 enumerate (Node left x right) = (enumerate left) ++ [x] ++ (enumerate right)
- 
