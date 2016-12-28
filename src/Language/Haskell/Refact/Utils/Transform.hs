@@ -172,6 +172,7 @@ constructHsVar nm = do
 #if __GLASGOW_HASKELL__ <= 710
   newVar <- locate (GHC.HsVar nm)
 #else
+  logm $ "New var construction ghc 8"
   lNm <- locate nm
   addAnnVal lNm
   zeroDP lNm
@@ -183,6 +184,7 @@ constructHsVar nm = do
 constructLHsTy :: GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
 constructLHsTy nm = do
 #if __GLASGOW_HASKELL__ <= 710
+  logm "New ty var ghc 7" 
   newTy <- locate (GHC.HsTyVar nm)
 #else
   lNm <- locate nm
@@ -191,4 +193,5 @@ constructLHsTy nm = do
   newTy <- locate (GHC.HsTyVar lNm)
 #endif
   addAnnVal newTy
+  zeroDP newTy
   return newTy    
