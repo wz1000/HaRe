@@ -77,7 +77,9 @@ fixTypeSig = SYB.everywhereM (SYB.mkM replaceList)
           dlistTy <- constructLHsTy dlistUq          
           setDP (DP (0,1)) innerTy
           lTy <- locate (GHC.HsAppTy dlistTy innerTy)
-#if __GLASGOW_HASKELL__ > 710
+#if __GLASGOW_HASKELL__ <= 710
+          addAnnVal lTy
+#else
           zeroDP lTy
 #endif          
           return lTy
