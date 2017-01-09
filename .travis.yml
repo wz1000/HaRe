@@ -58,6 +58,7 @@ install:
  - BENCH=${BENCH---enable-benchmarks}
  - TEST=${TEST---enable-tests}
  - travis_retry cabal update -v
+ - cabal install hspec-discover
  - sed -i 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config
  - rm -fv cabal.project.local
  - "echo 'packages: .' > cabal.project"
@@ -85,6 +86,8 @@ script:
  # this builds all libraries and executables (including tests/benchmarks)
  # - rm -rf ./dist-newstyle
  - cabal new-build -w ${HC} ${TEST} ${BENCH}
+ - cabal haddock
+ - cabal check
 
  # there's no 'cabal new-test' yet, so let's emulate for now
  - TESTS=( $(awk 'tolower($0) ~ /^test-suite / { print $2 }' *.cabal) )
