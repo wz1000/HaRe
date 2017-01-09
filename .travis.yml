@@ -58,8 +58,12 @@ install:
  - BENCH=${BENCH---enable-benchmarks}
  - TEST=${TEST---enable-tests}
  - travis_retry cabal update -v
+ # Make sure we have hspec-discover, and it can run
  - cabal install hspec-discover
  - export PATH=$HOME/.cabal/bin:$PATH
+ - which hspec-discover
+ - cabal new-build ${TEST} ${BENCH} --dep
+
  - sed -i 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config
  - rm -fv cabal.project.local
  - "echo 'packages: .' > cabal.project"
