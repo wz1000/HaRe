@@ -92,6 +92,8 @@ script:
  - rm -f cabal.project.freeze
  - cabal new-configure -w ${HC} --disable-tests --disable-benchmarks
  - cabal new-build -w ${HC} --disable-tests --disable-benchmarks
+ - ls -als dist-newstyle/build
+ - ls -als dist-newstyle/build/HaRe-0.8.3.0
  - cabal act-as-setup -- haddock --builddir=dist-newstyle/build/HaRe-0.8.3.0
  - cabal check
  # this builds all libraries and executables (including tests/benchmarks)
