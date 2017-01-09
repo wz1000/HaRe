@@ -94,7 +94,8 @@ script:
  # this builds all libraries and executables (including tests/benchmarks)
  # - rm -rf ./dist-newstyle
  - cabal new-build -w ${HC} ${TEST} ${BENCH}
- - cabal haddock
+ # - cabal haddock
+ - cabal act-as-setup -- haddock --builddir=dist-newstyle/build/HaRe-0.8.3.0
  - cabal check
 
  # there's no 'cabal new-test' yet, so let's emulate for now
