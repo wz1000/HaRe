@@ -90,12 +90,10 @@ script:
  - "echo 'packages: .' > cabal.project"
  # this builds all libraries and executables (without tests/benchmarks)
  - rm -f cabal.project.freeze
- - cabal new-configure -w ${HC} --disable-tests --disable-benchmarks
+ # - cabal new-configure -w ${HC} --disable-tests --disable-benchmarks
  - cabal new-build -w ${HC} --disable-tests --disable-benchmarks
- - pwd
- - find . | grep dist
- - ls -als /home/travis/build/alanz/HaRe/dist/HaRe-0.8.3.0/dist-newstyle/build
- - ls -als /home/travis/build/alanz/HaRe/dist/HaRe-0.8.3.0/dist-newstyle/build/HaRe-0.8.3.0
+ # - pwd
+ # - find . | grep dist
  - cabal act-as-setup -- haddock --builddir=./dist-newstyle/build/x86_64-linux/ghc-8.0.1/HaRe-0.8.3.0
  - cabal check
  # this builds all libraries and executables (including tests/benchmarks)
@@ -112,7 +110,8 @@ script:
    if dist-newstyle/build/**/$SRC_BASENAME/**/build/$T/$T; then echo "= $T OK =";
    else echo "= $T FAILED ="; RC=false; fi; done; $RC
 
- - emacs --version
- - emacs -Q --batch -L elisp -l elisp/tests/hare-tests.el -f ert-run-tests-batch-and-exit
+ # emacs tests do not currently do anything. Preferred integration is via haskell-ide-engine anyway
+ # - emacs --version
+ # - emacs -Q --batch -L elisp -l elisp/tests/hare-tests.el -f ert-run-tests-batch-and-exit
 
  # EOF
