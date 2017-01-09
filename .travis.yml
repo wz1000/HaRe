@@ -59,6 +59,7 @@ install:
  - TEST=${TEST---enable-tests}
  - travis_retry cabal update -v
  - cabal install hspec-discover
+ - export PATH=$HOME/.cabal/bin:$PATH
  - sed -i 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config
  - rm -fv cabal.project.local
  - "echo 'packages: .' > cabal.project"
