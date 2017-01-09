@@ -93,6 +93,7 @@ script:
  - cabal new-configure -w ${HC} --disable-tests --disable-benchmarks
  - cabal new-build -w ${HC} --disable-tests --disable-benchmarks
  - pwd
+ - find . | grep dist
  - ls -als /home/travis/build/alanz/HaRe/dist/HaRe-0.8.3.0/dist-newstyle/build
  - ls -als /home/travis/build/alanz/HaRe/dist/HaRe-0.8.3.0/dist-newstyle/build/HaRe-0.8.3.0
  - cabal act-as-setup -- haddock --builddir=/home/travis/build/alanz/HaRe/dist/HaRe-0.8.3.0/dist-newstyle/build/HaRe-0.8.3.0
