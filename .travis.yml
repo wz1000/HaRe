@@ -100,6 +100,7 @@ script:
  # - rm -rf ./dist-newstyle
  - which hspec-discover
  - echo $PATH
+ - cabal new-configure -w ${HC} ${TEST} ${BENCH}
  - cabal new-build -w ${HC} ${TEST} ${BENCH}
 
  # there's no 'cabal new-test' yet, so let's emulate for now
