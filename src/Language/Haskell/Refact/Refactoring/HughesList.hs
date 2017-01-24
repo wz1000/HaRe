@@ -3,6 +3,7 @@ module Language.Haskell.Refact.Refactoring.HughesList
        (hughesList, compHughesList) where
 
 import Language.Haskell.Refact.API
+import Language.Haskell.Refact.Utils.Types
 import qualified Language.Haskell.GhcMod as GM
 import System.Directory
 import qualified GHC.SYB.Utils as SYB
@@ -12,6 +13,7 @@ import qualified FastString as GHC
 import qualified RdrName as GHC
 import qualified OccName as GHC
 import qualified Name as GHC
+import qualified Bag as GHC
 import Language.Haskell.GHC.ExactPrint.Types
 import qualified Unique as Unique (mkUniqueGrimily)
 
@@ -66,7 +68,7 @@ doHughesList fileName funNm pos = do
   newTySig <- fixTypeSig tySig
   replaceTypeSig pos newTySig
   addSimpleImportDecl "Data.DList"
-  return ()
+  fixClientFunctions pos funNm
 
 fixTypeSig :: GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
 fixTypeSig = SYB.everywhereM (SYB.mkM replaceList)
@@ -124,6 +126,36 @@ fixFunBind funRdr bind = do
           zeroDP pE
           return pE
         comp x = return x
-        singletonRdr = GHC.mkVarUnqual (GHC.fsLit "singleton")
-        fromListRdr = GHC.mkVarUnqual (GHC.fsLit "fromList")
-        appendRdr = GHC.mkVarUnqual (GHC.fsLit "append")                        
+        singletonRdr = mkRdrName "singleton"
+        fromListRdr = mkRdrName "fromList"
+        appendRdr = mkRdrName "append"                     
+
+
+--TODO: This will eventually handle all the different ways that
+-- this refactoring will need to change functions not part of the main refactoring
+-- First tackling: f :: sometype -> [a] ==> f_refact :: sometype -> DList a
+-- in this case all uses of f must be wrapped in toList
+-- Other patterns:
+
+--                 f :: [a] -> [a] ==> f_refact :: DList a -> DList a
+-- Here any list parameters will need to be wrapped in fromList
+-- and any uses of f will be wrapped in toList
+
+--                 f :: [a] -> sometype ==> f_refact :: DList a -> sometype
+-- Any parameters of type list need to be wrapped in fromList
+fixClientFunctions :: GHC.RdrName -> RefactGhc ()
+fixClientFunctions name = undefined
+
+
+-- This function takes in a function that transforms the call points of the given identifier
+-- The function will be applied over the parsed AST
+--applyAtCallPoint assumes that the function handles any changes to annotations itself
+applyAtCallPoint :: GHC.RdrName -> (ParsedExpr -> RefactGhc ParsedExpr) -> RefactGhc ()
+applyAtCallPoint nm f = do
+  parsed <- getRefactParsed
+  parsed' <- SYB.everywhereM (SYB.mkM comp) parsed
+  putRefactParsed parsed' emptyAnns
+    where comp a@(GHC.HsApp (GHC.L _ (GHC.HsVar id)) rhs)
+            | id == nm  = f a
+            | otherwise = return a
+          comp a = return a
