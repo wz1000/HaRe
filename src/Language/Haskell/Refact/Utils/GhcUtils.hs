@@ -89,8 +89,8 @@ everywhereButM :: Monad m => SYB.GenericQ Bool -> SYB.Generic m -> SYB.GenericM 
 everywhereButM q f x
   | q x = return x
   | otherwise = do
-      x' <- f x
-      gmapM (everywhereButM q f) x'
+      x' <- gmapM (everywhereButM q f) x  
+      f x'
 
 -- | Bottom-up transformation
 everywhereStaged ::  SYB.Stage -> (forall a. Data a => a -> a) -> forall a. Data a => a -> a
