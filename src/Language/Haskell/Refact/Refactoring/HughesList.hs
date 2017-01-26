@@ -68,7 +68,7 @@ doHughesList fileName funNm pos = do
   newTySig <- fixTypeSig tySig
   replaceTypeSig pos newTySig
   addSimpleImportDecl "Data.DList"
-  fixClientFunctions pos funNm
+  fixClientFunctions funRdr
 
 fixTypeSig :: GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
 fixTypeSig = SYB.everywhereM (SYB.mkM replaceList)
@@ -144,18 +144,38 @@ fixFunBind funRdr bind = do
 --                 f :: [a] -> sometype ==> f_refact :: DList a -> sometype
 -- Any parameters of type list need to be wrapped in fromList
 fixClientFunctions :: GHC.RdrName -> RefactGhc ()
-fixClientFunctions name = undefined
+fixClientFunctions name = wrapCallsWithToList name
+
+--This function handles the case where callsites need to be wrapped with toList
+wrapCallsWithToList :: GHC.RdrName -> RefactGhc ()
+wrapCallsWithToList name = applyAtCallPoint name comp
+  where comp :: ParsedLExpr -> RefactGhc ParsedLExpr
+        comp e = do
+          zeroDP e
+          parE <- wrapInPars e
+          lLhs <- locate toListVar
+          addAnnVal lLhs
+          res <- locate $ (GHC.HsApp lLhs parE)
+          return res
+        toListVar = GHC.HsVar (mkRdrName "toList")
+        
 
 
 -- This function takes in a function that transforms the call points of the given identifier
 -- The function will be applied over the parsed AST
 --applyAtCallPoint assumes that the function handles any changes to annotations itself
-applyAtCallPoint :: GHC.RdrName -> (ParsedExpr -> RefactGhc ParsedExpr) -> RefactGhc ()
+applyAtCallPoint :: GHC.RdrName -> (ParsedLExpr -> RefactGhc ParsedLExpr) -> RefactGhc ()
 applyAtCallPoint nm f = do
   parsed <- getRefactParsed
-  parsed' <- SYB.everywhereM (SYB.mkM comp) parsed
+  parsed' <- everywhereButM (False `SYB.mkQ` stopCon) (SYB.mkM comp) parsed
   putRefactParsed parsed' emptyAnns
-    where comp a@(GHC.HsApp (GHC.L _ (GHC.HsVar id)) rhs)
-            | id == nm  = f a
-            | otherwise = return a
-          comp a = return a
+    where
+      stopCon :: GHC.HsBind GHC.RdrName -> Bool
+      stopCon (GHC.FunBind (GHC.L _ id) _ _ _ _ _) = id == nm
+      stopCon _ = False
+      comp a@(GHC.L _ (GHC.HsApp (GHC.L _ (GHC.HsVar id)) rhs))
+            | id == nm  = do
+                res <- f a
+                return res
+            | otherwise = return a 
+      comp a = return a
