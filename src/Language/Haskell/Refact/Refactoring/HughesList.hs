@@ -153,11 +153,20 @@ wrapCallsWithToList name = applyAtCallPoint name comp
         comp e = do
           zeroDP e
           parE <- wrapInPars e
+#if __GLASGOW_HASKELL__ > 710
+          toListVar <- toListVar'
+#endif
           lLhs <- locate toListVar
           addAnnVal lLhs
           res <- locate $ (GHC.HsApp lLhs parE)
           return res
+#if __GLASGOW_HASKELL__ <= 710          
         toListVar = GHC.HsVar (mkRdrName "toList")
+#else
+        toListVar' = do
+           lNm <- locate (mkRdrName "toList")
+           return (GHC.HsVar lNm)
+#endif
         
 
 
@@ -171,9 +180,17 @@ applyAtCallPoint nm f = do
   putRefactParsed parsed' emptyAnns
     where
       stopCon :: GHC.HsBind GHC.RdrName -> Bool
+#if __GLASGOW_HASKELL__ <= 710
       stopCon (GHC.FunBind (GHC.L _ id) _ _ _ _ _) = id == nm
+#else
+      stopCon (GHC.FunBind (GHC.L _ id) _ _ _ _) = id == nm
+#endif
       stopCon _ = False
+#if __GLASGOW_HASKELL__ <= 710                  
       comp a@(GHC.L _ (GHC.HsApp (GHC.L _ (GHC.HsVar id)) rhs))
+#else
+      comp a@(GHC.L _ (GHC.HsApp (GHC.L _ (GHC.HsVar (GHC.L _ id))) rhs))
+#endif
             | id == nm  = do
                 res <- f a
                 return res
