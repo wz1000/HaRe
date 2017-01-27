@@ -44,34 +44,34 @@ TODO: Figure out strategy for name conflicts. Probably need another optional arg
    The argument could also be made that the DList import should always be qualified.
 -}
 
-hughesList :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> IO [FilePath]
-hughesList settings cradle fileName funNm pos = do
+hughesList :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> Int -> IO [FilePath]
+hughesList settings cradle fileName funNm pos argNum = do
   absFileName <- canonicalizePath fileName
-  runRefacSession settings cradle (compHughesList fileName funNm pos)
+  runRefacSession settings cradle (compHughesList fileName funNm pos argNum)
 
-compHughesList :: FilePath -> String -> SimpPos -> RefactGhc [ApplyRefacResult]
-compHughesList fileName funNm pos = do
-  (refRes@((_fp,ismod),_), ()) <- applyRefac (doHughesList fileName funNm pos) (RSFile fileName)
+compHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]
+compHughesList fileName funNm pos argNum = do
+  (refRes@((_fp,ismod),_), ()) <- applyRefac (doHughesList fileName funNm pos argNum) (RSFile fileName)
   case ismod of
     RefacUnmodifed -> error "Introducing Hughes lists failed"
     RefacModified -> return ()
   return [refRes]
 
-doHughesList :: FilePath -> String -> SimpPos -> RefactGhc ()
-doHughesList fileName funNm pos = do
+doHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc ()
+doHughesList fileName funNm pos argNum = do
   parsed <- getRefactParsed
   let (Just funBind) = getHsBind pos funNm parsed
       (Just tySig) = getTypeSig pos funNm parsed
       (Just (GHC.L _ funRdr)) = locToRdrName pos parsed
   newBind <- fixFunBind funRdr funBind
   replaceFunBind pos newBind
-  newTySig <- fixTypeSig tySig
+  newTySig <- fixTypeSig argNum tySig
   replaceTypeSig pos newTySig
   addSimpleImportDecl "Data.DList"
   fixClientFunctions funRdr
 
-fixTypeSig :: GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
-fixTypeSig = SYB.everywhereM (SYB.mkM replaceList)
+fixTypeSig :: Int -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
+fixTypeSig argNum =  traverseTypeSig argNum replaceList
   where replaceList :: GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
         replaceList (GHC.L l (GHC.HsListTy innerTy)) = do
           let dlistFS = GHC.fsLit "DList"
@@ -87,6 +87,21 @@ fixTypeSig = SYB.everywhereM (SYB.mkM replaceList)
           return lTy
         replaceList x = return x
 
+--This function will apply the given function to the appropriate type signature element.
+--The int denotes which argument the function should be applied to starting at one
+--For example when: "traverseTypeSig 2 g"
+--Is applied to the signature "f :: Int -> (Int -> String) -> String"
+--g will be applied to "(Int -> String)"
+traverseTypeSig :: Int -> (GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)) -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
+traverseTypeSig argNum f (GHC.TypeSig lst ty rn) = do
+  newTy <- SYB.everywhereM (SYB.mkM (comp argNum)) ty
+  return (GHC.TypeSig lst newTy rn)
+  where comp 1 (GHC.L l (GHC.HsFunTy lhs rhs)) = f lhs >>= (\res -> return (GHC.L l (GHC.HsFunTy res rhs)))
+        comp 2 (GHC.L l (GHC.HsFunTy lhs rhs)) = f rhs >>= (\res -> return (GHC.L l (GHC.HsFunTy lhs res)))
+        comp n (GHC.L l (GHC.HsFunTy lhs rhs)) = comp (n-1) rhs >>= (\res -> return (GHC.L l (GHC.HsFunTy lhs res)))
+        comp _ lHsTy@(GHC.L _ ty) = return lHsTy
+        
+traverseTypeSig _ _ sig = error $ "traverseTypeSig: Unsupported constructor: " ++ show (toConstr sig)
 
 fixFunBind :: GHC.RdrName -> GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
 fixFunBind funRdr bind = do
