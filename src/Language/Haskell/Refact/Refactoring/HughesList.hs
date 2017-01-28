@@ -16,6 +16,7 @@ import qualified Name as GHC
 import qualified Bag as GHC
 import Language.Haskell.GHC.ExactPrint.Types
 import qualified Unique as Unique (mkUniqueGrimily)
+import System.IO.Unsafe
 
 {-
 This refactoring will rewrite functions to use Hughes lists (also called difference lists) instead of the standard list interface.
@@ -63,7 +64,7 @@ doHughesList fileName funNm pos argNum = do
   let (Just funBind) = getHsBind pos funNm parsed
       (Just tySig) = getTypeSig pos funNm parsed
       (Just (GHC.L _ funRdr)) = locToRdrName pos parsed
-  newBind <- fixFunBind funRdr funBind
+  newBind <- fixFunBind argNum funRdr funBind
   replaceFunBind pos newBind
   newTySig <- fixTypeSig argNum tySig
   replaceTypeSig pos newTySig
@@ -94,17 +95,76 @@ fixTypeSig argNum =  traverseTypeSig argNum replaceList
 --g will be applied to "(Int -> String)"
 traverseTypeSig :: Int -> (GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)) -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
 traverseTypeSig argNum f (GHC.TypeSig lst ty rn) = do
-  newTy <- SYB.everywhereM (SYB.mkM (comp argNum)) ty
+  newTy <- comp argNum ty
   return (GHC.TypeSig lst newTy rn)
-  where comp 1 (GHC.L l (GHC.HsFunTy lhs rhs)) = f lhs >>= (\res -> return (GHC.L l (GHC.HsFunTy res rhs)))
-        comp 2 (GHC.L l (GHC.HsFunTy lhs rhs)) = f rhs >>= (\res -> return (GHC.L l (GHC.HsFunTy lhs res)))
-        comp n (GHC.L l (GHC.HsFunTy lhs rhs)) = comp (n-1) rhs >>= (\res -> return (GHC.L l (GHC.HsFunTy lhs res)))
-        comp _ lHsTy@(GHC.L _ ty) = return lHsTy
+  where
+    comp argNum (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt ty)) =
+      case ty of
+        (GHC.L _ (GHC.HsFunTy _ _)) -> comp' argNum ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt res)))
+        otherwise -> f ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt res)))
+    comp' 1 (GHC.L l (GHC.HsFunTy lhs rhs)) = f lhs >>= (\res -> return (GHC.L l (GHC.HsFunTy res rhs)))
+    comp' 1 lTy = f lTy 
+    comp' n (GHC.L l (GHC.HsFunTy lhs rhs)) = comp' (n-1) rhs >>= (\res -> return (GHC.L l (GHC.HsFunTy lhs res)))
+    comp' _ lHsTy@(GHC.L _ ty) = return lHsTy
         
 traverseTypeSig _ _ sig = error $ "traverseTypeSig: Unsupported constructor: " ++ show (toConstr sig)
 
-fixFunBind :: GHC.RdrName -> GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
-fixFunBind funRdr bind = do
+fixFunBind :: Int -> GHC.RdrName -> ParsedBind -> RefactGhc ParsedBind
+fixFunBind argNum funRdr bind = do
+  let numArgs = numTypesOfBind bind
+  if argNum < numArgs
+    then wrapParamWithToLst argNum bind
+    else outputParameterBecomesDList bind
+
+wrapParamWithToLst :: Int -> ParsedBind -> RefactGhc ParsedBind
+wrapParamWithToLst argNum bind = do
+  let argNames = getArgRdrNms argNum bind
+  logm $ "Arg names: " ++ show (SYB.showData SYB.Parser 3 argNames)
+  modifyMatchGroup argNames bind
+  where
+    modifyMatchGroup :: [Maybe GHC.RdrName] -> ParsedBind -> RefactGhc ParsedBind
+    modifyMatchGroup aNms bind = do
+          let mg = GHC.fun_matches bind
+          newAlts <- mapM handleLMatch (zip aNms (GHC.mg_alts mg))
+          let newMG = mg {GHC.mg_alts = newAlts}
+          return $ bind {GHC.fun_matches = newMG}
+    handleLMatch :: (Maybe GHC.RdrName, ParsedLMatch) -> RefactGhc ParsedLMatch
+    handleLMatch (Nothing, m ) = return m
+    handleLMatch ((Just rdr), m) = SYB.everywhereM (SYB.mkM (wrapRdr rdr)) m
+    wrapRdr :: GHC.RdrName -> ParsedLExpr -> RefactGhc ParsedLExpr
+    wrapRdr rdr e@(GHC.L _ (GHC.HsVar nm))
+      | rdr /= nm = return e
+      | otherwise = do
+          lToLst <- locate toLstExpr
+          addAnnVal lToLst
+          zeroDP lToLst
+          app <- locate (GHC.HsApp lToLst e)
+          pe <- wrapInPars app
+          logDataWithAnns "wrapRdr" pe
+          return pe
+    wrapRdr _ e = return e
+    toLstExpr = GHC.HsVar (mkRdrName "toList")
+
+numTypesOfBind :: ParsedBind -> Int
+numTypesOfBind bnd = let mg = GHC.fun_matches bnd
+                         ((GHC.L _ match):_) = GHC.mg_alts mg                         
+                     in (length (GHC.m_pats match)) + 1
+                      
+                 
+
+getArgRdrNms :: Int -> GHC.HsBind GHC.RdrName -> [Maybe GHC.RdrName]
+getArgRdrNms argNum bind = let mg = GHC.fun_matches bind
+                               matches = GHC.mg_alts mg
+  in map (\(GHC.L _ match) -> comp match) matches
+  where
+    comp :: ParsedMatch -> Maybe GHC.RdrName
+    comp (GHC.Match _ pats _ _) = findRdr (pats !! (argNum-1))
+    findRdr (GHC.L _ (GHC.VarPat rdr)) = Just rdr
+    findRdr (GHC.L _ (GHC.AsPat (GHC.L _ rdr) _)) = Just rdr
+    findRdr _ = Nothing
+
+outputParameterBecomesDList :: GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
+outputParameterBecomesDList bind = do
   SYB.everywhereM (SYB.mkM comp) bind
   where comp :: ParsedLExpr -> RefactGhc ParsedLExpr
 #if __GLASGOW_HASKELL__ <= 710

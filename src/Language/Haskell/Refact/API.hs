@@ -257,6 +257,7 @@ module Language.Haskell.Refact.API
  , UnlocParsedHsBind
  , ParsedGRHSs
  , ParsedMatchGroup
+ , ParsedMatch
  , ParsedLMatch
  , ParsedExpr
  , ParsedLStmt
