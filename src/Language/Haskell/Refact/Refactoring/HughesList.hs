@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 module Language.Haskell.Refact.Refactoring.HughesList
        (hughesList, compHughesList) where
 
@@ -16,7 +17,7 @@ import qualified Name as GHC
 import qualified Bag as GHC
 import Language.Haskell.GHC.ExactPrint.Types
 import qualified Unique as Unique (mkUniqueGrimily)
-import System.IO.Unsafe
+import Data.Generics.Strafunski.StrategyLib.StrategyLib
 
 {-
 This refactoring will rewrite functions to use Hughes lists (also called difference lists) instead of the standard list interface.
@@ -69,7 +70,7 @@ doHughesList fileName funNm pos argNum = do
   newTySig <- fixTypeSig argNum tySig
   replaceTypeSig pos newTySig
   addSimpleImportDecl "Data.DList"
-  fixClientFunctions funRdr
+  fixClientFunctions (numTypesOfBind funBind) argNum funRdr
 
 fixTypeSig :: Int -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
 fixTypeSig argNum =  traverseTypeSig argNum replaceList
@@ -108,16 +109,20 @@ traverseTypeSig argNum f (GHC.TypeSig lst ty rn) = do
     comp' _ lHsTy@(GHC.L _ ty) = return lHsTy
         
 traverseTypeSig _ _ sig = error $ "traverseTypeSig: Unsupported constructor: " ++ show (toConstr sig)
+         
 
 fixFunBind :: Int -> GHC.RdrName -> ParsedBind -> RefactGhc ParsedBind
 fixFunBind argNum funRdr bind = do
   let numArgs = numTypesOfBind bind
   if argNum < numArgs
-    then wrapParamWithToLst argNum bind
+    then wrapBindParamWithToLst argNum bind
     else outputParameterBecomesDList bind
 
-wrapParamWithToLst :: Int -> ParsedBind -> RefactGhc ParsedBind
-wrapParamWithToLst argNum bind = do
+wrapBindParamWithToLst :: Int -> ParsedBind -> RefactGhc ParsedBind
+wrapBindParamWithToLst = wrapBindParamWithFun (mkRdrName "toList")
+
+wrapBindParamWithFun :: GHC.RdrName -> Int -> ParsedBind -> RefactGhc ParsedBind
+wrapBindParamWithFun funNm argNum bind = do
   let argNames = getArgRdrNms argNum bind
   logm $ "Arg names: " ++ show (SYB.showData SYB.Parser 3 argNames)
   modifyMatchGroup argNames bind
@@ -130,20 +135,22 @@ wrapParamWithToLst argNum bind = do
           return $ bind {GHC.fun_matches = newMG}
     handleLMatch :: (Maybe GHC.RdrName, ParsedLMatch) -> RefactGhc ParsedLMatch
     handleLMatch (Nothing, m ) = return m
-    handleLMatch ((Just rdr), m) = SYB.everywhereM (SYB.mkM (wrapRdr rdr)) m
-    wrapRdr :: GHC.RdrName -> ParsedLExpr -> RefactGhc ParsedLExpr
-    wrapRdr rdr e@(GHC.L _ (GHC.HsVar nm))
-      | rdr /= nm = return e
-      | otherwise = do
-          lToLst <- locate toLstExpr
-          addAnnVal lToLst
-          zeroDP lToLst
-          app <- locate (GHC.HsApp lToLst e)
-          pe <- wrapInPars app
-          logDataWithAnns "wrapRdr" pe
-          return pe
-    wrapRdr _ e = return e
-    toLstExpr = GHC.HsVar (mkRdrName "toList")
+    handleLMatch ((Just rdr), m) = SYB.everywhereM (SYB.mkM (wrapRdr funNm rdr)) m
+
+
+wrapRdr :: GHC.RdrName -> GHC.RdrName -> ParsedLExpr -> RefactGhc ParsedLExpr
+wrapRdr funNm rdr e@(GHC.L _ (GHC.HsVar nm))
+  | rdr /= nm = return e
+  | otherwise = do
+      let toLstExpr = GHC.HsVar funNm
+      lToLst <- locate toLstExpr
+      addAnnVal lToLst
+      zeroDP lToLst
+      app <- locate (GHC.HsApp lToLst e)
+      pe <- wrapInPars app
+      return pe
+
+wrapRdr _ _ e = return e
 
 numTypesOfBind :: ParsedBind -> Int
 numTypesOfBind bnd = let mg = GHC.fun_matches bnd
@@ -218,8 +225,11 @@ outputParameterBecomesDList bind = do
 
 --                 f :: [a] -> sometype ==> f_refact :: DList a -> sometype
 -- Any parameters of type list need to be wrapped in fromList
-fixClientFunctions :: GHC.RdrName -> RefactGhc ()
-fixClientFunctions name = wrapCallsWithToList name
+fixClientFunctions :: Int -> Int -> GHC.RdrName -> RefactGhc ()
+fixClientFunctions totalParams argNum name = if (totalParams == argNum)
+                                    then wrapCallsWithToList name
+                                    else applyAtCallPoint name (modifyNthParam totalParams argNum (wrapExpr fromLstRdr))
+  where fromLstRdr = mkRdrName "fromList"
 
 --This function handles the case where callsites need to be wrapped with toList
 wrapCallsWithToList :: GHC.RdrName -> RefactGhc ()
@@ -242,8 +252,9 @@ wrapCallsWithToList name = applyAtCallPoint name comp
            lNm <- locate (mkRdrName "toList")
            return (GHC.HsVar lNm)
 #endif
-        
 
+condStop_tdTP :: Monad m => SYB.GenericM (forall a. Data a => (Maybe (m a)) -> SYB.GenericM m
+condStop_tdTP f x = undefined
 
 -- This function takes in a function that transforms the call points of the given identifier
 -- The function will be applied over the parsed AST
@@ -252,22 +263,48 @@ applyAtCallPoint :: GHC.RdrName -> (ParsedLExpr -> RefactGhc ParsedLExpr) -> Ref
 applyAtCallPoint nm f = do
   parsed <- getRefactParsed
   parsed' <- everywhereButM (False `SYB.mkQ` stopCon) (SYB.mkM comp) parsed
+  --parsed' <- applyTP (stop_tdTP ((MkTP stopCon) `adhocTP` comp)) parsed
   putRefactParsed parsed' emptyAnns
     where
       stopCon :: GHC.HsBind GHC.RdrName -> Bool
 #if __GLASGOW_HASKELL__ <= 710
-      stopCon (GHC.FunBind (GHC.L _ id) _ _ _ _ _) = id == nm
+      stopCon b@(GHC.FunBind (GHC.L _ id) _ _ _ _ _) = id == nm
 #else
       stopCon (GHC.FunBind (GHC.L _ id) _ _ _ _) = id == nm
 #endif
       stopCon _ = False
-#if __GLASGOW_HASKELL__ <= 710                  
-      comp a@(GHC.L _ (GHC.HsApp (GHC.L _ (GHC.HsVar id)) rhs))
-#else
-      comp a@(GHC.L _ (GHC.HsApp (GHC.L _ (GHC.HsVar (GHC.L _ id))) rhs))
-#endif
-            | id == nm  = do
-                res <- f a
-                return res
-            | otherwise = return a 
-      comp a = return a
+      comp :: ParsedLExpr -> RefactGhc ParsedLExpr
+      comp lEx = if searchExpr nm (GHC.unLoc lEx)
+                 then do
+                    logDataWithAnns "Applying f to: " lEx
+                    f lEx                   
+                 else do
+                    logm "Else case in comp"
+                    return lEx
+
+searchExpr :: GHC.RdrName -> ParsedExpr -> Bool
+searchExpr funNm (GHC.HsApp (GHC.L _ (GHC.HsVar rdr)) _) = rdr == funNm
+searchExpr funNm (GHC.HsApp lhs _) = searchExpr funNm (GHC.unLoc lhs)
+searchExpr funNm (GHC.OpApp _ (GHC.L _ (GHC.HsVar rdr)) _ _) = rdr == funNm
+searchExpr funNm (GHC.OpApp _ op _ _) = searchExpr funNm (GHC.unLoc op)
+searchExpr _ _ = False
+
+modifyNthParam :: Int -> Int -> (ParsedLExpr -> RefactGhc ParsedLExpr) -> ParsedLExpr -> RefactGhc ParsedLExpr
+modifyNthParam paramNums argIndx f app = comp (paramNums - argIndx) app
+  where comp i (GHC.L l (GHC.HsApp lhs rhs))
+          | i == 1 = do
+              newRhs <- f rhs
+              return (GHC.L l (GHC.HsApp lhs newRhs))
+          | otherwise = do
+              newLhs <- comp (i-1) lhs
+              return (GHC.L l (GHC.HsApp newLhs rhs))
+
+wrapExpr :: GHC.RdrName -> ParsedLExpr -> RefactGhc ParsedLExpr
+wrapExpr nm e = do
+  lNmE <- locate nmE
+  addAnnVal lNmE
+  zeroDP lNmE
+  let expr = (GHC.HsApp lNmE e)
+  lE <- locate expr
+  wrapInPars lE
+    where nmE = (GHC.HsVar nm)
