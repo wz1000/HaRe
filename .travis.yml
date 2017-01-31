@@ -86,3 +86,6 @@ script:
 notifications:
   irc: "irc.freenode.org#haskell-refactorer"
 
+branches:
+   except:
+      - hughes-list
