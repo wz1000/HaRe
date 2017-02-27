@@ -18,6 +18,7 @@ import qualified Bag as GHC
 import Language.Haskell.GHC.ExactPrint.Types
 import qualified Unique as Unique (mkUniqueGrimily)
 import Data.Generics.Strafunski.StrategyLib.StrategyLib
+import Control.Applicative
 
 {-
 This refactoring will rewrite functions to use Hughes lists (also called difference lists) instead of the standard list interface.
@@ -253,8 +254,10 @@ wrapCallsWithToList name = applyAtCallPoint name comp
            return (GHC.HsVar lNm)
 #endif
 
-condStop_tdTP :: Monad m => SYB.GenericM (forall a. Data a => (Maybe (m a)) -> SYB.GenericM m
-condStop_tdTP f x = undefined
+condStop_tdTP :: (MonadPlus m) => SYB.GenericQ Bool -> SYB.GenericM m -> SYB.GenericM m
+condStop_tdTP q f x
+  | q x = return x
+  | otherwise = (f `choiceMp` (gmapM (condStop_tdTP q f))) x
 
 -- This function takes in a function that transforms the call points of the given identifier
 -- The function will be applied over the parsed AST
@@ -262,7 +265,8 @@ condStop_tdTP f x = undefined
 applyAtCallPoint :: GHC.RdrName -> (ParsedLExpr -> RefactGhc ParsedLExpr) -> RefactGhc ()
 applyAtCallPoint nm f = do
   parsed <- getRefactParsed
-  parsed' <- everywhereButM (False `SYB.mkQ` stopCon) (SYB.mkM comp) parsed
+  parsed' <- condStop_tdTP (False `SYB.mkQ` stopCon) (SYB.mkM comp) parsed  
+  logm "Done with stop traversal"
   --parsed' <- applyTP (stop_tdTP ((MkTP stopCon) `adhocTP` comp)) parsed
   putRefactParsed parsed' emptyAnns
     where
