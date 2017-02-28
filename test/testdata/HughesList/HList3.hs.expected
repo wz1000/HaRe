@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module HList3 where
-import DList
+import Data.DList
 
 --Super contrived example
 explode :: Int -> DList a -> [a]

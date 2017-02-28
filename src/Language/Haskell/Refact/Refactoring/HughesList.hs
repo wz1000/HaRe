@@ -69,26 +69,25 @@ doHughesList fileName funNm pos argNum = do
   newBind <- fixFunBind argNum funRdr funBind
   replaceFunBind pos newBind
   newTySig <- fixTypeSig argNum tySig
+  logDataWithAnns "New type sig: " newTySig
   replaceTypeSig pos newTySig
   addSimpleImportDecl "Data.DList"
   fixClientFunctions (numTypesOfBind funBind) argNum funRdr
 
 fixTypeSig :: Int -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
 fixTypeSig argNum =  traverseTypeSig argNum replaceList
-  where replaceList :: GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
-        replaceList (GHC.L l (GHC.HsListTy innerTy)) = do
-          let dlistFS = GHC.fsLit "DList"
-              dlistUq = GHC.mkVarUnqual dlistFS
-          dlistTy <- constructLHsTy dlistUq          
-          setDP (DP (0,1)) innerTy
-          lTy <- locate (GHC.HsAppTy dlistTy innerTy)
-#if __GLASGOW_HASKELL__ <= 710
-          addAnnVal lTy
-#else
-          zeroDP lTy
-#endif          
-          return lTy
-        replaceList x = return x
+  where
+    
+    replaceList :: GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
+    replaceList (GHC.L l (GHC.HsListTy innerTy)) = do
+      let dlistFS = GHC.fsLit "DList"
+          dlistUq = GHC.mkVarUnqual dlistFS
+      dlistTy <- constructLHsTy dlistUq          
+      lTy <- locate (GHC.HsAppTy dlistTy innerTy)
+      setDP (DP (0,1)) innerTy
+      setDP (DP (0,1)) lTy
+      return lTy
+    replaceList x = return x
 
 --This function will apply the given function to the appropriate type signature element.
 --The int denotes which argument the function should be applied to starting at one
@@ -104,7 +103,11 @@ traverseTypeSig argNum f (GHC.TypeSig lst ty rn) = do
       case ty of
         (GHC.L _ (GHC.HsFunTy _ _)) -> comp' argNum ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt res)))
         otherwise -> f ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt res)))
-    comp' 1 (GHC.L l (GHC.HsFunTy lhs rhs)) = f lhs >>= (\res -> return (GHC.L l (GHC.HsFunTy res rhs)))
+    comp' 1 (GHC.L l (GHC.HsFunTy lhs rhs)) = do
+      resLHS <- f lhs
+      let funTy = (GHC.L l (GHC.HsFunTy resLHS rhs))
+      zeroDP funTy
+      return funTy
     comp' 1 lTy = f lTy 
     comp' n (GHC.L l (GHC.HsFunTy lhs rhs)) = comp' (n-1) rhs >>= (\res -> return (GHC.L l (GHC.HsFunTy lhs res)))
     comp' _ lHsTy@(GHC.L _ ty) = return lHsTy
@@ -254,37 +257,36 @@ wrapCallsWithToList name = applyAtCallPoint name comp
            return (GHC.HsVar lNm)
 #endif
 
-condStop_tdTP :: (MonadPlus m) => SYB.GenericQ Bool -> SYB.GenericM m -> SYB.GenericM m
-condStop_tdTP q f x
-  | q x = return x
-  | otherwise = (f `choiceMp` (gmapM (condStop_tdTP q f))) x
-
 -- This function takes in a function that transforms the call points of the given identifier
 -- The function will be applied over the parsed AST
 --applyAtCallPoint assumes that the function handles any changes to annotations itself
 applyAtCallPoint :: GHC.RdrName -> (ParsedLExpr -> RefactGhc ParsedLExpr) -> RefactGhc ()
 applyAtCallPoint nm f = do
   parsed <- getRefactParsed
-  parsed' <- condStop_tdTP (False `SYB.mkQ` stopCon) (SYB.mkM comp) parsed  
-  logm "Done with stop traversal"
-  --parsed' <- applyTP (stop_tdTP ((MkTP stopCon) `adhocTP` comp)) parsed
+  logm "Done with traversal"
+  parsed' <- applyTP (stop_tdTP (failTP `adhocTP` stopCon `adhocTP` comp)) parsed
   putRefactParsed parsed' emptyAnns
     where
-      stopCon :: GHC.HsBind GHC.RdrName -> Bool
+      stopCon :: GHC.HsBind GHC.RdrName -> RefactGhc ParsedBind
 #if __GLASGOW_HASKELL__ <= 710
-      stopCon b@(GHC.FunBind (GHC.L _ id) _ _ _ _ _) = id == nm
+      stopCon b@(GHC.FunBind (GHC.L _ id) _ _ _ _ _) = if id == nm
 #else
-      stopCon (GHC.FunBind (GHC.L _ id) _ _ _ _) = id == nm
+      stopCon b@(GHC.FunBind (GHC.L _ id) _ _ _ _) = if id == nm                                                   
 #endif
-      stopCon _ = False
+                                                     then do
+--If the bindings name is the function we are looking for then we succeed and the traversal should stop
+                                                       return b
+                                                     else do
+                                                       mzero
+      stopCon b = do
+         logm "Other binding constructor matched"
+         mzero
       comp :: ParsedLExpr -> RefactGhc ParsedLExpr
       comp lEx = if searchExpr nm (GHC.unLoc lEx)
                  then do
-                    logDataWithAnns "Applying f to: " lEx
                     f lEx                   
                  else do
-                    logm "Else case in comp"
-                    return lEx
+                    mzero 
 
 searchExpr :: GHC.RdrName -> ParsedExpr -> Bool
 searchExpr funNm (GHC.HsApp (GHC.L _ (GHC.HsVar rdr)) _) = rdr == funNm
