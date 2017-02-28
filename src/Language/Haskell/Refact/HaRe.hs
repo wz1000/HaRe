@@ -19,13 +19,13 @@ module Language.Haskell.Refact.HaRe
  , rename,          compRename
  , addOneParameter, compAddOneParameter
  , rmOneParameter,  compRmOneParameter
- , deleteDef
+ , deleteDef,       compDeleteDef
  -- , swapArgs
  , roundTrip
 -- , introduceTypeSyn
 -- , unwrapTypeSyn
- , genApplicative
  , hughesList
+ , genApplicative, compGenApplicative
  )
 where
 

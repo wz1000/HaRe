@@ -42,7 +42,7 @@ module Language.Haskell.Refact.API
        , getModuleName
        , clientModsAndFiles
        , serverModsAndFiles
-       , lookupAnns  
+       -- , lookupAnns
 
        , stripCallStack
 
@@ -206,7 +206,7 @@ module Language.Haskell.Refact.API
     , everywhereStaged'
     , listifyStaged
     , everywhereButM
-      
+
     -- ** Scrap Your Zipper versions
     , zeverywhereStaged
     , zopenStaged
