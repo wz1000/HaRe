@@ -19,8 +19,9 @@ import qualified GHC as GHC
 import qualified BasicTypes as GHC
 import qualified Data.Map as Map
 import Data.Data
+import Data.Maybe
 import qualified Data.Generics as SYB
-
+import qualified FastString as GHC
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
 
@@ -38,11 +39,11 @@ import Language.Haskell.Refact.Utils.ExactPrint
 
 --Takes in a string corresponding to the module name to be imported
 --Adds the import declaration at the end of that module's imports 
-addSimpleImportDecl :: String -> RefactGhc ()
-addSimpleImportDecl modName = do
+addSimpleImportDecl :: String -> Maybe String -> RefactGhc ()
+addSimpleImportDecl modName mqual = do
   let modNm' = GHC.mkModuleName modName
   parsed <- getRefactParsed
-  newP <- addImportDecl parsed modNm' Nothing False False False Nothing False []
+  newP <- addImportDecl parsed modNm' Nothing False False (isJust mqual) mqual False []
   currAnns <- fetchAnnsFinal
   putRefactParsed newP currAnns
 

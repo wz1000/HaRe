@@ -71,7 +71,8 @@ doHughesList fileName funNm pos argNum = do
   newTySig <- fixTypeSig argNum tySig
   logDataWithAnns "New type sig: " newTySig
   replaceTypeSig pos newTySig
-  addSimpleImportDecl "Data.DList"
+  --Eventually should extract the qualifier as an argument so that people can choose their own.
+  addSimpleImportDecl "Data.DList" (Just "DList")
   fixClientFunctions (numTypesOfBind funBind) argNum funRdr
 
 fixTypeSig :: Int -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
@@ -94,6 +95,7 @@ fixTypeSig argNum =  traverseTypeSig argNum replaceList
 --For example when: "traverseTypeSig 2 g"
 --Is applied to the signature "f :: Int -> (Int -> String) -> String"
 --g will be applied to "(Int -> String)"
+--You also need to handle spacing before the type signature element
 traverseTypeSig :: Int -> (GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)) -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
 traverseTypeSig argNum f (GHC.TypeSig lst ty rn) = do
   newTy <- comp argNum ty
