@@ -269,6 +269,7 @@ equivalentNameInNewMod old = do
   -- let clientInscopes = filter (\n -> clientModule == GHC.nameModule n) gnames
   let clientInscopes = filter (\n -> eqModules clientModule (GHC.nameModule n)) gnames
   logm $ "equivalentNameInNewMod:clientInscopes=" ++ showGhcQual clientInscopes
+  -- logm $ "equivalentNameInNewMod:clientInscopes=" ++ (showGhcQual ( map GHC.nameModule clientInscopes))
   let newNames = filter (\n -> showGhcQual n == showGhcQual old) clientInscopes
   return newNames
 
@@ -412,7 +413,11 @@ causeNameClashInExports::  NameMap
 causeNameClashInExports nm pn newName modName parsed@(GHC.L _ p)
   = let exps = GHC.unLoc $ fromMaybe (GHC.noLoc []) (GHC.hsmodExports p)
         varExps = concatMap nameFromExport $ filter isImpVar exps
+#if __GLASGOW_HASKELL__ <= 800
         nameFromExport (GHC.L _ (GHC.IEVar x)) = [rdrName2NamePure nm x]
+#else
+        nameFromExport (GHC.L _ (GHC.IEVar x)) = [rdrName2NamePure nm (GHC.ieLWrappedName x)]
+#endif
         nameFromExport _                       = []
         -- TODO: make withoutQual part of the API
         withoutQual n = showGhc $ GHC.localiseName n
@@ -861,11 +866,17 @@ addImportDecl (GHC.L l p) modName pkgQual source safe qualify alias hide idNames
        return (GHC.L l p { GHC.hsmodImports = (imp++[newImp])})
   where
 
-     alias' = case alias of
-                  Just stringName -> Just $ GHC.mkModuleName stringName
-                  _               -> Nothing
 
      mkImpDecl = do
+       alias' <- case alias of
+#if __GLASGOW_HASKELL__ <= 800
+                    Just stringName -> return $ Just $ GHC.mkModuleName stringName
+#else
+                    Just stringName ->  do
+                      newSpan <- liftT uniqueSrcSpanT
+                      return $ Just $ GHC.L newSpan (GHC.mkModuleName stringName)
+#endif
+                    _               -> return Nothing
        newSpan1 <- liftT uniqueSrcSpanT
        newSpan2 <- liftT uniqueSrcSpanT
        newEnts <- mkNewEntList idNames
@@ -878,7 +889,11 @@ addImportDecl (GHC.L l p) modName pkgQual source safe qualify alias hide idNames
        let lmodname = GHC.L newSpan1 modName
        liftT $ addSimpleAnnT lmodname (DP (0,1)) [((G GHC.AnnVal),DP (0,0))]
        return $ GHC.ImportDecl
+#if __GLASGOW_HASKELL__ <= 800
                         { GHC.ideclSourceSrc = Nothing
+#else
+                        { GHC.ideclSourceSrc = GHC.NoSourceText
+#endif
                         , GHC.ideclName      = lmodname
                         , GHC.ideclPkgQual   = pkgQual
                         , GHC.ideclSource    = source
@@ -1062,7 +1077,11 @@ mkNewEnt :: Bool -> GHC.RdrName -> RefactGhc (GHC.LIE GHC.RdrName)
 mkNewEnt addCommaAnn pn = do
   newSpan <- liftT uniqueSrcSpanT
   let lpn = GHC.L newSpan pn
+#if __GLASGOW_HASKELL__ <= 800
   let lie = GHC.L newSpan (GHC.IEVar lpn)
+#else
+  let lie = GHC.L newSpan (GHC.IEVar (GHC.L newSpan (GHC.IEName lpn)))
+#endif
   liftT $ addSimpleAnnT lpn (DP (0,0)) [((G GHC.AnnVal),DP (0,0))]
   when addCommaAnn $
     liftT $ addSimpleAnnT lie (DP (0,0)) [((G GHC.AnnComma),DP (0,0))]
@@ -1149,8 +1168,10 @@ addParamsToSigs :: [GHC.Name] -> GHC.LSig GHC.RdrName -> RefactGhc (GHC.LSig GHC
 addParamsToSigs [] ms = return ms
 #if __GLASGOW_HASKELL__ <= 710
 addParamsToSigs newParams (GHC.L l (GHC.TypeSig lns ltyp pns)) = do
-#else
+#elif __GLASGOW_HASKELL__ <= 800
 addParamsToSigs newParams (GHC.L l (GHC.TypeSig lns (GHC.HsIB ivs (GHC.HsWC wcs mwc ltyp)))) = do
+#else
+addParamsToSigs newParams (GHC.L l (GHC.TypeSig lns (GHC.HsWC wcs (GHC.HsIB v ltyp c)))) = do
 #endif
   logm $ "addParamsToSigs:newParams=" ++ showGhc newParams
   mts <- mapM getTypeForName newParams
@@ -1165,8 +1186,10 @@ addParamsToSigs newParams (GHC.L l (GHC.TypeSig lns (GHC.HsIB ivs (GHC.HsWC wcs 
   if sigOk
 #if __GLASGOW_HASKELL__ <= 710
     then return (GHC.L l (GHC.TypeSig lns typ' pns))
-#else
+#elif __GLASGOW_HASKELL__ <= 800
     then return (GHC.L l (GHC.TypeSig lns (GHC.HsIB ivs (GHC.HsWC wcs mwc typ'))))
+#else
+    then return (GHC.L l (GHC.TypeSig lns (GHC.HsWC wcs (GHC.HsIB v typ' c))))
 #endif
     else error $ "\nNew type signature may fail type checking: " ++ newStr ++ "\n"
   where
@@ -1188,8 +1211,12 @@ addParamsToSigs newParams (GHC.L l (GHC.TypeSig lns (GHC.HsIB ivs (GHC.HsWC wcs 
       addSimpleAnnT typ (DP (0,0)) [((G GHC.AnnRarrow),DP (0,1))]
 #else
       hst1 <- case t of
+#if __GLASGOW_HASKELL__ <= 800
          -- GHC 8: (ForAllTy (Anon arg) res used to be called FunTy arg res.)
         (GHC.ForAllTy (GHC.Anon _) _) -> do
+#else
+        (GHC.ForAllTy _bndrs _ty) -> do
+#endif
           ss <- uniqueSrcSpanT
           let t1 = GHC.L ss (GHC.HsParTy hst)
           setEntryDPT hst (DP (0,0))
@@ -1234,8 +1261,10 @@ isNewSignatureOk types = do
           ([] `SYB.mkQ` usesForAll) types
 #if __GLASGOW_HASKELL__ <= 710
     usesForAll (GHC.ForAllTy _ _) = [1::Int]
-#else
+#elif __GLASGOW_HASKELL__ <= 800
     usesForAll (GHC.ForAllTy (GHC.Named _ _) _) = [1::Int]
+#else
+    usesForAll (GHC.ForAllTy _ _) = [1::Int]
 #endif
     usesForAll _                  = []
 
@@ -1249,8 +1278,10 @@ typeToLHsType (GHC.TyVarTy v)   = do
   ss <- uniqueSrcSpanT
 #if __GLASGOW_HASKELL__ <= 710
   let typ = GHC.L ss (GHC.HsTyVar (GHC.nameRdrName $ Var.varName v))
-#else
+#elif __GLASGOW_HASKELL__ <= 800
   let typ = GHC.L ss (GHC.HsTyVar (GHC.L ss (GHC.nameRdrName $ Var.varName v)))
+#else
+  let typ = GHC.L ss (GHC.HsTyVar GHC.NotPromoted (GHC.L ss (GHC.nameRdrName $ Var.varName v)))
 #endif
   addSimpleAnnT typ (DP (0,0)) [((G GHC.AnnVal),DP (0,0))]
   return typ
@@ -1271,7 +1302,7 @@ typeToLHsType (GHC.FunTy t1 t2) = do
   let typ = GHC.L ss (GHC.HsFunTy t1' t2')
   addSimpleAnnT typ (DP (0,0)) [((G GHC.AnnRarrow),DP (0,1))]
   return typ
-#else
+#elif __GLASGOW_HASKELL__ <= 800
 -- GHC 8: (ForAllTy (Anon arg) res used to be called FunTy arg res.)
 typeToLHsType (GHC.ForAllTy (GHC.Anon t1) t2) = do
   t1' <- typeToLHsType t1
@@ -1281,7 +1312,6 @@ typeToLHsType (GHC.ForAllTy (GHC.Anon t1) t2) = do
   addSimpleAnnT typ (DP (0,0)) [((G GHC.AnnRarrow),DP (0,1))]
   return typ
 #endif
-
 typeToLHsType (GHC.ForAllTy _v t) = do
   t' <- typeToLHsType t
   ss1 <- uniqueSrcSpanT
@@ -1294,13 +1324,21 @@ typeToLHsType (GHC.ForAllTy _v t) = do
 
 typeToLHsType (GHC.LitTy (GHC.NumTyLit i)) = do
   ss <- uniqueSrcSpanT
+#if __GLASGOW_HASKELL__ <= 800
   let typ = GHC.L ss (GHC.HsTyLit (GHC.HsNumTy (show i) i)) :: GHC.LHsType GHC.RdrName
+#else
+  let typ = GHC.L ss (GHC.HsTyLit (GHC.HsNumTy GHC.NoSourceText i)) :: GHC.LHsType GHC.RdrName
+#endif
   addSimpleAnnT typ (DP (0,0)) [((G GHC.AnnVal),DP (0,0))]
   return typ
 
 typeToLHsType (GHC.LitTy (GHC.StrTyLit s)) = do
   ss <- uniqueSrcSpanT
+#if __GLASGOW_HASKELL__ <= 800
   let typ = GHC.L ss (GHC.HsTyLit (GHC.HsStrTy "" s)) :: GHC.LHsType GHC.RdrName
+#else
+  let typ = GHC.L ss (GHC.HsTyLit (GHC.HsStrTy GHC.NoSourceText s)) :: GHC.LHsType GHC.RdrName
+#endif
   addSimpleAnnT typ (DP (0,0)) [((G GHC.AnnVal),DP (0,0))]
   return typ
 
@@ -1353,7 +1391,11 @@ tyConAppToHsType (GHC.TyConApp tc _ts) = r (show $ GHC.tyConName tc)
   where
     r str = do
       ss <- uniqueSrcSpanT
+#if __GLASGOW_HASKELL__ <= 800
       let typ = GHC.L ss (GHC.HsTyLit (GHC.HsStrTy str $ GHC.mkFastString str)) :: GHC.LHsType GHC.RdrName
+#else
+      let typ = GHC.L ss (GHC.HsTyLit (GHC.HsStrTy GHC.NoSourceText $ GHC.mkFastString str)) :: GHC.LHsType GHC.RdrName
+#endif
       addSimpleAnnT typ (DP (0,0)) [((G GHC.AnnVal),DP (0,1))]
       return typ
 
@@ -1488,7 +1530,7 @@ addItemsToExport modu@(GHC.L l (GHC.HsModule modName exps imps ds deps hs)) (Jus
                         else return modu
        Nothing   -> return modu
 
-addItemsToExport (GHC.L l (GHC.HsModule _ (Just ents) _ _ _ _)) Nothing createExp ids
+addItemsToExport (GHC.L _ (GHC.HsModule _ (Just ents) _ _ _ _)) Nothing createExp ids
   = assert False undefined
     -- = do ((toks,_),others)<-get
     --      let es = case ids of
@@ -2172,13 +2214,25 @@ renamePN oldPN newName useQual t = do
 
     -- ---------------------------------
 
+    -- AZ:TODO: pretty sure old and newRdr are always the same, modulo
+    -- newNameCalc'. Hence newNameCalc' can probably be moved into makeNewName
     makeNewName :: GHC.Located GHC.RdrName -> GHC.RdrName -> RefactGhc (GHC.Located GHC.RdrName)
     makeNewName old newRdr = do
-      ss' <- liftT $ uniqueSrcSpanT
+      ss' <- liftT uniqueSrcSpanT
       let new = (GHC.L ss' newRdr)
       liftT $ modifyAnnsT (copyAnn old new)
       addToNameMap ss' newName
       return new
+
+#if __GLASGOW_HASKELL__ > 800
+    makeNewNameIe :: HowToQual -> GHC.LIEWrappedName GHC.RdrName
+                  -> RefactGhc (GHC.LIEWrappedName GHC.RdrName)
+    makeNewNameIe useQual' old = do
+      let old' = (GHC.ieLWrappedName old)
+      let newRdr = newNameCalc useQual' $ GHC.unLoc old'
+      new <- makeNewName old' (newNameCalc useQual' $ GHC.unLoc old')
+      return (GHC.replaceLWrappedName old (GHC.unLoc new))
+#endif
 
     -- ---------------------------------
 
@@ -2212,11 +2266,8 @@ renamePN oldPN newName useQual t = do
      nm <- getRefactNameMap
      if cond nm old
        then do
-          -- logDataWithAnns "renamePN:rename old :" old
           let nn = newNameCalc useQual' n
           new <- makeNewName old nn
-          -- logDataWithAnns "renamePN:rename new :" new
-          -- logDataWithAnns "renamePN:rename old2 :" old
           return new
        else return old
 
@@ -2225,8 +2276,10 @@ renamePN oldPN newName useQual t = do
     renameTyVar :: HowToQual -> (GHC.Located (GHC.HsType GHC.RdrName)) -> RefactGhc (GHC.Located (GHC.HsType GHC.RdrName))
 #if __GLASGOW_HASKELL__ <= 710
     renameTyVar useQual' x@(GHC.L l (GHC.HsTyVar n)) = do
-#else
+#elif __GLASGOW_HASKELL__ <= 800
     renameTyVar useQual' x@(GHC.L l (GHC.HsTyVar (GHC.L _ n))) = do
+#else
+    renameTyVar useQual' x@(GHC.L l (GHC.HsTyVar p (GHC.L _ n))) = do
 #endif
      nm <- getRefactNameMap
      if cond nm (GHC.L l n)
@@ -2241,7 +2294,11 @@ renamePN oldPN newName useQual t = do
           return (GHC.L l' (GHC.HsTyVar nn))
 #else
           new <- makeNewName (GHC.L l n) nn
+#  if __GLASGOW_HASKELL__ <= 800
           return (GHC.L l (GHC.HsTyVar new))
+#  else
+          return (GHC.L l (GHC.HsTyVar p new))
+#  endif
 #endif
        else return x
     renameTyVar _ x = return x
@@ -2272,40 +2329,49 @@ renamePN oldPN newName useQual t = do
     -- ---------------------------------
 
     renameLIE :: HowToQual -> (GHC.LIE GHC.RdrName) -> RefactGhc (GHC.LIE GHC.RdrName)
-    renameLIE useQual' x@(GHC.L l (GHC.IEVar old@(GHC.L ln n))) = do
+    renameLIE useQual' x@(GHC.L l (GHC.IEVar old)) = do
      nm <- getRefactNameMap
-     if cond nm (GHC.L ln n)
+#if __GLASGOW_HASKELL__ <= 800
+     if cond nm old
        then do
-          -- logm $ "renamePN:renameLIE.IEVar at :" ++ (showGhc l)
-          let nn = newNameCalc useQual' n
-
-          new <- makeNewName old nn
-
+          new <- makeNewName old (newNameCalc useQual' $ GHC.unLoc old)
           return (GHC.L l (GHC.IEVar new))
+#else
+     if cond nm (GHC.ieLWrappedName old)
+       then do
+          new <- makeNewNameIe useQual' old
+          return (GHC.L l (GHC.IEVar new))
+#endif
        else return x
 
     renameLIE useQual' x@(GHC.L l (GHC.IEThingAbs old@(GHC.L _ln n))) = do
      nm <- getRefactNameMap
+#if __GLASGOW_HASKELL__ <= 800
      if cond nm (GHC.L l n)
        then do
-          -- logm $ "renamePN:renameLIE.IEThingAbs at :" ++ (showGhc l)
-          let nn = newNameCalc useQual' n
-
-          new <- makeNewName old nn
-
+          new <- makeNewName old (newNameCalc useQual' n)
           return (GHC.L l (GHC.IEThingAbs new))
+#else
+     if cond nm (GHC.ieLWrappedName old)
+       then do
+          new <- makeNewNameIe useQual' old
+          return (GHC.L l (GHC.IEThingAbs new))
+#endif
        else return x
 
     renameLIE useQual' x@(GHC.L l (GHC.IEThingAll old@(GHC.L ln n))) = do
      nm <- getRefactNameMap
+#if __GLASGOW_HASKELL__ <= 800
      if cond nm (GHC.L ln n)
        then do
-          -- logm $ "renamePN:renameLIE.IEThingAll at :" ++ (showGhc l)
-          let nn = newNameCalc useQual' n
-
-          new <- makeNewName old nn
-
+          new <- makeNewName old (newNameCalc useQual' n)
           return (GHC.L l (GHC.IEThingAll new))
+#else
+     if cond nm (GHC.ieLWrappedName old)
+       then do
+          new <- makeNewNameIe useQual' old
+          return (GHC.L l (GHC.IEThingAll new))
+#endif
        else return x
 
     -- TODO: check inside the ns here too
@@ -2316,17 +2382,25 @@ renamePN oldPN newName useQual t = do
 #endif
      = do
          nm <- getRefactNameMap
+#if __GLASGOW_HASKELL__ <= 800
          old' <- if (cond nm (GHC.L ln n))
            then do
-             logm $ "renamePN:renameLIE.IEThingWith at :" ++ (showGhc l)
-             -- let nn = newNameCalcBool useQual' n
-             let nn = newNameCalc useQual' n
-             new <- makeNewName old nn
+             new <- makeNewName old (newNameCalc useQual' n)
              return new
            else return old
+#else
+         old' <- if (cond nm (GHC.ieLWrappedName old))
+           then do
+             new <- makeNewNameIe useQual' old
+             return new
+           else return old
+#endif
 
-
+#if __GLASGOW_HASKELL__ <= 800
          ns' <- if (any (\(GHC.L lnn nn) -> cond nm (GHC.L lnn nn)) ns)
+#else
+         ns' <- if (any (\nn -> cond nm (GHC.ieLWrappedName nn)) ns)
+#endif
            then renameTransform useQual' ns
            else return ns
 #if __GLASGOW_HASKELL__ <= 710
@@ -2384,7 +2458,7 @@ renamePN oldPN newName useQual t = do
              return (Just (new,f))
            else return mln
        Nothing -> return mln
-#else
+#elif __GLASGOW_HASKELL__ <= 800
        GHC.FunBindMatch old f -> do
          nm <- getRefactNameMap
          if cond nm old
@@ -2393,6 +2467,15 @@ renamePN oldPN newName useQual t = do
              return (GHC.FunBindMatch new f)
            else return mln
        GHC.NonFunBindMatch -> return mln
+#else
+       GHC.FunRhs old f -> do
+         nm <- getRefactNameMap
+         if cond nm old
+           then do
+             new <- makeNewName old newNameUnqual
+             return (GHC.FunRhs new f)
+           else return mln
+       _ -> return mln
 #endif
      return (GHC.Match mln' pats' ty' grhss')
 
