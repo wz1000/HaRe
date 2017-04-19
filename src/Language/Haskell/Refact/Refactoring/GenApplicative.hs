@@ -4,19 +4,24 @@ module Language.Haskell.Refact.Refactoring.GenApplicative
   (genApplicative, compGenApplicative) where
 
 import Language.Haskell.Refact.API
-import qualified Language.Haskell.GhcMod as GM
+-- import qualified Language.Haskell.GhcMod as GM
+-- import qualified Language.Haskell.GhcMod.Monad       as GM
+-- import qualified Language.Haskell.GhcMod.Monad.Out   as GM
+-- import qualified Language.Haskell.GhcMod.Monad.Types as GM
+-- import qualified Language.Haskell.GhcMod.Target      as GM
+import qualified Language.Haskell.GhcMod.Types       as GM
 import qualified GHC as GHC
 import qualified RdrName as GHC
 import System.Directory
 import FastString
-import Data.Map as Map (union)
+-- import Data.Map as Map (union)
 import Data.Generics as SYB
 import GHC.SYB.Utils as SYB
 import Data.List
-import Control.Monad
+-- import Control.Monad
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
-import Language.Haskell.GHC.ExactPrint.Print
+-- import Language.Haskell.GHC.ExactPrint.Print
 import Language.Haskell.GHC.ExactPrint.Parsers
 
 genApplicative :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> IO [FilePath]

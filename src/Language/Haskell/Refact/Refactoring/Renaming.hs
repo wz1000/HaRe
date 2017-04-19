@@ -6,7 +6,7 @@ module Language.Haskell.Refact.Refactoring.Renaming
   ) where
 
 import qualified Data.Generics         as SYB
-import qualified GHC.SYB.Utils         as SYB
+-- import qualified GHC.SYB.Utils         as SYB
 
 import qualified GHC
 import qualified Name                  as GHC
@@ -21,7 +21,7 @@ import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Utils
 import Language.Haskell.Refact.API
 import System.Directory
-import qualified Language.Haskell.GhcMod as GM (Options(..))
+import qualified Language.Haskell.GhcMod.Types as GM (Options(..))
 import qualified Data.Map as Map
 
 {-# ANN module "HLint: ignore Redunant do" #-}

@@ -11,7 +11,11 @@ import qualified GHC.SYB.Utils         as SYB
 import qualified BasicTypes    as GHC
 import qualified GHC           as GHC
 
-import qualified Language.Haskell.GhcMod as GM (Options(..))
+-- import qualified Language.Haskell.GhcMod.Monad       as GM
+-- import qualified Language.Haskell.GhcMod.Monad.Out   as GM
+-- import qualified Language.Haskell.GhcMod.Monad.Types as GM
+-- import qualified Language.Haskell.GhcMod.Target      as GM
+import qualified Language.Haskell.GhcMod.Types       as GM
 import Language.Haskell.Refact.API
 
 -- To be moved into HaRe API

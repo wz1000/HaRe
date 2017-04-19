@@ -16,8 +16,13 @@ import qualified RdrName               as GHC
 import Data.List
 import Data.Maybe
 
-import qualified Language.Haskell.GhcMod as GM
-import Language.Haskell.GhcMod.Internal  as GM
+-- import qualified Language.Haskell.GhcMod as GM
+-- import Language.Haskell.GhcMod.Internal  as GM
+-- import qualified Language.Haskell.GhcMod.Monad       as GM
+-- import qualified Language.Haskell.GhcMod.Monad.Out   as GM
+-- import qualified Language.Haskell.GhcMod.Monad.Types as GM
+-- import qualified Language.Haskell.GhcMod.Target      as GM
+import qualified Language.Haskell.GhcMod.Types       as GM
 import Language.Haskell.Refact.API
 
 import Language.Haskell.GHC.ExactPrint.Types

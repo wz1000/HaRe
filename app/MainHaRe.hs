@@ -12,7 +12,7 @@ import           Distribution.Text (display)
 import           Language.Haskell.Refact.API
 import           Language.Haskell.Refact.HaRe
 import           Options.Applicative.Simple
-import qualified Language.Haskell.GhcMod as GM
+import qualified Language.Haskell.GhcMod.Types as GM
 import qualified Paths_HaRe as Meta
 
 -- temporary until exposed by ghc-mod

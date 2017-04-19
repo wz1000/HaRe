@@ -126,7 +126,7 @@ Library
                                , filepath
                                , ghc
                                , ghc-exactprint == 0.5.3.*
-                               , ghc-mod >= 5.7.0.0
+                               , ghc-mod > 5.7.0.0
                                , ghc-syb-utils
                                , hslogger
                                , monad-control
@@ -146,7 +146,7 @@ Library
         -- real	0m36.427s
         -- user 0m41.448s
         -- sys 0m2.544s
-        GHC-Options:            -O0
+        GHC-Options:            -O0 -Wall
         Hs-Source-Dirs:         src
         -- Other-Modules:          Paths_HaRe
         Exposed-modules:

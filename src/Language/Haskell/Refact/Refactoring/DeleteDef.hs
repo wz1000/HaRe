@@ -4,16 +4,20 @@ module Language.Haskell.Refact.Refactoring.DeleteDef
   (deleteDef, compDeleteDef) where
 
 import qualified Data.Generics as SYB
-import qualified GHC.SYB.Utils as SYB
-import BasicTypes
+-- import qualified GHC.SYB.Utils as SYB
+-- import BasicTypes
 import qualified GHC
 import Control.Monad
-import Control.Monad.State
-import Language.Haskell.GhcMod
+-- import Control.Monad.State
+
 import Language.Haskell.Refact.API
 import Data.Generics.Strafunski.StrategyLib.StrategyLib
-import qualified Language.Haskell.GhcMod as GM
-import qualified Language.Haskell.GhcMod.Internal as GM
+-- import qualified Language.Haskell.GhcMod as GM
+-- import qualified Language.Haskell.GhcMod.Monad       as GM
+-- import qualified Language.Haskell.GhcMod.Monad.Out   as GM
+-- import qualified Language.Haskell.GhcMod.Monad.Types as GM
+-- import qualified Language.Haskell.GhcMod.Target      as GM
+import qualified Language.Haskell.GhcMod.Types       as GM
 import System.Directory
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
