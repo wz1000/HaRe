@@ -4,7 +4,7 @@ import qualified Data.DList as DList
 
 --Super contrived example
 explode :: Int -> [a] -> DList.DList a
-explode n lst = (DList.concat (DList.map (\x -> DList.replicate n x) (DList.fromList lst)))
+explode n lst = DList.concat (map (\x -> DList.replicate n x) lst)
 
 f :: IO ()
 f = do
