@@ -73,6 +73,7 @@ doHughesList fileName funNm pos argNum = do
   replaceTypeSig pos newTySig
   --Eventually should extract the qualifier as an argument so that people can choose their own.
   addSimpleImportDecl "Data.DList" (Just "DList")
+  logParsedSource "After adding import decl"
   fixClientFunctions (numTypesOfBind funBind) argNum funRdr
 
 fixTypeSig :: Int -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
