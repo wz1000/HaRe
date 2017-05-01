@@ -47,21 +47,21 @@ TODO: Figure out strategy for name conflicts. Probably need another optional arg
    The argument could also be made that the DList import should always be qualified.
 -}
 
-hughesList :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> Int -> IO [FilePath]
-hughesList settings cradle fileName funNm pos argNum = do
+hughesList :: RefactSettings -> GM.Options -> FilePath -> String -> Maybe String -> SimpPos -> Int -> IO [FilePath]
+hughesList settings cradle fileName funNm mqual pos argNum = do
   absFileName <- canonicalizePath fileName
-  runRefacSession settings cradle (compHughesList fileName funNm pos argNum)
+  runRefacSession settings cradle (compHughesList fileName funNm mqual pos argNum)
 
-compHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]
-compHughesList fileName funNm pos argNum = do
-  (refRes@((_fp,ismod),_), ()) <- applyRefac (doHughesList fileName funNm pos argNum) (RSFile fileName)
+compHughesList :: FilePath -> String -> Maybe String -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]
+compHughesList fileName funNm mqual pos argNum = do
+  (refRes@((_fp,ismod),_), ()) <- applyRefac (doHughesList fileName funNm mqual pos argNum) (RSFile fileName)
   case ismod of
     RefacUnmodifed -> error "Introducing Hughes lists failed"
     RefacModified -> return ()
   return [refRes]
 
-doHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc ()
-doHughesList fileName funNm pos argNum = do
+doHughesList :: FilePath -> String -> Maybe String -> SimpPos -> Int -> RefactGhc ()
+doHughesList fileName funNm mqual pos argNum = do
   parsed <- getRefactParsed
   let (Just funBind) = getHsBind pos funNm parsed
       (Just tySig) = getTypeSig pos funNm parsed
@@ -72,8 +72,7 @@ doHughesList fileName funNm pos argNum = do
   logDataWithAnns "New type sig: " newTySig
   replaceTypeSig pos newTySig
   --Eventually should extract the qualifier as an argument so that people can choose their own.
-  addSimpleImportDecl "Data.DList" (Just "DList")
-  logParsedSource "After adding import decl"
+  addSimpleImportDecl "Data.DList" mqual
   fixClientFunctions (numTypesOfBind funBind) argNum funRdr
 
 fixTypeSig :: Int -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)

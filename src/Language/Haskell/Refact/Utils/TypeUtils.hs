@@ -890,7 +890,7 @@ addImportDecl (GHC.L l p) modName pkgQual source safe qualify alias hide idNames
                         }
      getQualAnns Nothing _ = []
      getQualAnns (Just _) q = let cond = if q then [((G GHC.AnnQualified), DP (0,1))] else [] in
-       [((G GHC.AnnAs), DP (0,1)),((G GHC.AnnVal),DP (0,1))] ++ cond
+       [((G GHC.AnnAs), DP (0,1)),((G GHC.AnnVal), (DP (0,1)))] ++ cond
 
 -- ---------------------------------------------------------------------
 
