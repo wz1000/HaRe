@@ -63,7 +63,7 @@ compHughesList fileName funNm mqual pos argNum = do
 doHughesList :: FilePath -> String -> Maybe String -> SimpPos -> Int -> RefactGhc ()
 doHughesList fileName funNm mqual pos argNum = do
   parsed <- getRefactParsed
-  let (Just funBind) = getHsBind pos funNm parsed
+  let (Just funBind) = getHsBind pos parsed
       (Just tySig) = getTypeSig pos funNm parsed
       (Just (GHC.L _ funRdr)) = locToRdrName pos parsed
   newBind <- fixFunBind argNum funRdr funBind
