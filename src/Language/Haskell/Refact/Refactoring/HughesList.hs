@@ -69,16 +69,19 @@ doHughesList fileName funNm mqual pos argNum = do
   newBind <- fixFunBind argNum funRdr funBind
   replaceFunBind pos newBind
   newTySig <- fixTypeSig argNum tySig
-  logDataWithAnns "New type sig: " newTySig
+  --logDataWithAnns "New type sig: " newTySig
   replaceTypeSig pos newTySig
+  --We will import the DList constructor only so type signatures are cleaner
+  case mqual of
+    (Just _) -> addConstructorImport
+    _ -> return ()
   --Eventually should extract the qualifier as an argument so that people can choose their own.
   addSimpleImportDecl "Data.DList" mqual
   fixClientFunctions (numTypesOfBind funBind) argNum funRdr
 
 fixTypeSig :: Int -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
 fixTypeSig argNum =  traverseTypeSig argNum replaceList
-  where
-    
+  where    
     replaceList :: GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
     replaceList (GHC.L l (GHC.HsListTy innerTy)) = do
       let dlistFS = GHC.fsLit "DList"
@@ -89,6 +92,15 @@ fixTypeSig argNum =  traverseTypeSig argNum replaceList
       setDP (DP (0,1)) lTy
       return lTy
     replaceList x = return x
+
+addConstructorImport :: RefactGhc ()
+addConstructorImport = do
+  let modNm = GHC.mkModuleName "Data.DList"
+      rdr = mkRdrName "DList"
+  parsed <- getRefactParsed
+  newP <- addImportDecl parsed modNm Nothing False False False Nothing False [rdr]
+  putRefactParsed newP mempty
+  logDataWithAnns "addConstructorImport" newP
 
 --This function will apply the given function to the appropriate type signature element.
 --The int denotes which argument the function should be applied to starting at one

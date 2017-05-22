@@ -44,9 +44,7 @@ addSimpleImportDecl modName mqual = do
   let modNm' = GHC.mkModuleName modName
   parsed <- getRefactParsed
   newP <- addImportDecl parsed modNm' Nothing False False (isJust mqual) mqual False []
-  logDataWithAnns "ImportDecl: " newP
-  currAnns <- fetchAnnsFinal
-  putRefactParsed newP currAnns
+  putRefactParsed newP mempty
 
 --Takes in a lhs pattern and a rhs. Wraps those in a lambda and adds the annotations associated with the lambda. Returns the new located lambda expression
 
