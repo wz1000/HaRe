@@ -26,19 +26,18 @@ spec = do
       diff <- ct $ compareFiles "./HughesList/HList2.refactored.hs"
                                 "./HughesList/HList2.hs.expected"     
       diff `shouldBe` []
-    it "A really contrived example where the second argument of a function is refactored to a DList" $ do
-      res <- ct $ hughesList defaultTestSettings testOptions "./HughesList/HList3.hs" "explode" Nothing (6,1) 2
+   {- it "A really contrived example where the second argument of a function is refactored to a DList" $ do
+      res <- ct $ hughesList logTestSettings testOptions "./HughesList/HList3.hs" "explode" (Just "DList") (6,1) 2
       res' <- ct $ mapM makeRelativeToCurrentDirectory res
       res' `shouldBe` ["HughesList/HList3.hs"]
       diff <- ct $ compareFiles "./HughesList/HList3.refactored.hs"
                                 "./HughesList/HList3.hs.expected"     
-      diff `shouldBe` []
-    it "A really contrived example where the third argument of a function is refactored to a DList" $ do
+      diff `shouldBe` []-}
+    it "A really contrived example where the result type of a function is refactored to a DList" $ do
       res <- ct $ hughesList logTestSettings testOptions "./HughesList/HList3.hs" "explode" (Just "DList") (6,1) 3
       res' <- ct $ mapM makeRelativeToCurrentDirectory res
       res' `shouldBe` ["HughesList/HList3.hs"]
       diff <- ct $ compareFiles "./HughesList/HList3.refactored.hs"
                                 "./HughesList/HList3.hs.expected2"     
       diff `shouldBe` []
-    
-
+        

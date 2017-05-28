@@ -5,6 +5,10 @@ module Language.Haskell.Refact.Utils.Query where
 --This module contains functions that retrieve sections of the ast. It is fairly high level.
 
 import qualified GHC as GHC
+import qualified SrcLoc as GHC
+import qualified Id as GHC
+import qualified OccName as GHC
+import qualified Name as GHC
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.Synonyms
 import Language.Haskell.Refact.Utils.Types
@@ -40,6 +44,33 @@ getHsBind pos a =
 #endif
             | name == rNm = (Just bnd)
         isBind _ = Nothing
+
+
+--Get the name of a function from a string
+getFunName :: (SYB.Data t) => String -> t -> Maybe GHC.Name
+getFunName str = SYB.something (Nothing `SYB.mkQ` comp)
+  where
+    comp :: GHC.HsBind GHC.Name -> Maybe GHC.Name
+    comp (GHC.FunBind lid _ _ _ _ _)
+      | (GHC.unLoc lid) `isNameString` str = Just (GHC.unLoc lid)
+      | otherwise = Nothing
+    comp _ = Nothing
+        --This seems pretty dangerous but it'll do in a pinch
+    isNameString :: GHC.Name -> String -> Bool
+    isNameString nm str = (GHC.nameOccName nm) == (GHC.mkVarOcc str)
+          
+
+getTypedHsBind :: (Data a) => GHC.OccName -> a -> Maybe (GHC.HsBind GHC.Id)
+getTypedHsBind occ = SYB.something (Nothing `SYB.mkQ` isBind)
+  where
+#if __GLASGOW_HASKELL__ <= 710
+        isBind (bnd@(GHC.FunBind (GHC.L _ nm) _ _ _ _ _) :: GHC.HsBind GHC.Id)
+#else
+        isBind (bnd@(GHC.FunBind (GHC.L _ nm) _ _ _ _) :: GHC.HsBind GHC.Id)
+#endif
+            |  (GHC.occName (GHC.idName nm)) == occ = (Just bnd)
+        isBind _ = Nothing
+  
 
 --This looks up the type signature of the given identifier.
 --The given position is assumed to be the location of where the identifier is defined
@@ -83,3 +114,11 @@ extTwinQ f g a1 a2 =
     Nothing -> f a1 a2
     (Just r) -> r
   where mr = cast a1 >>= (\b1 -> cast a2 >>= (\b2 -> Just $ g b1 b2))                        
+
+
+lookupByLoc :: (SYB.Data a,  SYB.Data b) => GHC.SrcSpan -> GHC.Located a -> Maybe (GHC.Located b)
+lookupByLoc loc = SYB.something (Nothing `SYB.mkQ` comp)
+  where comp :: (SYB.Data a) => GHC.Located a -> Maybe (GHC.Located a)
+        comp a@(GHC.L l _)
+          | l == loc = Just a
+          | otherwise = Nothing

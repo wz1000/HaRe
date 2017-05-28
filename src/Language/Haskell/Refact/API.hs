@@ -56,11 +56,13 @@ module Language.Haskell.Refact.API
        , getRefactStreamModified
        , setRefactStreamModified
        , getRefactInscopes
+       , getRefactTyped
        , getRefactRenamed
        , putRefactRenamed
        , getRefactParsed
        , putRefactParsed
        , putParsedModule
+       , typeCheckModule
        , clearParsedModule
        , getRefactFileName
        , getRefactTargetModule
@@ -263,6 +265,7 @@ module Language.Haskell.Refact.API
  , ParsedLStmt
  , ParsedLExpr
  , ParsedBind
+ , ParsedLDecl
 
  -- from Language.Haskell.Refact.Utils.Transform
   , addSimpleImportDecl
@@ -277,12 +280,17 @@ module Language.Haskell.Refact.API
   , addBackquotes
   , constructLHsTy
   , constructHsVar
+  , insertNewDecl
+  , rmFun
 -- from Language.Haskell.Refact.Utils.Query
   , getVarAndRHS
   , getHsBind
+  , getFunName
+  , getTypedHsBind
   , getTypeSig
   , isHsVar
   , astCompare
+  , lookupByLoc
  ) where
 
 import Language.Haskell.Refact.Utils.ExactPrint

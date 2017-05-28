@@ -19,7 +19,16 @@ import Language.Haskell.GHC.ExactPrint.Types
 import qualified Unique as Unique (mkUniqueGrimily)
 import Data.Generics.Strafunski.StrategyLib.StrategyLib
 import Control.Applicative
+import Outputable
+import qualified TypeRep as GHC
+import qualified Module as GHC
+import Data.Maybe (fromMaybe)
+import qualified Data.Map as M
 
+
+import qualified TypeRep as GHC
+import qualified TyCon as GHC
+import qualified HscTypes as GHC
 {-
 This refactoring will rewrite functions to use Hughes lists (also called difference lists) instead of the standard list interface.
 
@@ -63,6 +72,14 @@ compHughesList fileName funNm mqual pos argNum = do
 doHughesList :: FilePath -> String -> Maybe String -> SimpPos -> Int -> RefactGhc ()
 doHughesList fileName funNm mqual pos argNum = do
   parsed <- getRefactParsed
+  --Eventually should extract the qualifier as an argument so that people can choose their own.
+  logm "Adding importDecl"
+  addSimpleImportDecl "Data.DList" mqual
+  --We will import the DList constructor only so type signatures are cleaner
+ {- case mqual of
+    (Just _) -> addConstructorImport
+    _ -> return ()-}
+  _ <- getDListTyCon mqual
   let (Just funBind) = getHsBind pos parsed
       (Just tySig) = getTypeSig pos funNm parsed
       (Just (GHC.L _ funRdr)) = locToRdrName pos parsed
@@ -71,13 +88,10 @@ doHughesList fileName funNm mqual pos argNum = do
   newTySig <- fixTypeSig argNum tySig
   --logDataWithAnns "New type sig: " newTySig
   replaceTypeSig pos newTySig
-  --We will import the DList constructor only so type signatures are cleaner
-  case mqual of
-    (Just _) -> addConstructorImport
-    _ -> return ()
-  --Eventually should extract the qualifier as an argument so that people can choose their own.
-  addSimpleImportDecl "Data.DList" mqual
-  fixClientFunctions (numTypesOfBind funBind) argNum funRdr
+  let modQual = case mqual of
+                  (Just s) -> s ++ "."
+                  Nothing -> ""
+  fixClientFunctions modQual (numTypesOfBind funBind) argNum funRdr
 
 fixTypeSig :: Int -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
 fixTypeSig argNum =  traverseTypeSig argNum replaceList
@@ -100,7 +114,6 @@ addConstructorImport = do
   parsed <- getRefactParsed
   newP <- addImportDecl parsed modNm Nothing False False False Nothing False [rdr]
   putRefactParsed newP mempty
-  logDataWithAnns "addConstructorImport" newP
 
 --This function will apply the given function to the appropriate type signature element.
 --The int denotes which argument the function should be applied to starting at one
@@ -243,15 +256,15 @@ outputParameterBecomesDList bind = do
 
 --                 f :: [a] -> sometype ==> f_refact :: DList a -> sometype
 -- Any parameters of type list need to be wrapped in fromList
-fixClientFunctions :: Int -> Int -> GHC.RdrName -> RefactGhc ()
-fixClientFunctions totalParams argNum name = if (totalParams == argNum)
-                                    then wrapCallsWithToList name
+fixClientFunctions :: String -> Int -> Int -> GHC.RdrName -> RefactGhc ()
+fixClientFunctions modNm totalParams argNum name = if (totalParams == argNum)
+                                    then wrapCallsWithToList modNm name
                                     else applyAtCallPoint name (modifyNthParam totalParams argNum (wrapExpr fromLstRdr))
-  where fromLstRdr = mkRdrName "fromList"
+  where fromLstRdr = mkRdrName (modNm ++ "fromList")
 
 --This function handles the case where callsites need to be wrapped with toList
-wrapCallsWithToList :: GHC.RdrName -> RefactGhc ()
-wrapCallsWithToList name = applyAtCallPoint name comp
+wrapCallsWithToList :: String -> GHC.RdrName -> RefactGhc ()
+wrapCallsWithToList modNm name = applyAtCallPoint name comp
   where comp :: ParsedLExpr -> RefactGhc ParsedLExpr
         comp e = do
           zeroDP e
@@ -261,13 +274,14 @@ wrapCallsWithToList name = applyAtCallPoint name comp
 #endif
           lLhs <- locate toListVar
           addAnnVal lLhs
+          logm $ "ToList being inserted: " ++ SYB.showData SYB.Parser 3 lLhs
           res <- locate $ (GHC.HsApp lLhs parE)
           return res
 #if __GLASGOW_HASKELL__ <= 710          
-        toListVar = GHC.HsVar (mkRdrName "toList")
+        toListVar = GHC.HsVar (mkRdrName (modNm ++ "toList"))
 #else
         toListVar' = do
-           lNm <- locate (mkRdrName "toList")
+           lNm <- locate (mkRdrName (modNm ++ "toList"))
            return (GHC.HsVar lNm)
 #endif
 
@@ -328,3 +342,98 @@ wrapExpr nm e = do
   lE <- locate expr
   wrapInPars lE
     where nmE = (GHC.HsVar nm)
+
+
+printTypeDebug :: RefactGhc ()
+printTypeDebug = do
+  ts <- getRefactTyped  
+  SYB.everywhereM (SYB.mkM comp) ts
+  return ()
+    where
+      mapRdr = mkRdrName "replicate"
+      comp :: GHC.HsExpr GHC.Id -> RefactGhc (GHC.HsExpr GHC.Id)
+      comp e@(GHC.HsVar id)
+        | (GHC.getOccName id) == (GHC.rdrNameOcc mapRdr) = do
+            logm "==========Found replicate========"
+            let ty = GHC.idType id
+            logm $ SYB.showData SYB.TypeChecker 3 ty
+            return e
+        | otherwise = return e
+      comp e = return e
+
+--This takes in a type and returns its result type
+getResultType :: GHC.Type -> GHC.Type
+--This case is here because below top level bindings any types with type variables will be
+--explicitly polymorphic once we get past all of the polymorphic types we will either find
+--some other constructor and in that case we've found the result type
+--if we find a FunTy constructor we continue to descent the type down the RHS
+--until we find a non-FunTy constructor 
+getResultType (GHC.ForAllTy _ ty) = getResultType ty
+getResultType (GHC.FunTy _ ty) = comp ty
+  where comp :: GHC.Type -> GHC.Type
+        comp (GHC.FunTy _ ty) = comp ty
+        comp ty = ty
+getResultType ty = ty
+
+--Going to be playing around with the typechecked source
+getDListTyCon :: Maybe String -> RefactGhc GHC.Type
+getDListTyCon mqual = do
+  let prefix = case mqual of
+        (Just pre) -> pre ++ "."
+        Nothing -> ""
+  --Should probably work on generating a unique name somehow
+  decl <- insertNewDecl $ "emdl = " ++ prefix ++ "empty"  
+  typeCheckModule
+  logm "Ran type checker"
+  renamed <- getRefactRenamed
+  parsed <- getRefactParsed
+  typed <- getRefactTyped
+  let nm = gfromJust "Getting emdl's name" $ getFunName "emdl" renamed
+  logm $ "GOT name: " ++ (show nm)
+  let mBind = getTypedHsBind (getOcc decl) typed
+  ty <- case mBind of
+          (Just (GHC.FunBind lid _ _ _ _ _)) ->
+            do let id = GHC.unLoc lid
+               return $ GHC.idType id               
+          Nothing -> error "Could not retrieve DList type"
+  logm $ "Typed bind: " ++ SYB.showData SYB.TypeChecker 3 mBind
+  --Removing the decl
+  rmFun (GHC.mkRdrUnqual (GHC.occName nm))
+  return ty
+    where
+      getOcc :: ParsedLDecl -> GHC.OccName
+      getOcc (GHC.L _ (GHC.ValD (GHC.FunBind nm _ _ _ _ _))) = GHC.rdrNameOcc $ GHC.unLoc nm
+  --error "DONE with typePlayground"
+
+--NOTE: May want to change this to use GHC.Name
+data IsomorphicFuncs = IF {
+  projFun :: GHC.RdrName,
+  absFun :: GHC.RdrName,
+  eqFuns :: M.Map GHC.RdrName GHC.RdrName
+  }        
+            
+
+printType :: Int -> GHC.Type -> String
+printType n (GHC.TyVarTy v) = indent n ++ "(TyVarTy " ++ SYB.showData SYB.TypeChecker (n+1) v ++ ")"
+printType n (GHC.AppTy t1 t2) = indent n ++ "(AppTy\n" ++ (printType (n+1) t1) ++ "\n" ++ (printType (n+1) t2) ++ "\n)"
+printType n (GHC.TyConApp tc lst) = indent n ++ "(TyConApp: " ++ (printCon tc) ++
+                                (foldl (\rst ty -> rst ++ "\n" ++ (printType (n+1) ty)) "" lst) ++ ")"
+printType n (GHC.FunTy t1 t2) = indent n ++ "(FunTy " ++ (printType (n+1) t1) ++ indent n ++ "->" ++ (printType (n+1) t2) ++ ")"
+printType n (GHC.ForAllTy v ty) = indent n ++ "(ForAllTy: " ++ (SYB.showData SYB.TypeChecker (n+1) v) ++ "\n" ++ (printType (n+1) ty) ++ "\n)"
+printType n (GHC.LitTy tl) = indent n ++ "(LitTy: " ++ showTyLit tl ++ ")"
+
+
+showTyLit :: GHC.TyLit -> String
+showTyLit (GHC.NumTyLit i) = show i
+showTyLit (GHC.StrTyLit fs) = show fs
+
+
+printCon :: GHC.TyCon -> String
+printCon tc
+  | GHC.isFunTyCon tc = "FunTyCon: " ++ shwTc tc
+  | GHC.isAlgTyCon tc = "AlgTyCon: " ++ shwTc tc
+  | otherwise = "TyCon: " ++ (show $ toConstr tc) ++ "|" ++ shwTc tc
+
+shwTc = SYB.showSDoc_ . ppr
+indent i = "\n" ++ replicate i ' '
+

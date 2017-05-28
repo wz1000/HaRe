@@ -26,12 +26,14 @@ module Language.Haskell.Refact.Utils.MonadFunctions
 
        , getRefactInscopes
 
+       , getRefactTyped
+       
        , getRefactRenamed
        , putRefactRenamed
 
        , getRefactParsed
        , putRefactParsed
-
+       
        -- * Annotations
        -- , addRefactAnns
        , setRefactAnns
@@ -40,6 +42,7 @@ module Language.Haskell.Refact.Utils.MonadFunctions
        -- *
        , putParsedModule
        , clearParsedModule
+       , typeCheckModule
        , getRefactFileName
        , getRefactTargetModule
        , getRefactModule
@@ -86,6 +89,8 @@ import qualified GhcMonad      as GHC
 import qualified Module        as GHC
 import qualified Name          as GHC
 import qualified Unique        as GHC
+import qualified HscTypes      as GHC (md_exports)
+import qualified TcRnTypes     as GHC (tcg_rdr_env)
 #if __GLASGOW_HASKELL__ > 710
 import qualified Var
 #endif
@@ -138,6 +143,9 @@ setRefactStreamModified rr = do
 
 getRefactInscopes :: RefactGhc InScopes
 getRefactInscopes = GHC.getNamesInScope
+
+getRefactTyped :: RefactGhc GHC.TypecheckedSource
+getRefactTyped = getTypecheckedModule >>= (\tm -> return $ tmTypecheckedSource tm)
 
 getRefactRenamed :: RefactGhc GHC.RenamedSource
 getRefactRenamed = do
@@ -234,6 +242,32 @@ clearParsedModule :: RefactGhc ()
 clearParsedModule = do
   st <- get
   put $ st { rsModule = Nothing }
+
+
+--Manually runs the typechecker on the target module parsed source,
+--Updates the rsModule accordingly 
+typeCheckModule :: RefactGhc ()
+typeCheckModule = do
+  st <- get
+  mtm <- gets rsModule
+  let tm = gfromJust "typecheckModule mtm" mtm
+      t = rsTypecheckedMod tm
+      pm = tmParsedModule t
+  --logm "Typechecking this parsed: "
+  --exactPrintParsed
+  tm' <- GHC.typecheckModule pm
+  let
+    rmSource = gfromJust "typecheckModule rmSource" (GHC.tm_renamed_source tm')
+    (gblEnv, md) = GHC.tm_internals_ tm'
+    tm'' = TypecheckedModule {
+        tmParsedModule = GHC.tm_parsed_module tm',
+        tmRenamedSource = rmSource,
+        tmTypecheckedSource = GHC.tm_typechecked_source tm',
+        tmMinfExports = GHC.md_exports md,
+        tmMinfRdrEnv = Just (GHC.tcg_rdr_env gblEnv)        
+          }
+  let rm = tm {rsTypecheckedMod = tm''}
+  put $ st {rsModule = Just rm}
 
 -- ---------------------------------------------------------------------
 

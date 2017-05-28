@@ -13,6 +13,8 @@ module Language.Haskell.Refact.Utils.Transform
   , addBackquotes
   , constructLHsTy
   , constructHsVar
+  , insertNewDecl
+  , rmFun
   ) where
 
 import qualified GHC as GHC
@@ -21,10 +23,11 @@ import qualified Data.Map as Map
 import Data.Data
 import Data.Maybe
 import qualified Data.Generics as SYB
+import qualified GHC.SYB.Utils as SYB
 import qualified FastString as GHC
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
-
+import Language.Haskell.GHC.ExactPrint.Parsers
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.MonadFunctions
 import Language.Haskell.Refact.Utils.Types
@@ -32,6 +35,8 @@ import Language.Haskell.Refact.Utils.Utils
 import Language.Haskell.Refact.Utils.TypeUtils
 import Language.Haskell.Refact.Utils.Synonyms
 import Language.Haskell.Refact.Utils.ExactPrint
+import qualified Language.Haskell.GhcMod.Types as GM
+
 
 -- The goal of this module is to provide basic transformations of the ast and
 -- annotations that are useful in multiple refactorings
@@ -194,4 +199,36 @@ constructLHsTy nm = do
 #endif
   addAnnVal newTy
   zeroDP newTy
-  return newTy    
+  return newTy
+
+-- Inserts the string representation of the decl
+-- at the end of the target module returns the location
+-- of the new declaration
+insertNewDecl :: String -> RefactGhc ParsedLDecl
+insertNewDecl declStr = do
+  (GHC.L pSpn hsMod) <- getRefactParsed
+  trgtMod <- getRefactTargetModule
+  -- Use a fake filepath the ensure that the location remains unique
+  let fp = "HaRe"--GM.mpPath trgtMod
+  logm $ "Inserting decl into " ++ fp
+  df <- GHC.getSessionDynFlags
+  let pRes = parseDecl df fp declStr
+  case pRes of
+    Left (_spn, str) -> error $ "insertNewDecl: decl parse failed with message:\n" ++ str
+    Right (anns, decl@(GHC.L spn _)) -> do
+      let oldDecs = GHC.hsmodDecls hsMod
+          newParsed = (GHC.L pSpn (hsMod {GHC.hsmodDecls = oldDecs ++ [decl]}))
+      logm $ "New parsed: " ++ SYB.showData SYB.Parser 3 newParsed
+      putRefactParsed newParsed anns
+      addNewLines 1 decl
+      return decl
+
+rmFun :: GHC.RdrName -> RefactGhc ()
+rmFun nm = do
+  parsed <- getRefactParsed
+  let newP = SYB.everywhere (SYB.mkT filterDeclLst) parsed
+  putRefactParsed newP mempty
+    where filterDeclLst :: [GHC.LHsDecl GHC.RdrName] -> [GHC.LHsDecl GHC.RdrName]
+          filterDeclLst = filter (\dec -> not $ isFun dec)
+          isFun (GHC.L _ (GHC.ValD (GHC.FunBind lNm _ _ _ _ _))) = (GHC.unLoc lNm) == nm
+          isFun _ = False

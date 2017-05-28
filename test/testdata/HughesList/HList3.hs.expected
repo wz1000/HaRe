@@ -1,13 +1,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module HList3 where
-import Data.DList
+import qualified Data.DList as DList
 
 --Super contrived example
-explode :: Int -> DList a -> [a]
-explode n lst = concat (map (\x -> replicate n x) (toList lst))
+explode :: Int -> DList.DList a -> [a]
+explode n lst = concat (map (\x -> replicate n x) (DList.toList lst))
 
 f :: IO ()
 f = do
   (lst :: [Int]) <- read <$> getLine
-  let newLst = explode 3 (fromList lst)
+  let newLst = explode 3 (DList.fromList lst)
   print newLst
