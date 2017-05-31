@@ -16,6 +16,7 @@ import qualified OccName as GHC
 import qualified Name as GHC
 import qualified Bag as GHC
 import Language.Haskell.GHC.ExactPrint.Types
+import Language.Haskell.GHC.ExactPrint.Parsers
 import qualified Unique as Unique (mkUniqueGrimily)
 import Data.Generics.Strafunski.StrategyLib.StrategyLib
 import Control.Applicative
@@ -29,6 +30,12 @@ import qualified Data.Map as M
 import qualified TypeRep as GHC
 import qualified TyCon as GHC
 import qualified HscTypes as GHC
+import qualified HscMain as GHC
+import qualified RnExpr as GHC
+import qualified TcRnDriver as GHC
+import qualified ErrUtils as GHC
+
+import Outputable
 {-
 This refactoring will rewrite functions to use Hughes lists (also called difference lists) instead of the standard list interface.
 
@@ -79,10 +86,14 @@ doHughesList fileName funNm mqual pos argNum = do
  {- case mqual of
     (Just _) -> addConstructorImport
     _ -> return ()-}
-  _ <- getDListTyCon mqual
-  let (Just funBind) = getHsBind pos parsed
-      (Just tySig) = getTypeSig pos funNm parsed
-      (Just (GHC.L _ funRdr)) = locToRdrName pos parsed
+  ty <- getDListTy mqual
+  isoF <- hListFuncs mqual
+  let
+    dlistCon = getTyCon ty
+    newFType = resultTypeToDList dlistCon
+    (Just funBind) = getHsBind pos parsed
+    (Just tySig) = getTypeSig pos funNm parsed
+    (Just (GHC.L _ funRdr)) = locToRdrName pos parsed
   newBind <- fixFunBind argNum funRdr funBind
   replaceFunBind pos newBind
   newTySig <- fixTypeSig argNum tySig
@@ -92,6 +103,10 @@ doHughesList fileName funNm mqual pos argNum = do
                   (Just s) -> s ++ "."
                   Nothing -> ""
   fixClientFunctions modQual (numTypesOfBind funBind) argNum funRdr
+
+
+getTyCon :: GHC.Type -> GHC.TyCon
+getTyCon (GHC.TyConApp tc _) = tc
 
 fixTypeSig :: Int -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
 fixTypeSig argNum =  traverseTypeSig argNum replaceList
@@ -375,43 +390,126 @@ getResultType (GHC.FunTy _ ty) = comp ty
         comp ty = ty
 getResultType ty = ty
 
+resultTypeToDList :: GHC.TyCon -> GHC.Type -> GHC.Type
+resultTypeToDList tc = modResultType f
+  where f (GHC.TyConApp _ tys) = GHC.TyConApp tc tys
+
+modResultType :: (GHC.Type -> GHC.Type) -> GHC.Type -> GHC.Type
+modResultType f (GHC.ForAllTy v ty) = let newTy = modResultType f ty in
+                                        (GHC.ForAllTy v newTy)
+modResultType f (GHC.FunTy t1 t2) = let newT2 = comp t2 in
+                                      (GHC.FunTy t1 newT2)
+  where comp (GHC.FunTy t1 t2) = let newT2 = comp t2 in
+                                   (GHC.FunTy t1 newT2)
+        comp ty = f ty
+modResultType f ty = f ty
+
 --Going to be playing around with the typechecked source
-getDListTyCon :: Maybe String -> RefactGhc GHC.Type
-getDListTyCon mqual = do
+getDListTy :: Maybe String -> RefactGhc GHC.Type
+getDListTy mqual = do
   let prefix = case mqual of
         (Just pre) -> pre ++ "."
         Nothing -> ""
   --Should probably work on generating a unique name somehow
   decl <- insertNewDecl $ "emdl = " ++ prefix ++ "empty"  
   typeCheckModule
-  logm "Ran type checker"
   renamed <- getRefactRenamed
   parsed <- getRefactParsed
   typed <- getRefactTyped
+  env <- GHC.getSession
+  logm $ "getDListTy module graph: " ++ showOutputable (GHC.hsc_mod_graph env)
   let nm = gfromJust "Getting emdl's name" $ getFunName "emdl" renamed
-  logm $ "GOT name: " ++ (show nm)
   let mBind = getTypedHsBind (getOcc decl) typed
   ty <- case mBind of
           (Just (GHC.FunBind lid _ _ _ _ _)) ->
             do let id = GHC.unLoc lid
                return $ GHC.idType id               
           Nothing -> error "Could not retrieve DList type"
-  logm $ "Typed bind: " ++ SYB.showData SYB.TypeChecker 3 mBind
-  --Removing the decl
   rmFun (GHC.mkRdrUnqual (GHC.occName nm))
   return ty
     where
       getOcc :: ParsedLDecl -> GHC.OccName
       getOcc (GHC.L _ (GHC.ValD (GHC.FunBind nm _ _ _ _ _))) = GHC.rdrNameOcc $ GHC.unLoc nm
-  --error "DONE with typePlayground"
+      
+showOutputable :: (Outputable o) => o -> String
+showOutputable = SYB.showSDoc_ . ppr
 
 --NOTE: May want to change this to use GHC.Name
 data IsomorphicFuncs = IF {
-  projFun :: GHC.RdrName,
-  absFun :: GHC.RdrName,
-  eqFuns :: M.Map GHC.RdrName GHC.RdrName
+  projFun :: GHC.OccName,
+  absFun :: GHC.OccName,
+  eqFuns :: M.Map GHC.OccName (GHC.OccName, GHC.Type)
   }        
             
+
+hListFuncs :: Maybe String -> RefactGhc IsomorphicFuncs
+hListFuncs mqual = do
+  fs <- funs
+  return $ IF {
+    projFun = GHC.mkVarOcc $ qual ++ "toList",
+    absFun = GHC.mkVarOcc $ qual ++ "fromList",
+    eqFuns = fs
+    }
+  where
+    qual = case mqual of
+      Nothing -> ""
+      (Just q) -> q ++  "."
+    funs :: RefactGhc (M.Map GHC.OccName (GHC.OccName, GHC.Type))
+    funs = do
+      kvs <- mkLst
+      return $ M.fromList kvs
+    mkLst = mapM f strs
+    f :: (String,String) -> RefactGhc (GHC.OccName,(GHC.OccName, GHC.Type))
+    f (s1, s2) = do
+      let o1 = GHC.mkVarOcc s1
+          o2 = GHC.mkVarOcc s2
+          rdr = case mqual of
+                  Nothing -> GHC.mkRdrUnqual o2
+                  (Just mdNm) -> GHC.mkRdrQual (GHC.mkModuleName mdNm) o2
+      addImportToEnv "Data.DList" mqual
+      env <- GHC.getSession
+      let ic = GHC.hsc_IC env
+          imps = GHC.ic_imports ic
+      logm "Imports ========== "
+      logImps imps
+      lExpr <- locate (GHC.HsVar rdr)
+      ((wrns, errs), mty) <- tcPExprWithEnv env lExpr
+      case mty of
+        Nothing -> error $ "TypeChecking failed: " ++ GHC.foldBag (++) (\e -> show e ++ "\n") "" errs
+        (Just ty) -> return (o1,(o2,ty))
+    strs = [("[]","empty"),("(:)","cons"),("(++)","append"),("concat", "concat"),("replicate","replicate"), ("head","head"),("tail","tail"),("foldr","foldr"),("map","map"), ("unfoldr", "unfoldr")]
+
+logImps is = mapM_ (\i -> case i of
+                            GHC.IIDecl (dec) -> logm $ SYB.showData SYB.Renamer 3 dec
+                            GHC.IIModule mn -> logm $ showOutputable mn
+                            ) is
+
+dlistImportDecl :: Maybe String -> RefactGhc (GHC.LImportDecl GHC.RdrName)
+dlistImportDecl mqual = do
+  dflags <- GHC.getSessionDynFlags
+  let pres = case mqual of
+               Nothing -> parseImport dflags "HaRe" "import Data.DList"
+               (Just q) -> parseImport dflags "HaRe" ("import qualified Data.DList as " ++ q)
+  (_, dec) <- handleParseResult "dlistImportDecl" pres
+  return dec
+
+{-
+tcPExpr :: ParsedLExpr -> RefactGhc (GHC.Messages, Maybe GHC.Type)
+tcPExpr ex = do
+  hsc_env <- GHC.getSession
+  tcPExprWithEnv hsc_env ex
+  -}
+tcPExprWithEnv :: GHC.HscEnv -> ParsedLExpr -> RefactGhc (GHC.Messages, Maybe GHC.Type)
+tcPExprWithEnv env ex = liftIO $ GHC.tcRnExpr env ex
+  
+
+addImportToEnv :: String -> Maybe String -> RefactGhc ()
+addImportToEnv pkgNm mqual = do
+  _ <- case mqual of
+         Nothing -> GHC.runDecls $ "import " ++ pkgNm
+         (Just qual) -> GHC.runDecls $ "import qualified " ++ pkgNm ++ " as " ++ qual
+  return ()
+  
 
 printType :: Int -> GHC.Type -> String
 printType n (GHC.TyVarTy v) = indent n ++ "(TyVarTy " ++ SYB.showData SYB.TypeChecker (n+1) v ++ ")"

@@ -281,3 +281,11 @@ Executable hlist3
   Build-Depends:          base >= 4.0 && < 5
                         , dlist
   default-language:    Haskell2010
+
+-- ---------------------------------------------------------------------
+  
+Executable hlist4
+  Main-Is: HughesList/HList4.hs
+  Build-Depends:          base >= 4.0 && < 5
+                        , dlist
+  default-language:    Haskell2010  
