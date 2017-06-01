@@ -63,24 +63,24 @@ TODO: Figure out strategy for name conflicts. Probably need another optional arg
    The argument could also be made that the DList import should always be qualified.
 -}
 
-hughesList :: RefactSettings -> GM.Options -> FilePath -> String -> Maybe String -> SimpPos -> Int -> IO [FilePath]
-hughesList settings cradle fileName funNm mqual pos argNum = do
+hughesList :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> Int -> IO [FilePath]
+hughesList settings cradle fileName funNm pos argNum = do
   absFileName <- canonicalizePath fileName
-  runRefacSession settings cradle (compHughesList fileName funNm mqual pos argNum)
+  runRefacSession settings cradle (compHughesList fileName funNm pos argNum)
 
-compHughesList :: FilePath -> String -> Maybe String -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]
-compHughesList fileName funNm mqual pos argNum = do
-  (refRes@((_fp,ismod),_), ()) <- applyRefac (doHughesList fileName funNm mqual pos argNum) (RSFile fileName)
+compHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]
+compHughesList fileName funNm pos argNum = do
+  (refRes@((_fp,ismod),_), ()) <- applyRefac (doHughesList fileName funNm pos argNum) (RSFile fileName)
   case ismod of
     RefacUnmodifed -> error "Introducing Hughes lists failed"
     RefacModified -> return ()
   return [refRes]
 
-doHughesList :: FilePath -> String -> Maybe String -> SimpPos -> Int -> RefactGhc ()
-doHughesList fileName funNm mqual pos argNum = do
-  parsed <- getRefactParsed
+doHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc ()
+doHughesList fileName funNm pos argNum = do
   --Eventually should extract the qualifier as an argument so that people can choose their own.
   logm "Adding importDecl"
+  let mqual = Just "DList"
   addSimpleImportDecl "Data.DList" mqual
   --We will import the DList constructor only so type signatures are cleaner
  {- case mqual of
@@ -88,6 +88,10 @@ doHughesList fileName funNm mqual pos argNum = do
     _ -> return ()-}
   ty <- getDListTy mqual
   isoF <- hListFuncs mqual
+  logm $ "Current position: " ++ (show pos)
+  parsed <- getRefactParsed
+  let rdr = locToRdrName pos parsed
+  logm$  "doHughesList" ++ (SYB.showData SYB.Renamer 3 parsed)  
   let
     dlistCon = getTyCon ty
     newFType = resultTypeToDList dlistCon
@@ -417,7 +421,6 @@ getDListTy mqual = do
   parsed <- getRefactParsed
   typed <- getRefactTyped
   env <- GHC.getSession
-  logm $ "getDListTy module graph: " ++ showOutputable (GHC.hsc_mod_graph env)
   let nm = gfromJust "Getting emdl's name" $ getFunName "emdl" renamed
   let mBind = getTypedHsBind (getOcc decl) typed
   ty <- case mBind of
@@ -429,10 +432,7 @@ getDListTy mqual = do
   return ty
     where
       getOcc :: ParsedLDecl -> GHC.OccName
-      getOcc (GHC.L _ (GHC.ValD (GHC.FunBind nm _ _ _ _ _))) = GHC.rdrNameOcc $ GHC.unLoc nm
-      
-showOutputable :: (Outputable o) => o -> String
-showOutputable = SYB.showSDoc_ . ppr
+      getOcc (GHC.L _ (GHC.ValD (GHC.FunBind nm _ _ _ _ _))) = GHC.rdrNameOcc $ GHC.unLoc nm      
 
 --NOTE: May want to change this to use GHC.Name
 data IsomorphicFuncs = IF {
@@ -441,6 +441,8 @@ data IsomorphicFuncs = IF {
   eqFuns :: M.Map GHC.OccName (GHC.OccName, GHC.Type)
   }        
             
+
+
 
 hListFuncs :: Maybe String -> RefactGhc IsomorphicFuncs
 hListFuncs mqual = do
@@ -466,23 +468,13 @@ hListFuncs mqual = do
           rdr = case mqual of
                   Nothing -> GHC.mkRdrUnqual o2
                   (Just mdNm) -> GHC.mkRdrQual (GHC.mkModuleName mdNm) o2
-      addImportToEnv "Data.DList" mqual
-      env <- GHC.getSession
-      let ic = GHC.hsc_IC env
-          imps = GHC.ic_imports ic
-      logm "Imports ========== "
-      logImps imps
+      dec <- dlistImportDecl mqual
       lExpr <- locate (GHC.HsVar rdr)
-      ((wrns, errs), mty) <- tcPExprWithEnv env lExpr
+      ((wrns, errs), mty) <- tcExprInTargetMod dec lExpr
       case mty of
         Nothing -> error $ "TypeChecking failed: " ++ GHC.foldBag (++) (\e -> show e ++ "\n") "" errs
         (Just ty) -> return (o1,(o2,ty))
     strs = [("[]","empty"),("(:)","cons"),("(++)","append"),("concat", "concat"),("replicate","replicate"), ("head","head"),("tail","tail"),("foldr","foldr"),("map","map"), ("unfoldr", "unfoldr")]
-
-logImps is = mapM_ (\i -> case i of
-                            GHC.IIDecl (dec) -> logm $ SYB.showData SYB.Renamer 3 dec
-                            GHC.IIModule mn -> logm $ showOutputable mn
-                            ) is
 
 dlistImportDecl :: Maybe String -> RefactGhc (GHC.LImportDecl GHC.RdrName)
 dlistImportDecl mqual = do
@@ -501,14 +493,21 @@ tcPExpr ex = do
   -}
 tcPExprWithEnv :: GHC.HscEnv -> ParsedLExpr -> RefactGhc (GHC.Messages, Maybe GHC.Type)
 tcPExprWithEnv env ex = liftIO $ GHC.tcRnExpr env ex
-  
 
-addImportToEnv :: String -> Maybe String -> RefactGhc ()
-addImportToEnv pkgNm mqual = do
-  _ <- case mqual of
-         Nothing -> GHC.runDecls $ "import " ++ pkgNm
-         (Just qual) -> GHC.runDecls $ "import qualified " ++ pkgNm ++ " as " ++ qual
-  return ()
+
+tcExprInTargetMod :: GHC.LImportDecl GHC.RdrName -> ParsedLExpr -> RefactGhc (GHC.Messages, Maybe GHC.Type)
+tcExprInTargetMod idecl ex = do
+  pm <- getRefactParsedMod
+  oldCntx <- GHC.getContext
+  let
+    nm = GHC.unLoc . GHC.ideclName $ (GHC.unLoc idecl)
+    lst = (GHC.IIDecl (GHC.unLoc idecl)):oldCntx --(GHC.IIModule nm):oldCntx
+  GHC.setContext lst
+  env <- GHC.getSession
+  liftIO $ GHC.tcRnExpr env ex
+    where addImps decs ms = let old = GHC.ms_textual_imps ms in
+            ms {GHC.ms_textual_imps = old ++ [decs]}
+
   
 
 printType :: Int -> GHC.Type -> String

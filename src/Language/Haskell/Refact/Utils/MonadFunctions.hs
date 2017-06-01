@@ -40,6 +40,7 @@ module Language.Haskell.Refact.Utils.MonadFunctions
        , mergeRefactAnns
 
        -- *
+       , getRefactParsedMod
        , putParsedModule
        , clearParsedModule
        , typeCheckModule
@@ -79,6 +80,7 @@ module Language.Haskell.Refact.Utils.MonadFunctions
        , initRefactModule
        , initTokenCacheLayout
        , initRdrNameMap
+       , showOutputable
        ) where
 
 import Control.Monad.State
@@ -106,8 +108,10 @@ import Language.Haskell.GHC.ExactPrint.Utils
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.TypeSyn
 import Language.Haskell.Refact.Utils.Types
-
 import qualified Data.Map as Map
+
+import qualified GHC.SYB.Utils as SYB
+import Outputable
 
 -- ---------------------------------------------------------------------
 
@@ -165,11 +169,7 @@ putRefactRenamed renamed = do
 
 getRefactParsed :: RefactGhc GHC.ParsedSource
 getRefactParsed = do
-  mtm <- gets rsModule
-  let tm = gfromJust "getRefactParsed" mtm
-  let t  = rsTypecheckedMod tm
-
-  let pm = tmParsedModule t
+  pm <- getRefactParsedMod
   return $ GHC.pm_parsed_source pm
 
 putRefactParsed :: GHC.ParsedSource -> Anns -> RefactGhc ()
@@ -233,6 +233,13 @@ modifyAnns tk f = tk'
 
 -- ----------------------------------------------------------------------
 
+getRefactParsedMod :: RefactGhc (GHC.ParsedModule)
+getRefactParsedMod = do
+  mtm <- gets rsModule
+  let tm = gfromJust "getRefactParsed" mtm
+  let t  = rsTypecheckedMod tm
+  return $ tmParsedModule t
+
 putParsedModule :: [Comment] -> TypecheckedModule -> RefactGhc ()
 putParsedModule cppComments tm = do
   st <- get
@@ -253,8 +260,6 @@ typeCheckModule = do
   let tm = gfromJust "typecheckModule mtm" mtm
       t = rsTypecheckedMod tm
       pm = tmParsedModule t
-  --logm "Typechecking this parsed: "
-  --exactPrintParsed
   tm' <- GHC.typecheckModule pm
   let
     rmSource = gfromJust "typecheckModule rmSource" (GHC.tm_renamed_source tm')
@@ -690,3 +695,5 @@ parseDeclWithAnns src = do
 
 -- EOF
 
+showOutputable :: (Outputable o) => o -> String
+showOutputable = SYB.showSDoc_ . ppr

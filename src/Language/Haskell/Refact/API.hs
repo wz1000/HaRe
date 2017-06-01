@@ -17,7 +17,7 @@ module Language.Haskell.Refact.API
        , getRefacSettings
        , defaultSettings
        , logSettings
-
+       
        , logm
        , logDataWithAnns
        , logExactprint
@@ -43,9 +43,8 @@ module Language.Haskell.Refact.API
        , clientModsAndFiles
        , serverModsAndFiles
        -- , lookupAnns
-
+         
        , stripCallStack
-
 
  -- * from `Language.Haskell.Refact.Utils.MonadFunctions`
 
@@ -61,6 +60,7 @@ module Language.Haskell.Refact.API
        , putRefactRenamed
        , getRefactParsed
        , putRefactParsed
+       , getRefactParsedMod
        , putParsedModule
        , typeCheckModule
        , clearParsedModule
@@ -86,7 +86,7 @@ module Language.Haskell.Refact.API
 
        -- * Parsing source
        , parseDeclWithAnns
-
+       , showOutputable
        -- , logm
 
 
