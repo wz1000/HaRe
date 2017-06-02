@@ -90,12 +90,12 @@ doHughesList fileName funNm pos argNum = do
   isoF <- hListFuncs mqual
   logm $ "Current position: " ++ (show pos)
   parsed <- getRefactParsed
-  let rdr = locToRdrName pos parsed
-  logm$  "doHughesList" ++ (SYB.showData SYB.Renamer 3 parsed)  
+  logm $  "doHughesList" ++ (SYB.showData SYB.Renamer 3 parsed)  
   let
+    (Just rdr) = locToRdrName pos parsed
     dlistCon = getTyCon ty
     newFType = resultTypeToDList dlistCon
-    (Just funBind) = getHsBind pos parsed
+    (Just funBind) = getHsBind (GHC.unLoc rdr) parsed
     (Just tySig) = getTypeSig pos funNm parsed
     (Just (GHC.L _ funRdr)) = locToRdrName pos parsed
   newBind <- fixFunBind argNum funRdr funBind

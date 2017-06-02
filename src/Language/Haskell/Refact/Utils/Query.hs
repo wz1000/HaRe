@@ -29,24 +29,15 @@ getVarAndRHS match = do
     where varPat lPat@(GHC.L _ (GHC.VarPat _ )) = Just lPat
           varPat _ = Nothing
 
---Looks up the function binding at the given position. Returns nothing if the position does not contain a binding.
-getHsBind :: (Data a) => SimpPos -> a -> Maybe (GHC.HsBind GHC.RdrName)
-getHsBind pos a = getLHsBind pos a  >>= (\a -> return $ GHC.unLoc a)
-
-
-getLHsBind :: (Data a) => SimpPos -> a -> Maybe (GHC.LHsBind GHC.RdrName)
-getLHsBind pos a =
-  let rdrNm = locToRdrName pos a in
-  case rdrNm of
-  Nothing -> Nothing
-  (Just (GHC.L l1 rNm)) -> SYB.something  (Nothing `SYB.mkQ` isBind) a
+getHsBind :: (Data a) => GHC.RdrName -> a -> Maybe (GHC.HsBind GHC.RdrName)
+getHsBind nm a = SYB.something  (Nothing `SYB.mkQ` isBind) a
     where
 #if __GLASGOW_HASKELL__ <= 710
-        isBind (bnd@(GHC.L _ (GHC.FunBind (GHC.L l2 name) _ _ _ _ _)) :: GHC.LHsBind GHC.RdrName)
+        isBind ((bnd@(GHC.FunBind (GHC.L _ name) _ _ _ _ _)) :: GHC.HsBind GHC.RdrName)
 #else
-        isBind (bnd@(GHC.L _ (GHC.FunBind (GHC.L l2 name) _ _ _ _)) :: GHC.LHsBind GHC.RdrName)
+        isBind ((bnd@(GHC.FunBind (GHC.L _ name) _ _ _ _)) :: GHC.HsBind GHC.RdrName)
 #endif
-            | l1 == l2 = (Just bnd)
+            | name == nm = (Just bnd)
         isBind _ = Nothing
 
 --Get the name of a function from a string
