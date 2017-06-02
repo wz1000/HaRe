@@ -25,7 +25,7 @@ import qualified TypeRep as GHC
 import qualified Module as GHC
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
-
+import qualified Id as GHC
 
 import qualified TypeRep as GHC
 import qualified TyCon as GHC
@@ -36,6 +36,8 @@ import qualified TcRnDriver as GHC
 import qualified ErrUtils as GHC
 
 import Outputable
+
+import Control.Monad.State
 {-
 This refactoring will rewrite functions to use Hughes lists (also called difference lists) instead of the standard list interface.
 
@@ -82,32 +84,69 @@ doHughesList fileName funNm pos argNum = do
   logm "Adding importDecl"
   let mqual = Just "DList"
   addSimpleImportDecl "Data.DList" mqual
-  --We will import the DList constructor only so type signatures are cleaner
- {- case mqual of
-    (Just _) -> addConstructorImport
-    _ -> return ()-}
   ty <- getDListTy mqual
-  isoF <- hListFuncs mqual
-  logm $ "Current position: " ++ (show pos)
   parsed <- getRefactParsed
-  logm $  "doHughesList" ++ (SYB.showData SYB.Renamer 3 parsed)  
   let
-    (Just rdr) = locToRdrName pos parsed
+    (Just lrdr) = locToRdrName pos parsed
+    rdr = GHC.unLoc lrdr
     dlistCon = getTyCon ty
     newFType = resultTypeToDList dlistCon
-    (Just funBind) = getHsBind (GHC.unLoc rdr) parsed
+    (Just funBind) = getHsBind rdr parsed
     (Just tySig) = getTypeSig pos funNm parsed
-    (Just (GHC.L _ funRdr)) = locToRdrName pos parsed
-  newBind <- fixFunBind argNum funRdr funBind
+  newBind <- fixFunBind argNum rdr funBind
+  bind' <- isoRefact argNum mqual rdr funBind
   replaceFunBind pos newBind
   newTySig <- fixTypeSig argNum tySig
-  --logDataWithAnns "New type sig: " newTySig
   replaceTypeSig pos newTySig
   let modQual = case mqual of
                   (Just s) -> s ++ "."
                   Nothing -> ""
-  fixClientFunctions modQual (numTypesOfBind funBind) argNum funRdr
+  fixClientFunctions modQual (numTypesOfBind funBind) argNum rdr
+  addConstructorImport
 
+
+--Going to assume it's only the result type that will be modified right now
+isoRefact :: Int -> Maybe String -> GHC.RdrName -> ParsedBind -> RefactGhc ParsedBind
+isoRefact _ mqual funNm bnd = do
+  tca <- getDListTy mqual
+
+  typedS <- getRefactTyped
+  let m_fTy = getTypeFromRdr funNm typedS
+      dlistCon = getTyCon tca
+      fTy = gfromJust "isoRefact: getting function type" m_fTy
+      newFTy = resultTypeToDList dlistCon fTy
+      newResTy = getResultType newFTy
+      paramTys = breakType newFTy
+  logm $ "breakType: " ++ show (map (printType 3) paramTys)
+  isoF <- hListFuncs mqual
+  error "isoRefact isn't done yet"
+
+modMGAltsRHS :: (ParsedLExpr -> RefactGhc ParsedLExpr) -> ParsedBind -> RefactGhc ParsedBind
+modMGAltsRHS f = SYB.everywhereM (SYB.mkM comp)
+  where comp :: GHC.GRHS GHC.RdrName ParsedLExpr -> RefactGhc (GHC.GRHS GHC.RdrName ParsedLExpr)
+        comp (GHC.GRHS lst expr) = do
+          newExpr <- f expr
+          return (GHC.GRHS lst newExpr) 
+
+-- Breaks up a function type into a list of the types of the parameters
+breakType :: GHC.Type -> [GHC.Type]
+breakType ty = breakType' (consumeOuterForAlls ty)
+  where breakType' (GHC.FunTy lTy rTy) = breakType' lTy ++ breakType' rTy
+        breakType' ty = [ty]
+
+--The removes the for all types that are on the outside of a type with type variables
+consumeOuterForAlls :: GHC.Type -> GHC.Type
+consumeOuterForAlls (GHC.ForAllTy _ ty) = consumeOuterForAlls ty
+consumeOuterForAlls ty = ty
+
+getTypeFromRdr :: (Data a) => GHC.RdrName -> a -> Maybe GHC.Type
+getTypeFromRdr nm a = SYB.something (Nothing `SYB.mkQ` comp) a
+  where comp :: GHC.HsBind GHC.Id -> Maybe GHC.Type
+        comp (GHC.FunBind (GHC.L _ id) _ _ _ _ _)
+          | occNm == (GHC.occName (GHC.idName id)) = Just (GHC.idType id)
+          | otherwise = Nothing
+        comp _ = Nothing
+        occNm = (GHC.occName nm)
 
 getTyCon :: GHC.Type -> GHC.TyCon
 getTyCon (GHC.TyConApp tc _) = tc
@@ -408,7 +447,8 @@ modResultType f (GHC.FunTy t1 t2) = let newT2 = comp t2 in
         comp ty = f ty
 modResultType f ty = f ty
 
---Going to be playing around with the typechecked source
+--This function inserts a definition and grabs the DList type constructor
+--From that definition's type then deletes the definition from the module
 getDListTy :: Maybe String -> RefactGhc GHC.Type
 getDListTy mqual = do
   let prefix = case mqual of
@@ -420,7 +460,6 @@ getDListTy mqual = do
   renamed <- getRefactRenamed
   parsed <- getRefactParsed
   typed <- getRefactTyped
-  env <- GHC.getSession
   let nm = gfromJust "Getting emdl's name" $ getFunName "emdl" renamed
   let mBind = getTypedHsBind (getOcc decl) typed
   ty <- case mBind of
@@ -440,10 +479,14 @@ data IsomorphicFuncs = IF {
   absFun :: GHC.OccName,
   eqFuns :: M.Map GHC.OccName (GHC.OccName, GHC.Type)
   }        
-            
 
+data IsoRefactState = IsoState {
+  funcs :: IsomorphicFuncs,
+  typeQueue :: [GHC.Type]
+                               }
 
-
+type IsoRefact = StateT IsoRefactState RefactGhc
+                     
 hListFuncs :: Maybe String -> RefactGhc IsomorphicFuncs
 hListFuncs mqual = do
   fs <- funs

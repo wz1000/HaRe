@@ -1,9 +1,10 @@
 module HList1 where
-import Data.DList
+import qualified Data.DList as DList
+import Data.DList (DList)
 
 data Tree a = Leaf
             | Node (Tree a) a (Tree a)
 
 enumerate :: Tree a -> DList a
 enumerate Leaf = empty
-enumerate (Node left x right) = (enumerate left) `append` (singleton x) `append` (enumerate right)
+enumerate (Node left x right) = (enumerate left) `DList.append` (DList.singleton x) `DList.append` (enumerate right)
