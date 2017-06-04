@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ImpredicativeTypes #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Language.Haskell.Refact.Refactoring.HughesList
        (hughesList, compHughesList) where
 
@@ -38,6 +39,7 @@ import qualified ErrUtils as GHC
 import Outputable
 
 import Control.Monad.State
+import Exception
 {-
 This refactoring will rewrite functions to use Hughes lists (also called difference lists) instead of the standard list interface.
 
@@ -118,8 +120,12 @@ isoRefact _ mqual funNm bnd = do
       newResTy = getResultType newFTy
       paramTys = breakType newFTy
   logm $ "breakType: " ++ show (map (printType 3) paramTys)
-  isoF <- hListFuncs mqual
+  iST <- getInitState mqual newResTy
+  newBnd <- modMGAltsRHS (\e -> runIsoRefact (doIsoRefact e) iST) bnd
   error "isoRefact isn't done yet"
+
+doIsoRefact :: ParsedLExpr -> IsoRefact ParsedLExpr
+doIsoRefact = undefined
 
 modMGAltsRHS :: (ParsedLExpr -> RefactGhc ParsedLExpr) -> ParsedBind -> RefactGhc ParsedBind
 modMGAltsRHS f = SYB.everywhereM (SYB.mkM comp)
@@ -485,8 +491,17 @@ data IsoRefactState = IsoState {
   typeQueue :: [GHC.Type]
                                }
 
+getInitState :: Maybe String -> GHC.Type -> RefactGhc IsoRefactState
+getInitState mqual ty = do
+  funcs <- hListFuncs mqual
+  return $ IsoState funcs [ty]
+                      
 type IsoRefact = StateT IsoRefactState RefactGhc
-                     
+
+runIsoRefact :: IsoRefact a -> IsoRefactState -> RefactGhc a
+runIsoRefact m initSt = evalStateT m initSt
+
+
 hListFuncs :: Maybe String -> RefactGhc IsomorphicFuncs
 hListFuncs mqual = do
   fs <- funs
