@@ -291,6 +291,7 @@ module Language.Haskell.Refact.API
   , isHsVar
   , astCompare
   , lookupByLoc
+  , getIdFromVar
  ) where
 
 import Language.Haskell.Refact.Utils.ExactPrint

@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ImpredicativeTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Language.Haskell.Refact.Refactoring.HughesList
        (hughesList, compHughesList) where
@@ -40,6 +41,7 @@ import Outputable
 
 import Control.Monad.State
 import Exception
+import qualified Unique as GHC
 {-
 This refactoring will rewrite functions to use Hughes lists (also called difference lists) instead of the standard list interface.
 
@@ -97,7 +99,7 @@ doHughesList fileName funNm pos argNum = do
     (Just tySig) = getTypeSig pos funNm parsed
   newBind <- fixFunBind argNum rdr funBind
   bind' <- isoRefact argNum mqual rdr funBind
-  replaceFunBind pos newBind
+  replaceFunBind pos bind'
   newTySig <- fixTypeSig argNum tySig
   replaceTypeSig pos newTySig
   let modQual = case mqual of
@@ -119,13 +121,102 @@ isoRefact _ mqual funNm bnd = do
       newFTy = resultTypeToDList dlistCon fTy
       newResTy = getResultType newFTy
       paramTys = breakType newFTy
-  logm $ "breakType: " ++ show (map (printType 3) paramTys)
   iST <- getInitState mqual newResTy
   newBnd <- modMGAltsRHS (\e -> runIsoRefact (doIsoRefact e) iST) bnd
-  error "isoRefact isn't done yet"
+  --logm $ "The new binding: " ++ SYB.showData SYB.Renamer 3 newBnd
+  return newBnd
+
+isoDone :: IsoRefact Bool
+isoDone = do
+  st <- get
+  return $ (typeQueue st) == []
+
+skipCurrent :: IsoRefact Bool
+skipCurrent = do
+  st <- get
+  let currType = head (typeQueue st)
+  case currType of
+    Nothing -> do
+      put $ st {typeQueue = tail (typeQueue st)}
+      return False
+    Just _ -> return True
 
 doIsoRefact :: ParsedLExpr -> IsoRefact ParsedLExpr
-doIsoRefact = undefined
+doIsoRefact expr = do
+  b1 <- isoDone
+  b2 <- skipCurrent
+  if b1 || b2
+    then return expr
+    else doIsoRefact' expr
+  where doIsoRefact' :: ParsedLExpr -> IsoRefact ParsedLExpr
+        doIsoRefact' (GHC.L l (GHC.HsApp le re)) = do
+          le' <- doIsoRefact le
+          re' <- doIsoRefact re
+          return (GHC.L l (GHC.HsApp le' re'))
+        doIsoRefact' (GHC.L l (GHC.OpApp le op rn re)) = do
+          op' <- doIsoRefact op
+          le' <- doIsoRefact le
+          re' <- doIsoRefact re
+          return (GHC.L l (GHC.OpApp le' op' rn re'))
+        doIsoRefact' var@(GHC.L l (GHC.HsVar rdr)) = do
+          st <- get          
+          let tq = typeQueue st
+              fs = funcs st
+          if tq == []
+            then return var
+            else do            
+            typed <- lift getRefactTyped
+            (Just id) <- lift (getIdFromVar var)
+            let goalType = gfromJust "Getting goal type" $ head tq
+                currRes = getResultType (GHC.idType id)
+                keyOcc = GHC.rdrNameOcc rdr
+                mVal = (GHC.occNameString keyOcc) `M.lookup` (eqFuns fs)
+            --showMP (M.toList (eqFuns fs))
+            case mVal of
+              Nothing -> do
+                lift $ logm $ "No map on var: " ++ (SYB.showData SYB.Parser 3 keyOcc) ++ ": " ++ show (GHC.getUnique keyOcc)
+                return var
+              (Just (oNm, ty)) -> do
+                if compType (getResultType ty) goalType
+                  then do
+                  lift $ logm $ "Replacing var with dlist function"
+                  return (GHC.L l (GHC.HsVar oNm))
+                  else do
+                  lift $ logm $ "The goal type of " ++ (showOutputable oNm) ++ "didn't match."
+                  lift $ logm (printType 3 (getResultType ty))
+                  lift $ logm (printType 3 (getResultType goalType))
+                  return var
+        doIsoRefact' ex = gmapM (SYB.mkM doIsoRefact) ex
+
+showMP :: [(String,  (GHC.RdrName, GHC.Type))] -> IsoRefact ()
+showMP lst = mapM_ f lst
+  where f (kNm, (vNm, ty)) = do
+          let str = "(" ++ kNm  ++ " ==> " ++ SYB.showData SYB.Parser 3 vNm ++ ")"
+          lift $ logm str
+
+{-
+NOTE: When do we catch if the goal type is nothing??? Does this happen when we find a var or when
+we descend subtrees?
+
+From here we need to figure out if the var has a possible match from the map,
+if it does then we need to see if the result type of the dlist function is the goalType
+if it is then we can do the swap, we need to check which of the parameters of the new function changes type
+from left to right those types are added to the type queue
+-}
+            
+
+
+
+compType :: GHC.Type -> GHC.Type -> Bool
+compType (GHC.TyVarTy v1) (GHC.TyVarTy v2) = True --v1 == v2
+compType (GHC.TyVarTy _) _ = True
+compType _ (GHC.TyVarTy _) = True --v1 == v2
+compType (GHC.AppTy l1 l2) (GHC.AppTy r1 r2) = compType l1 r1 && compType l2 r2
+compType (GHC.TyConApp tc1 lst1) (GHC.TyConApp tc2 lst2) = tc1 == tc2 && (and (zipWith compType lst1 lst2))
+compType (GHC.FunTy l1 l2) (GHC.FunTy r1 r2) = compType l1 r1 && compType l2 r2
+compType (GHC.ForAllTy v1 lTy) (GHC.ForAllTy v2 rTy) = compType lTy rTy
+compType (GHC.LitTy l) (GHC.LitTy r) = l == r
+compType _ _ = False
 
 modMGAltsRHS :: (ParsedLExpr -> RefactGhc ParsedLExpr) -> ParsedBind -> RefactGhc ParsedBind
 modMGAltsRHS f = SYB.everywhereM (SYB.mkM comp)
@@ -481,20 +572,20 @@ getDListTy mqual = do
 
 --NOTE: May want to change this to use GHC.Name
 data IsomorphicFuncs = IF {
-  projFun :: GHC.OccName,
-  absFun :: GHC.OccName,
-  eqFuns :: M.Map GHC.OccName (GHC.OccName, GHC.Type)
+  projFun :: GHC.RdrName,
+  absFun :: GHC.RdrName,
+  eqFuns :: M.Map String (GHC.RdrName, GHC.Type)
   }        
 
 data IsoRefactState = IsoState {
   funcs :: IsomorphicFuncs,
-  typeQueue :: [GHC.Type]
+  typeQueue :: [Maybe GHC.Type]
                                }
 
 getInitState :: Maybe String -> GHC.Type -> RefactGhc IsoRefactState
 getInitState mqual ty = do
   funcs <- hListFuncs mqual
-  return $ IsoState funcs [ty]
+  return $ IsoState funcs [Just ty]
                       
 type IsoRefact = StateT IsoRefactState RefactGhc
 
@@ -506,33 +597,30 @@ hListFuncs :: Maybe String -> RefactGhc IsomorphicFuncs
 hListFuncs mqual = do
   fs <- funs
   return $ IF {
-    projFun = GHC.mkVarOcc $ qual ++ "toList",
-    absFun = GHC.mkVarOcc $ qual ++ "fromList",
+    projFun = mkRdr (GHC.mkVarOcc "toList"),
+    absFun = mkRdr (GHC.mkVarOcc "fromList"),
     eqFuns = fs
     }
   where
-    qual = case mqual of
-      Nothing -> ""
-      (Just q) -> q ++  "."
-    funs :: RefactGhc (M.Map GHC.OccName (GHC.OccName, GHC.Type))
+    mkRdr = case mqual of
+      Nothing -> GHC.mkRdrUnqual
+      (Just q) -> (\nm -> GHC.mkRdrQual (GHC.mkModuleName q) nm)
+    funs :: RefactGhc (M.Map String (GHC.RdrName, GHC.Type))
     funs = do
       kvs <- mkLst
       return $ M.fromList kvs
     mkLst = mapM f strs
-    f :: (String,String) -> RefactGhc (GHC.OccName,(GHC.OccName, GHC.Type))
+    f :: (String,String) -> RefactGhc (String,(GHC.RdrName, GHC.Type))
     f (s1, s2) = do
-      let o1 = GHC.mkVarOcc s1
-          o2 = GHC.mkVarOcc s2
-          rdr = case mqual of
-                  Nothing -> GHC.mkRdrUnqual o2
-                  (Just mdNm) -> GHC.mkRdrQual (GHC.mkModuleName mdNm) o2
+      let o2 = GHC.mkVarOcc s2
+          rdr = mkRdr o2
       dec <- dlistImportDecl mqual
       lExpr <- locate (GHC.HsVar rdr)
       ((wrns, errs), mty) <- tcExprInTargetMod dec lExpr
       case mty of
         Nothing -> error $ "TypeChecking failed: " ++ GHC.foldBag (++) (\e -> show e ++ "\n") "" errs
-        (Just ty) -> return (o1,(o2,ty))
-    strs = [("[]","empty"),("(:)","cons"),("(++)","append"),("concat", "concat"),("replicate","replicate"), ("head","head"),("tail","tail"),("foldr","foldr"),("map","map"), ("unfoldr", "unfoldr")]
+        (Just ty) -> return (s1,(rdr,ty))
+    strs = [("[]","empty"),(":","cons"),("++","append"),("concat", "concat"),("replicate","replicate"), ("head","head"),("tail","tail"),("foldr","foldr"),("map","map"), ("unfoldr", "unfoldr")]
 
 dlistImportDecl :: Maybe String -> RefactGhc (GHC.LImportDecl GHC.RdrName)
 dlistImportDecl mqual = do

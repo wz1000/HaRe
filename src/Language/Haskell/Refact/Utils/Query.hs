@@ -18,6 +18,7 @@ import GHC.SYB.Utils as SYB
 import Control.Applicative
 import FastString
 import RdrName
+import Language.Haskell.Refact.Utils.MonadFunctions
 
 --Takes a single match and returns a tuple containing the grhs and the pattern
 --Assumptions:
@@ -110,9 +111,20 @@ extTwinQ f g a1 a2 =
   where mr = cast a1 >>= (\b1 -> cast a2 >>= (\b2 -> Just $ g b1 b2))                        
 
 
-lookupByLoc :: (SYB.Data a,  SYB.Data b) => GHC.SrcSpan -> GHC.Located a -> Maybe (GHC.Located b)
+lookupByLoc :: (SYB.Data a,  SYB.Data b) => GHC.SrcSpan -> a -> Maybe (GHC.Located b)
 lookupByLoc loc = SYB.something (Nothing `SYB.mkQ` comp)
   where comp :: (SYB.Data a) => GHC.Located a -> Maybe (GHC.Located a)
         comp a@(GHC.L l _)
           | l == loc = Just a
           | otherwise = Nothing
+
+
+
+getIdFromVar :: ParsedLExpr -> RefactGhc (Maybe GHC.Id)
+getIdFromVar (GHC.L l var) = do
+  typed <- getRefactTyped
+  let (mElem :: Maybe (GHC.LHsExpr GHC.Id)) = lookupByLoc l typed
+  return $ mElem >>= (\e -> SYB.something (Nothing `SYB.mkQ` comp) e)
+  where comp (GHC.HsVar id) = Just id
+        comp _ = Nothing
+
