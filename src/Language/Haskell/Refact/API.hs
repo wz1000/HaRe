@@ -252,8 +252,11 @@ module Language.Haskell.Refact.API
   , addNewKeywords
 
   , addEmptyAnn
+  , addAnnValWithDP
   , addAnnVal
   , addAnn
+  , copyAnnDP
+  , getDeltaPos
 
    -- from Language.Haskell.Refact.Utils.Synonyms
  , UnlocParsedHsBind

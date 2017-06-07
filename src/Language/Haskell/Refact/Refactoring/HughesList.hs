@@ -90,6 +90,7 @@ doHughesList fileName funNm pos argNum = do
   addSimpleImportDecl "Data.DList" mqual
   ty <- getDListTy mqual
   parsed <- getRefactParsed
+  logDataWithAnns "Initial parsed" parsed 
   let
     (Just lrdr) = locToRdrName pos parsed
     rdr = GHC.unLoc lrdr
@@ -122,8 +123,8 @@ isoRefact _ mqual funNm bnd = do
       newResTy = getResultType newFTy
       paramTys = breakType newFTy
   iST <- getInitState mqual newResTy
-  newBnd <- modMGAltsRHS (\e -> do{logm ("modMGAltsRHS: " ++ SYB.showData SYB.Parser 3 e); runIsoRefact (doIsoRefact e) iST}) bnd
-  logm $ "The new binding: " ++ SYB.showData SYB.Renamer 3 newBnd
+  newBnd <- modMGAltsRHS (\e -> runIsoRefact (doIsoRefact e) iST) bnd
+  logDataWithAnns "The new binding: " newBnd
   return newBnd
 
 isoDone :: IsoRefact Bool
@@ -184,7 +185,12 @@ doIsoRefact expr = do
                 then do
                 let changedTypes = typeDifference ty currTy
                     newE = (GHC.L l (GHC.HsVar oNm))
-                lift $ addAnnVal newE
+                oldAnns <- lift fetchAnnsFinal
+                case M.lookup (mkAnnKey var) oldAnns of
+                  Nothing -> lift (mergeRefactAnns $ copyAnn var newE oldAnns)
+                  Just v -> do
+                    let dp = annEntryDelta v
+                    lift $ addAnnValWithDP newE dp
                 popTQ
                 addToTQ changedTypes                
                 return newE
@@ -266,13 +272,8 @@ compType _ _ = False
 
 modMGAltsRHS :: (ParsedLExpr -> RefactGhc ParsedLExpr) -> ParsedBind -> RefactGhc ParsedBind
 modMGAltsRHS f bnd = do
-  logm $ "modMGAltsRHS called wiht: " ++ SYB.showData SYB.Parser 3 bnd
   applyTP (full_tdTP (idTP `adhocTP` comp)) bnd --SYB.everywhereM (SYB.mkM comp)
-  where {-comp :: GHC.GRHSs GHC.RdrName ParsedLExpr -> RefactGhc (GHC.GRHSs GHC.RdrName ParsedLExpr)
-        comp (GHC.GRHSs lst local) = do
-          logm $ "Found GRHSs with " ++ show (length lst) ++ " RHS in the list"
-          newLst <- mapM comp' lst
-          return (GHC.GRHSs newLst local)-}
+  where 
     comp :: GHC.GRHS GHC.RdrName ParsedLExpr -> RefactGhc (GHC.GRHS GHC.RdrName ParsedLExpr)
     comp (GHC.GRHS lst expr) = do
       logm "Inside comp"
@@ -350,7 +351,7 @@ traverseTypeSig argNum f (GHC.TypeSig lst ty rn) = do
         
 traverseTypeSig _ _ sig = error $ "traverseTypeSig: Unsupported constructor: " ++ show (toConstr sig)
          
-
+--DELETE
 fixFunBind :: Int -> GHC.RdrName -> ParsedBind -> RefactGhc ParsedBind
 fixFunBind argNum funRdr bind = do
   let numArgs = numTypesOfBind bind
@@ -358,6 +359,7 @@ fixFunBind argNum funRdr bind = do
     then wrapBindParamWithToLst argNum bind
     else outputParameterBecomesDList bind
 
+--DELETE
 wrapBindParamWithToLst :: Int -> ParsedBind -> RefactGhc ParsedBind
 wrapBindParamWithToLst = wrapBindParamWithFun (mkRdrName "toList")
 
@@ -409,7 +411,8 @@ getArgRdrNms argNum bind = let mg = GHC.fun_matches bind
     findRdr (GHC.L _ (GHC.VarPat rdr)) = Just rdr
     findRdr (GHC.L _ (GHC.AsPat (GHC.L _ rdr) _)) = Just rdr
     findRdr _ = Nothing
-
+    
+--DELETE
 outputParameterBecomesDList :: GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
 outputParameterBecomesDList bind = do
   SYB.everywhereM (SYB.mkM comp) bind
@@ -465,6 +468,9 @@ outputParameterBecomesDList bind = do
 
 --                 f :: [a] -> sometype ==> f_refact :: DList a -> sometype
 -- Any parameters of type list need to be wrapped in fromList
+
+--TODO 2: Modify this to use the isomorphic refactoring state so that this can
+-- Generically refactor types based on their projection and abstraction functions 
 fixClientFunctions :: String -> Int -> Int -> GHC.RdrName -> RefactGhc ()
 fixClientFunctions modNm totalParams argNum name = if (totalParams == argNum)
                                     then wrapCallsWithToList modNm name
