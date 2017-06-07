@@ -217,8 +217,7 @@ insertNewDecl declStr = do
     Left (_spn, str) -> error $ "insertNewDecl: decl parse failed with message:\n" ++ str
     Right (anns, decl@(GHC.L spn _)) -> do
       let oldDecs = GHC.hsmodDecls hsMod
-          newParsed = (GHC.L pSpn (hsMod {GHC.hsmodDecls = oldDecs ++ [decl]}))
-      logm $ "New parsed: " ++ SYB.showData SYB.Parser 3 newParsed
+          newParsed = (GHC.L pSpn (hsMod {GHC.hsmodDecls = oldDecs ++ [decl]}))      
       putRefactParsed newParsed anns
       addNewLines 1 decl
       return decl
