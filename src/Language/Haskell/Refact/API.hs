@@ -295,8 +295,17 @@ module Language.Haskell.Refact.API
   , astCompare
   , lookupByLoc
   , getIdFromVar
+-- from Language.Haskell.Refact.Refactoring.IsomorphicRefactoring
+  , isoRefact
+  , IsomorphicFuncs(..)
+  , IsoRefactState(..)
+  , IsoRefact
+  , runIsoRefact
+  , getTyCon
+  , getResultType
  ) where
 
+import Language.Haskell.Refact.Refactoring.IsomorphicRefactoring
 import Language.Haskell.Refact.Utils.ExactPrint
 import Language.Haskell.Refact.Utils.GhcUtils
 import Language.Haskell.Refact.Utils.GhcVersionSpecific
