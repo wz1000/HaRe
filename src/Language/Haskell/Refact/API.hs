@@ -305,7 +305,7 @@ module Language.Haskell.Refact.API
   , getResultType
  ) where
 
-import Language.Haskell.Refact.Refactoring.IsomorphicRefactoring
+import Language.Haskell.Refact.Utils.Isomorphic
 import Language.Haskell.Refact.Utils.ExactPrint
 import Language.Haskell.Refact.Utils.GhcUtils
 import Language.Haskell.Refact.Utils.GhcVersionSpecific

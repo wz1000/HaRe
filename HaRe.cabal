@@ -165,7 +165,7 @@ Library
 --           , Language.Haskell.Refact.Refactoring.UnwrapTypeSyn
            , Language.Haskell.Refact.Refactoring.GenApplicative
            , Language.Haskell.Refact.Refactoring.HughesList
-           , Language.Haskell.Refact.Refactoring.IsomorphicRefactoring                 
+           , Language.Haskell.Refact.Utils.Isomorphic             
            , Language.Haskell.Refact.Utils.ExactPrint
            , Language.Haskell.Refact.Utils.GhcBugWorkArounds
            , Language.Haskell.Refact.Utils.GhcModuleGraph
