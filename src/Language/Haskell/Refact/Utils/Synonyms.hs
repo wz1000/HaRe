@@ -15,3 +15,4 @@ type ParsedLExpr       = LHsExpr RdrName
 type ParsedLStmt       = LStmt RdrName (LHsExpr RdrName)
 type ParsedBind        = HsBind RdrName
 type ParsedLDecl       = LHsDecl RdrName
+type ParsedLImportDecl = LImportDecl RdrName

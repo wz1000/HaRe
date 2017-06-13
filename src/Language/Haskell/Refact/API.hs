@@ -269,6 +269,7 @@ module Language.Haskell.Refact.API
  , ParsedLExpr
  , ParsedBind
  , ParsedLDecl
+ , ParsedLImportDecl
 
  -- from Language.Haskell.Refact.Utils.Transform
   , addSimpleImportDecl
@@ -303,6 +304,7 @@ module Language.Haskell.Refact.API
   , runIsoRefact
   , getTyCon
   , getResultType
+  , mkFuncs
  ) where
 
 import Language.Haskell.Refact.Utils.Isomorphic

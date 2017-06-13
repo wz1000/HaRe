@@ -85,7 +85,6 @@ doHughesList fileName funNm pos argNum = do
   addSimpleImportDecl "Data.DList" mqual
   ty <- getDListTy mqual
   parsed <- getRefactParsed
-  logDataWithAnns "Initial parsed" parsed 
   let
     (Just lrdr) = locToRdrName pos parsed
     rdr = GHC.unLoc lrdr
@@ -302,9 +301,11 @@ getDListTy mqual = do
 
 getInitState :: Maybe String -> GHC.Type -> RefactGhc IsoRefactState
 getInitState mqual ty = do
-  funcs <- hListFuncs mqual
+  iDecl <- dlistImportDecl mqual
+  funcs <- mkFuncs iDecl "toList" "fromList" full_strs mqual
   return $ IsoState funcs [Just ty]
-                      
+
+{-
 hListFuncs :: Maybe String -> RefactGhc IsomorphicFuncs
 hListFuncs mqual = do
   fs <- funs
@@ -332,11 +333,11 @@ hListFuncs mqual = do
       case mty of
         Nothing -> error $ "TypeChecking failed: " ++ GHC.foldBag (++) (\e -> show e ++ "\n") "" errs
         (Just ty) -> return (s1,(rdr,ty))
-
+-}
 
 full_strs = [("[]","empty"),(":","cons"),("++","append"),("concat", "concat"),("replicate","replicate"), ("head","head"),("tail","tail"),("foldr","foldr"),("map","map"), ("unfoldr", "unfoldr")]
 
-dlistImportDecl :: Maybe String -> RefactGhc (GHC.LImportDecl GHC.RdrName)
+dlistImportDecl :: Maybe String -> RefactGhc ParsedLImportDecl
 dlistImportDecl mqual = do
   dflags <- GHC.getSessionDynFlags
   let pres = case mqual of
@@ -344,16 +345,6 @@ dlistImportDecl mqual = do
                (Just q) -> parseImport dflags "HaRe" ("import qualified Data.DList as " ++ q)
   (_, dec) <- handleParseResult "dlistImportDecl" pres
   return dec
-
-{-
-tcPExpr :: ParsedLExpr -> RefactGhc (GHC.Messages, Maybe GHC.Type)
-tcPExpr ex = do
-  hsc_env <- GHC.getSession
-  tcPExprWithEnv hsc_env ex
-  -}
-tcPExprWithEnv :: GHC.HscEnv -> ParsedLExpr -> RefactGhc (GHC.Messages, Maybe GHC.Type)
-tcPExprWithEnv env ex = liftIO $ GHC.tcRnExpr env ex
-
 
 tcExprInTargetMod :: GHC.LImportDecl GHC.RdrName -> ParsedLExpr -> RefactGhc (GHC.Messages, Maybe GHC.Type)
 tcExprInTargetMod idecl ex = do

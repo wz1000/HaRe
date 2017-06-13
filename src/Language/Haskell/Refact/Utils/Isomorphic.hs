@@ -5,7 +5,8 @@ module Language.Haskell.Refact.Utils.Isomorphic
  , IsoRefact
  , runIsoRefact
  , getTyCon
- , getResultType) where
+ , getResultType
+ , mkFuncs) where
 
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.MonadFunctions
@@ -21,6 +22,9 @@ import qualified OccName as GHC
 import qualified Id as GHC
 import qualified TypeRep as GHC
 import qualified TyCon as GHC
+import qualified TcRnDriver as GHC
+import qualified ErrUtils as GHC
+import qualified Bag as GHC
 import qualified Unique as GHC
 import qualified GHC.SYB.Utils as SYB
 import Data.Generics as SYB
@@ -268,3 +272,44 @@ getTypeFromRdr nm a = SYB.something (Nothing `SYB.mkQ` comp) a
           | otherwise = Nothing
         comp _ = Nothing
         occNm = (GHC.occName nm)
+
+mkFuncs :: ParsedLImportDecl -> String -> String -> [(String,String)] -> Maybe String -> RefactGhc IsomorphicFuncs
+mkFuncs iDecl projStr absStr fStrings mqual = do
+  fs <- funs
+  return $ IF {
+    projFun = mkRdr (GHC.mkVarOcc projStr),
+    absFun = mkRdr (GHC.mkVarOcc absStr),
+    eqFuns = fs
+    }
+  where
+    mkRdr = case mqual of
+      Nothing -> GHC.mkRdrUnqual
+      (Just q) -> (\nm -> GHC.mkRdrQual (GHC.mkModuleName q) nm)
+    funs :: RefactGhc (M.Map String (GHC.RdrName, GHC.Type))
+    funs = do
+      kvs <- mkLst
+      return $ M.fromList kvs
+    mkLst = mapM f fStrings
+    f :: (String,String) -> RefactGhc (String,(GHC.RdrName, GHC.Type))
+    f (s1, s2) = do
+      let o2 = GHC.mkVarOcc s2
+          rdr = mkRdr o2
+      lExpr <- locate (GHC.HsVar rdr)
+      ((wrns, errs), mty) <- tcExprInTargetMod iDecl lExpr
+      case mty of
+        Nothing -> error $ "TypeChecking failed: " ++ GHC.foldBag (++) (\e -> show e ++ "\n") "" errs
+        (Just ty) -> return (s1,(rdr,ty))
+
+
+tcExprInTargetMod :: GHC.LImportDecl GHC.RdrName -> ParsedLExpr -> RefactGhc (GHC.Messages, Maybe GHC.Type)
+tcExprInTargetMod idecl ex = do
+  pm <- getRefactParsedMod
+  oldCntx <- GHC.getContext
+  let
+    nm = GHC.unLoc . GHC.ideclName $ (GHC.unLoc idecl)
+    lst = (GHC.IIDecl (GHC.unLoc idecl)):oldCntx --(GHC.IIModule nm):oldCntx
+  GHC.setContext lst
+  env <- GHC.getSession
+  liftIO $ GHC.tcRnExpr env ex
+    where addImps decs ms = let old = GHC.ms_textual_imps ms in
+            ms {GHC.ms_textual_imps = old ++ [decs]}
