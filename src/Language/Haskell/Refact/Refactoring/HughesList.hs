@@ -20,7 +20,6 @@ import qualified Bag as GHC
 import Data.Generics.Strafunski.StrategyLib.StrategyLib
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Parsers
-import qualified Unique as Unique (mkUniqueGrimily)
 import Control.Applicative
 import Outputable
 import qualified TypeRep as GHC
@@ -29,7 +28,6 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Id as GHC
 
-import qualified TypeRep as GHC
 import qualified TyCon as GHC
 import qualified HscTypes as GHC
 import qualified HscMain as GHC
@@ -140,7 +138,7 @@ traverseTypeSig argNum f (GHC.TypeSig lst ty rn) = do
     comp argNum (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt ty)) =
       case ty of
         (GHC.L _ (GHC.HsFunTy _ _)) -> comp' argNum ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt res)))
-        otherwise -> f ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt res)))
+        _ -> f ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt res)))
     comp' 1 (GHC.L l (GHC.HsFunTy lhs rhs)) = do
       resLHS <- f lhs
       let funTy = (GHC.L l (GHC.HsFunTy resLHS rhs))
@@ -173,7 +171,7 @@ numTypesOfBind bnd = let mg = GHC.fun_matches bnd
 --TODO 2: Modify this to use the isomorphic refactoring state so that this can
 -- Generically refactor types based on their projection and abstraction functions 
 fixClientFunctions :: String -> Int -> Int -> GHC.RdrName -> RefactGhc ()
-fixClientFunctions modNm totalParams argNum name = if (totalParams == argNum)
+fixClientFunctions modNm totalParams argNum name = if totalParams == argNum
                                     then wrapCallsWithToList modNm name
                                     else applyAtCallPoint name (modifyNthParam totalParams argNum (wrapExpr fromLstRdr))
   where fromLstRdr = mkRdrName (modNm ++ "fromList")
@@ -191,8 +189,7 @@ wrapCallsWithToList modNm name = applyAtCallPoint name comp
           lLhs <- locate toListVar
           addAnnVal lLhs
           logm $ "ToList being inserted: " ++ SYB.showData SYB.Parser 3 lLhs
-          res <- locate $ (GHC.HsApp lLhs parE)
-          return res
+          locate $ (GHC.HsApp lLhs parE)          
 #if __GLASGOW_HASKELL__ <= 710          
         toListVar = GHC.HsVar (mkRdrName (modNm ++ "toList"))
 #else
@@ -217,20 +214,16 @@ applyAtCallPoint nm f = do
 #else
       stopCon b@(GHC.FunBind (GHC.L _ id) _ _ _ _) = if id == nm                                                   
 #endif
-                                                     then do
 --If the bindings name is the function we are looking for then we succeed and the traversal should stop
-                                                       return b
-                                                     else do
-                                                       mzero
+                                                     then return b                                                        
+                                                     else mzero
       stopCon b = do
          logm "Other binding constructor matched"
          mzero
       comp :: ParsedLExpr -> RefactGhc ParsedLExpr
       comp lEx = if searchExpr nm (GHC.unLoc lEx)
-                 then do
-                    f lEx                   
-                 else do
-                    mzero 
+                 then f lEx                   
+                 else mzero 
 
 searchExpr :: GHC.RdrName -> ParsedExpr -> Bool
 searchExpr funNm (GHC.HsApp (GHC.L _ (GHC.HsVar rdr)) _) = rdr == funNm
@@ -302,40 +295,10 @@ getDListTy mqual = do
 getInitState :: Maybe String -> GHC.Type -> RefactGhc IsoRefactState
 getInitState mqual ty = do
   iDecl <- dlistImportDecl mqual
-  funcs <- mkFuncs iDecl "toList" "fromList" full_strs mqual
+  funcs <- mkFuncs iDecl "toList" "fromList" fullStrs mqual
   return $ IsoState funcs [Just ty]
 
-{-
-hListFuncs :: Maybe String -> RefactGhc IsomorphicFuncs
-hListFuncs mqual = do
-  fs <- funs
-  return $ IF {
-    projFun = mkRdr (GHC.mkVarOcc "toList"),
-    absFun = mkRdr (GHC.mkVarOcc "fromList"),
-    eqFuns = fs
-    }
-  where
-    mkRdr = case mqual of
-      Nothing -> GHC.mkRdrUnqual
-      (Just q) -> (\nm -> GHC.mkRdrQual (GHC.mkModuleName q) nm)
-    funs :: RefactGhc (M.Map String (GHC.RdrName, GHC.Type))
-    funs = do
-      kvs <- mkLst
-      return $ M.fromList kvs
-    mkLst = mapM f full_strs
-    f :: (String,String) -> RefactGhc (String,(GHC.RdrName, GHC.Type))
-    f (s1, s2) = do
-      let o2 = GHC.mkVarOcc s2
-          rdr = mkRdr o2
-      dec <- dlistImportDecl mqual
-      lExpr <- locate (GHC.HsVar rdr)
-      ((wrns, errs), mty) <- tcExprInTargetMod dec lExpr
-      case mty of
-        Nothing -> error $ "TypeChecking failed: " ++ GHC.foldBag (++) (\e -> show e ++ "\n") "" errs
-        (Just ty) -> return (s1,(rdr,ty))
--}
-
-full_strs = [("[]","empty"),(":","cons"),("++","append"),("concat", "concat"),("replicate","replicate"), ("head","head"),("tail","tail"),("foldr","foldr"),("map","map"), ("unfoldr", "unfoldr")]
+fullStrs = [("[]","empty"),(":","cons"),("++","append"),("concat", "concat"),("replicate","replicate"), ("head","head"),("tail","tail"),("foldr","foldr"),("map","map"), ("unfoldr", "unfoldr")]
 
 dlistImportDecl :: Maybe String -> RefactGhc ParsedLImportDecl
 dlistImportDecl mqual = do
@@ -345,18 +308,3 @@ dlistImportDecl mqual = do
                (Just q) -> parseImport dflags "HaRe" ("import qualified Data.DList as " ++ q)
   (_, dec) <- handleParseResult "dlistImportDecl" pres
   return dec
-
-tcExprInTargetMod :: GHC.LImportDecl GHC.RdrName -> ParsedLExpr -> RefactGhc (GHC.Messages, Maybe GHC.Type)
-tcExprInTargetMod idecl ex = do
-  pm <- getRefactParsedMod
-  oldCntx <- GHC.getContext
-  let
-    nm = GHC.unLoc . GHC.ideclName $ (GHC.unLoc idecl)
-    lst = (GHC.IIDecl (GHC.unLoc idecl)):oldCntx --(GHC.IIModule nm):oldCntx
-  GHC.setContext lst
-  env <- GHC.getSession
-  liftIO $ GHC.tcRnExpr env ex
-    where addImps decs ms = let old = GHC.ms_textual_imps ms in
-            ms {GHC.ms_textual_imps = old ++ [decs]}
-
-
