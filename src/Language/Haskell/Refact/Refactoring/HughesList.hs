@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Language.Haskell.Refact.Refactoring.HughesList
-       (hughesList, compHughesList) where
+       (hughesList, compHughesList, fastHughesList, compFastHughesList) where
 
 import Language.Haskell.Refact.API
 import Language.Haskell.Refact.Utils.Types
@@ -64,6 +64,8 @@ TODO: Figure out strategy for name conflicts. Probably need another optional arg
    The argument could also be made that the DList import should always be qualified.
 -}
 
+
+
 hughesList :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> Int -> IO [FilePath]
 hughesList settings cradle fileName funNm pos argNum = do
   absFileName <- canonicalizePath fileName
@@ -71,14 +73,28 @@ hughesList settings cradle fileName funNm pos argNum = do
 
 compHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]
 compHughesList fileName funNm pos argNum = do
-  (refRes@((_fp,ismod),_), ()) <- applyRefac (doHughesList fileName funNm pos argNum) (RSFile fileName)
+  (refRes@((_fp,ismod),_), ()) <- applyRefac (doHughesList fileName funNm pos argNum fullStrs) (RSFile fileName)
   case ismod of
     RefacUnmodifed -> error "Introducing Hughes lists failed"
     RefacModified -> return ()
   return [refRes]
 
-doHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc ()
-doHughesList fileName funNm pos argNum = do
+fastHughesList :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> Int -> IO [FilePath]
+fastHughesList settings cradle fileName funNm pos argNum = do
+  absFileName <- canonicalizePath fileName
+  runRefacSession settings cradle (compFastHughesList fileName funNm pos argNum)
+
+compFastHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]
+compFastHughesList fileName funNm pos argNum = do
+  (refRes@((_fp,ismod),_), ()) <- applyRefac (doHughesList fileName funNm pos argNum fastStrs) (RSFile fileName)
+  case ismod of
+    RefacUnmodifed -> error "Introducing Hughes lists failed"
+    RefacModified -> return ()
+  return [refRes]
+
+
+doHughesList :: FilePath -> String -> SimpPos -> Int -> IsoFuncStrings -> RefactGhc ()
+doHughesList fileName funNm pos argNum fStrs = do
   let mqual = Just "DList"
   addSimpleImportDecl "Data.DList" mqual
   ty <- getDListTy mqual
@@ -91,7 +107,8 @@ doHughesList fileName funNm pos argNum = do
     (Just funBind) = getHsBind rdr parsed
     (Just tySig) = getTypeSig pos funNm parsed
     newResTy = getResultType ty
-  iSt <- getInitState mqual newResTy
+  iDecl <- dlistImportDecl mqual
+  iSt <- getInitState iDecl fStrs mqual newResTy
   bind' <- isoRefact argNum mqual rdr ty iSt funBind
   replaceFunBind pos bind'
   newTySig <- fixTypeSig argNum tySig
@@ -292,13 +309,9 @@ getDListTy mqual = do
       getOcc :: ParsedLDecl -> GHC.OccName
       getOcc (GHC.L _ (GHC.ValD (GHC.FunBind nm _ _ _ _ _))) = GHC.rdrNameOcc $ GHC.unLoc nm      
 
-getInitState :: Maybe String -> GHC.Type -> RefactGhc IsoRefactState
-getInitState mqual ty = do
-  iDecl <- dlistImportDecl mqual
-  funcs <- mkFuncs iDecl "toList" "fromList" fullStrs mqual
-  return $ IsoState funcs [Just ty]
-
 fullStrs = [("[]","empty"),(":","cons"),("++","append"),("concat", "concat"),("replicate","replicate"), ("head","head"),("tail","tail"),("foldr","foldr"),("map","map"), ("unfoldr", "unfoldr")]
+
+fastStrs = [("[]","empty"), (":","cons"),("++", "append")]
 
 dlistImportDecl :: Maybe String -> RefactGhc ParsedLImportDecl
 dlistImportDecl mqual = do

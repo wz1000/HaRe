@@ -13,7 +13,7 @@ spec :: Spec
 spec = do
   describe "doHughesList" $ do
     it "Simplest example that rewrites a single function to use Hughes lists instead of standard ones." $ do
-      res <- ct $ hughesList logTestSettings testOptions "./HughesList/HList1.hs" "enumerate" (7,1) 2
+      res <- ct $ hughesList defaultTestSettings testOptions "./HughesList/HList1.hs" "enumerate" (7,1) 2
       res' <- ct $ mapM makeRelativeToCurrentDirectory res
       res' `shouldBe` ["HughesList/HList1.hs"]
       diff <- ct $ compareFiles "./HughesList/HList1.refactored.hs"
@@ -40,3 +40,17 @@ spec = do
       diff <- ct $ compareFiles "./HughesList/HList4.refactored.hs"
                                 "./HughesList/HList4.hs.expected"     
       diff `shouldBe` []      
+    it "Simple refactoring using the fast subset of DList functions" $ do
+      res <- ct $ fastHughesList defaultTestSettings testOptions "./HughesList/FHList1.hs" "interleave" (3,1) 3
+      res' <- ct $ mapM makeRelativeToCurrentDirectory res
+      res' `shouldBe` ["HughesList/FHList1.hs"]
+      diff <- ct $ compareFiles "./HughesList/FHList1.refactored.hs"
+                                "./HughesList/FHList1.hs.expected"     
+      diff `shouldBe` []      
+    it "Explode example again this time using the fast functions only" $ do
+      res <- ct $ fastHughesList logTestSettings testOptions "./HughesList/FHList2.hs" "interleave" (6,1) 3
+      res' <- ct $ mapM makeRelativeToCurrentDirectory res
+      res' `shouldBe` ["HughesList/FHList2.hs"]
+      diff <- ct $ compareFiles "./HughesList/FHList2.refactored.hs"
+                                "./HughesList/FHList2.hs.expected"     
+      diff `shouldBe` []

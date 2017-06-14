@@ -6,7 +6,9 @@ module Language.Haskell.Refact.Utils.Isomorphic
  , runIsoRefact
  , getTyCon
  , getResultType
- , mkFuncs) where
+ , mkFuncs
+ , IsoFuncStrings
+ , getInitState) where
 
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.MonadFunctions
@@ -272,6 +274,13 @@ getTypeFromRdr nm a = SYB.something (Nothing `SYB.mkQ` comp) a
           | otherwise = Nothing
         comp _ = Nothing
         occNm = (GHC.occName nm)
+
+getInitState :: ParsedLImportDecl -> IsoFuncStrings -> Maybe String -> GHC.Type -> RefactGhc IsoRefactState
+getInitState iDecl fStrs mqual fstResTy = do
+  funcs <- mkFuncs iDecl "toList" "fromList" fStrs mqual
+  return $ IsoState funcs [Just fstResTy]
+
+type IsoFuncStrings = [(String,String)]
 
 mkFuncs :: ParsedLImportDecl -> String -> String -> [(String,String)] -> Maybe String -> RefactGhc IsomorphicFuncs
 mkFuncs iDecl projStr absStr fStrings mqual = do

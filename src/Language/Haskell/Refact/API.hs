@@ -305,6 +305,8 @@ module Language.Haskell.Refact.API
   , getTyCon
   , getResultType
   , mkFuncs
+  , IsoFuncStrings
+  , getInitState
  ) where
 
 import Language.Haskell.Refact.Utils.Isomorphic
