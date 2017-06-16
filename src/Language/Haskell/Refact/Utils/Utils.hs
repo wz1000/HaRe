@@ -48,9 +48,10 @@ import Language.Haskell.GHC.ExactPrint.Preprocess
 import Language.Haskell.GHC.ExactPrint.Print
 import Language.Haskell.GHC.ExactPrint.Utils
 
-import qualified GhcMod          as GM
-import qualified GhcMod.Target   as GM
-import qualified GhcMod.Types    as GM
+import qualified GhcMod             as GM
+import qualified GhcMod.Monad.Types as GM
+import qualified GhcMod.Target      as GM
+import qualified GhcMod.Types       as GM
 
 import Language.Haskell.Refact.Utils.GhcModuleGraph
 import Language.Haskell.Refact.Utils.GhcVersionSpecific
@@ -108,16 +109,37 @@ parseSourceFileGhc' targetFile = do
 -}
 -- ---------------------------------------------------------------------
 
+getMappedFileName :: FilePath -> RefactGhc FilePath
+getMappedFileName fname = RefactGhc doGetMappedFileName
+  where
+    doGetMappedFileName :: (GM.IOish m) => GM.GhcModT m FilePath
+    doGetMappedFileName = do
+      maybeMapped <- GM.lookupMMappedFile fname
+      let
+        mFileName = case maybeMapped of
+          Just (GM.FileMapping mfname _isTemp) -> mfname
+          Nothing -> fname
+      return mFileName
+
+-- ---------------------------------------------------------------------
+
 -- | Parse a single source file into a GHC session
 parseSourceFileGhc :: FilePath -> RefactGhc ()
 parseSourceFileGhc targetFile = do
   logm $ "parseSourceFileGhc:targetFile=" ++ show targetFile
   cfileName <- liftIO $ canonicalizePath targetFile
+  -- maybeMapped <- GM.lookupMMappedFile cfileName
+  -- let
+  --   mFileName = case maybeMapped of
+  --     Just (GM.FileMapping fname _isTemp) -> fname
+  --     Nothing -> cFileName
+  mFileName <- getMappedFileName cfileName
   logm $ "parseSourceFileGhc:cfileName=" ++ show cfileName
-  ref <- liftIO $ newIORef (cfileName,Nothing)
+  logm $ "parseSourceFileGhc:maybeMapped=" ++ show mFileName
+  -- ref <- liftIO $ newIORef (cfileName,Nothing)
+  ref <- liftIO $ newIORef (mFileName,Nothing)
   let
     setTarget fileName = RefactGhc $ GM.runGmlT' [Left fileName] (installHooks ref) (return ())
-  -- setTarget targetFile
   setTarget cfileName
   logm $ "parseSourceFileGhc:after setTarget"
   (_,mtm) <- liftIO $ readIORef ref
