@@ -151,8 +151,9 @@ field, to ensure uniqueness.
 
 data RefacSource = RSFile FilePath
                  | RSTarget TargetModule
-                 | RSMod GHC.ModSummary
+                 -- x| RSMod GHC.ModSummary
                  | RSAlreadyLoaded
+                 deriving (Show)
 
 type TargetModule = GM.ModulePath -- From ghc-mod
 
