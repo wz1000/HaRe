@@ -46,6 +46,7 @@ import qualified Outputable    as GHC
 
 import Control.Applicative
 import Control.Monad.State
+import Data.IORef
 --import Data.Time.Clock
 import Distribution.Helper
 import Exception
@@ -134,7 +135,16 @@ data RefactState = RefSt
                                         -- refactoring takes place
         , rsCurrentTarget :: !(Maybe TargetModule) -- TODO:AZ: push this into rsModule
         , rsModule        :: !(Maybe RefactModule) -- ^The current module being refactored
+        , rsHookIORef     :: !(Maybe (IORef HookIORefData))
+                  -- ^Used to communicate between the parseSourceFileGhc
+                  -- function and the GHC hook function that returns the
+                  -- TypecheckedModule. The IORef itself needs to be stable, as
+                  -- it is sometimes cached in the ghc-mod GHC session.
         } deriving (Show)
+
+instance Show (IORef HookIORefData) where
+  show _ = "IORef HookIORefData"
+
 {-
 Note [rsSrcSpanCol]
 ~~~~~~~~~~~~~~~~~~~
@@ -260,7 +270,7 @@ cabalModuleGraphs = RefactGhc doCabalModuleGraphs
         Just _ -> do
           mcs <- GM.cabalResolvedComponents
           let graph = map GM.gmcHomeModuleGraph $ Map.elems mcs
-          return $ graph
+          return graph
         Nothing -> return []
 
 -- ---------------------------------------------------------------------

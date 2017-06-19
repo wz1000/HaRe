@@ -103,19 +103,31 @@ spec = do
 
     -- ---------------------------------
 
-    it "loads a series of files based on cabal1" $ do
+    it "loads a series of files based on cabal1 1" $ do
 
-      currentDir <- getCurrentDirectory
-      setCurrentDirectory "./test/testdata/cabal/cabal1"
+      let dir = "./test/testdata/cabal/cabal1"
+
+      let settings = defaultSettings { rsetEnabledTargets = (True,True,False,False)
+                                     , rsetVerboseLevel = Debug
+                                     }
+
+      r <-  cdAndDo dir $ rename settings testOptions "./src/main.hs" "baz1" (7, 1)
+      r' <- cdAndDo dir $ mapM makeRelativeToCurrentDirectory r
+
+      (show r') `shouldBe` "[\"src/main.hs\"]"
+
+    -- ---------------------------------
+
+    it "loads a series of files based on cabal1 2" $ do
+
+      let dir = "./test/testdata/cabal/cabal1"
 
       let settings = defaultSettings { rsetEnabledTargets = (True,True,False,False)
                                      -- , rsetVerboseLevel = Debug
                                      }
 
-      r <- rename settings testOptions "./src/Foo/Bar.hs" "baz1" (3, 1)
-      -- r <- rename logTestSettings cradle "./src/Foo/Bar.hs" "baz1" (3, 1)
-      r' <- mapM makeRelativeToCurrentDirectory r
-      setCurrentDirectory currentDir
+      r <-  cdAndDo dir $ rename settings testOptions "./src/Foo/Bar.hs" "baz1" (3, 1)
+      r' <- cdAndDo dir $ mapM makeRelativeToCurrentDirectory r
 
       (show r') `shouldBe` "[\"src/Foo/Bar.hs\","
                           ++"\"src/main.hs\"]"
@@ -125,22 +137,14 @@ spec = do
 
     it "loads a series of files based on cabal2, which has 2 exe" $ do
 
-      currentDir <- getCurrentDirectory
-      setCurrentDirectory "./test/testdata/cabal/cabal2"
+      let dir = "./test/testdata/cabal/cabal2"
 
       let settings = defaultSettings { rsetEnabledTargets = (True,True,True,True)
                                      -- , rsetVerboseLevel = Debug
                                      }
 
-      let handler = [Handler handler1]
-          handler1 :: GHC.SourceError -> IO [String]
-          handler1 e = do
-             setCurrentDirectory currentDir
-             return [show e]
-
-      r <- catches (rename settings testOptions "./src/Foo/Bar.hs" "baz1" (3, 1)) handler
-      r' <- mapM makeRelativeToCurrentDirectory r
-      setCurrentDirectory currentDir
+      r  <- cdAndDo dir $ rename settings testOptions "./src/Foo/Bar.hs" "baz1" (3, 1)
+      r' <- cdAndDo dir $ mapM makeRelativeToCurrentDirectory r
 
 
       (show r') `shouldBe` "[\"src/Foo/Bar.hs\","++
@@ -450,7 +454,8 @@ spec = do
          tm <- getRefactTargetModule
          g <- clientModsAndFiles tm
          return g
-      (mg,_s) <- cdAndDo testDir $ runRefactGhc comp initialState testOptions
+      -- (mg,_s) <- cdAndDo testDir $ runRefactGhc comp initialState testOptions
+      (mg,_s) <- cdAndDo testDir $ runRefactGhc comp initialLogOnState testOptions
       showGhc (map GM.mpModule mg) `shouldBe` "[]"
 
 

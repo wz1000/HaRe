@@ -5,6 +5,7 @@ module Language.Haskell.Refact.Utils.Types
         ApplyRefacResult
        , RefacResult(..)
        , TypecheckedModule(..)
+       , HookIORefData
        -- *
        , TreeId(..)
        , mainTid
@@ -46,6 +47,11 @@ data TypecheckedModule = TypecheckedModule
   , tmMinfExports       :: ![GHC.AvailInfo]
   , tmMinfRdrEnv        :: !(Maybe GHC.GlobalRdrEnv)   -- Nothing for a compiled/package mod
   }
+
+-- |Contents of IORef used to communicate with the GHC frontend hook. This has
+-- to be kept in the RefactGhc state because so ghc-mod caches GHC sessions, so
+-- it is not possible to change the IORef.
+type HookIORefData = (FilePath,FilePath,Maybe TypecheckedModule, [Maybe FilePath])
 
 -- TODO: improve this, or remove it's need
 instance Show TypecheckedModule where

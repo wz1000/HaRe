@@ -131,8 +131,14 @@ parseSourceFileGhc targetFile = do
   mFileName <- getMappedFileName cfileName
   logm $ "parseSourceFileGhc:cfileName=" ++ show cfileName
   logm $ "parseSourceFileGhc:maybeMapped=" ++ show mFileName
-  -- ref <- liftIO $ newIORef (cfileName,Nothing)
-  ref <- liftIO $ newIORef (mFileName,cfileName,Nothing, [])
+  mref <- getHookIORef
+  ref <- case mref of
+           Just r -> return r
+           Nothing -> do
+             r <- liftIO $ newIORef (mFileName,cfileName,Nothing, [])
+             setHookIORef (Just r)
+             return r
+  liftIO $ modifyIORef' ref (const (mFileName,cfileName,Nothing, []))
   let
     setTarget fileName = RefactGhc $ GM.runGmlT' [Left fileName] (installHooks ref) (return ())
   setTarget cfileName
@@ -149,7 +155,7 @@ parseSourceFileGhc targetFile = do
     _ -> error $ "HaRe:unexpected error parsing " ++ targetFile
 
 -- ---------------------------------------------------------------------
-type HookIORefData = (FilePath,FilePath,Maybe TypecheckedModule, [Maybe FilePath])
+
 
 installHooks :: (Monad m) => IORef HookIORefData -> GHC.DynFlags -> m GHC.DynFlags
 installHooks ref dflags = return $ dflags {
@@ -183,6 +189,7 @@ hscFrontend ref mod_summary = do
     (mfn,_) <- canonicalizeModSummary mod_summary
     -- liftIO $ putStrLn $ "hscFrontend:mfn:" ++ show mfn
     (fn,cn,om,fps) <- liftIO $ readIORef ref
+    -- liftIO $ putStrLn $ "hscFrontend:(fn,cn,fps):" ++ show (fn,cn,fps)
     let
       keepInfo = case mfn of
                    Just fileName -> fn == fileName
@@ -255,7 +262,7 @@ loadFromModSummary :: Maybe TypecheckedModule -> GHC.ModSummary -> RefactGhc ()
 loadFromModSummary mtm modSum = do
   logm $ "loadFromModSummary:modSum=" ++ show modSum
   t <- case mtm of
-         Nothing -> error $ "loadFromModSummary: TypecheckedModule not provided"
+         Nothing -> error "loadFromModSummary: TypecheckedModule not provided"
          Just tm -> return tm
 
   cppComments <- if True
@@ -327,6 +334,7 @@ runRefacSession settings opt comp = do
         , rsStorage       = StorageNone
         , rsCurrentTarget = Nothing
         , rsModule        = Nothing
+        , rsHookIORef     = Nothing
         }
 
   (refactoredMods,_s) <- runRefactGhc comp initialState opt
@@ -353,6 +361,7 @@ runMultRefacSession settings opt comps = do
         , rsStorage       = StorageNone
         , rsCurrentTarget = Nothing
         , rsModule        = Nothing
+        , rsHookIORef     = Nothing
         }
   results <- threadState opt initialState comps
   let (_, finState) = last results
@@ -585,8 +594,9 @@ writeRefactoredFiles verbosity files
 clientModsAndFiles :: GM.ModulePath -> RefactGhc [TargetModule]
 -- TODO: Use ghc-mod cache if there is a cabal file, else normal GHC modulegraph
 clientModsAndFiles m = do
+  logm $ "clientModsAndFiles:m=" ++ show m
   mgs <- cabalModuleGraphs
-  -- logm $ "clientModsAndFiles:mgs=" ++ show mgs
+  logm $ "clientModsAndFiles:mgs=" ++ show mgs
   -- mgs is [Map ModulePath (Set ModulePath)]
   --  where eack key imports the corresponding set.
   -- There are no cycles
