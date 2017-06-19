@@ -128,33 +128,30 @@ parseSourceFileGhc :: FilePath -> RefactGhc ()
 parseSourceFileGhc targetFile = do
   logm $ "parseSourceFileGhc:targetFile=" ++ show targetFile
   cfileName <- liftIO $ canonicalizePath targetFile
-  -- maybeMapped <- GM.lookupMMappedFile cfileName
-  -- let
-  --   mFileName = case maybeMapped of
-  --     Just (GM.FileMapping fname _isTemp) -> fname
-  --     Nothing -> cFileName
   mFileName <- getMappedFileName cfileName
   logm $ "parseSourceFileGhc:cfileName=" ++ show cfileName
   logm $ "parseSourceFileGhc:maybeMapped=" ++ show mFileName
   -- ref <- liftIO $ newIORef (cfileName,Nothing)
-  ref <- liftIO $ newIORef (mFileName,Nothing)
+  ref <- liftIO $ newIORef (mFileName,cfileName,Nothing, [])
   let
     setTarget fileName = RefactGhc $ GM.runGmlT' [Left fileName] (installHooks ref) (return ())
   setTarget cfileName
   logm $ "parseSourceFileGhc:after setTarget"
-  (_,mtm) <- liftIO $ readIORef ref
+  (_,_,mtm,fps) <- liftIO $ readIORef ref
   logm $ "parseSourceFileGhc:isJust mtm:" ++ show (isJust mtm)
+  logm $ "parseSourceFileGhc:fps:" ++ show fps
   graph  <- GHC.getModuleGraph
   cgraph <- canonicalizeGraph graph
-  let mm = filter (\(mfn,_ms) -> mfn == Just cfileName) cgraph
+  -- let mm = filter (\(mfn,_ms) -> mfn == Just cfileName) cgraph
+  let mm = filter (\(mfn,_ms) -> mfn == Just mFileName) cgraph
   case mm of
     [(_,modSum)] -> loadFromModSummary mtm modSum
-    -- [(_,modSum)] -> loadFromModSummary Nothing modSum
     _ -> error $ "HaRe:unexpected error parsing " ++ targetFile
 
 -- ---------------------------------------------------------------------
+type HookIORefData = (FilePath,FilePath,Maybe TypecheckedModule, [Maybe FilePath])
 
-installHooks :: (Monad m) => IORef (FilePath,Maybe TypecheckedModule) -> GHC.DynFlags -> m GHC.DynFlags
+installHooks :: (Monad m) => IORef HookIORefData -> GHC.DynFlags -> m GHC.DynFlags
 installHooks ref dflags = return $ dflags {
     GHC.hooks = (GHC.hooks dflags) {
 
@@ -167,7 +164,7 @@ installHooks ref dflags = return $ dflags {
   }
 
 #if __GLASGOW_HASKELL__ > 710
-runHscFrontend :: IORef (FilePath,Maybe TypecheckedModule) -> GHC.ModSummary -> GHC.Hsc GHC.FrontendResult
+runHscFrontend :: IORef HookIORefData -> GHC.ModSummary -> GHC.Hsc GHC.FrontendResult
 runHscFrontend ref mod_summary
     = GHC.FrontendTypecheck `fmap` hscFrontend ref mod_summary
 #endif
@@ -180,12 +177,12 @@ runHscFrontend ref mod_summary
 -- This gets called on every module compiled when loading the wanted target.
 -- When it is the wanted target, keep the ParsedSource and TypecheckedSource,
 -- with API Annotations enabled.
-hscFrontend :: IORef (FilePath,Maybe TypecheckedModule) -> GHC.ModSummary -> GHC.Hsc GHC.TcGblEnv
+hscFrontend :: IORef HookIORefData -> GHC.ModSummary -> GHC.Hsc GHC.TcGblEnv
 hscFrontend ref mod_summary = do
     -- liftIO $ putStrLn $ "hscFrontend:entered:" ++ fileNameFromModSummary mod_summary
     (mfn,_) <- canonicalizeModSummary mod_summary
     -- liftIO $ putStrLn $ "hscFrontend:mfn:" ++ show mfn
-    (fn,_) <- liftIO $ readIORef ref
+    (fn,cn,om,fps) <- liftIO $ readIORef ref
     let
       keepInfo = case mfn of
                    Just fileName -> fn == fileName
@@ -211,6 +208,7 @@ hscFrontend ref mod_summary = do
         let
           tc =
             TypecheckedModule {
+              tmFileNameUnmapped  = cn,
               tmParsedModule      = p,
               tmRenamedSource     = gfromJust "hscFrontend" rn_info,
               tmTypecheckedSource = GHC.tcg_binds tc_gbl_env,
@@ -218,9 +216,10 @@ hscFrontend ref mod_summary = do
               tmMinfRdrEnv        = Just (GHC.tcg_rdr_env tc_gbl_env)
               }
 
-        liftIO $ modifyIORef' ref (const (fn,Just tc))
+        liftIO $ modifyIORef' ref (const (fn,cn,Just tc, mfn:fps))
         return tc_gbl_env
       else do
+        liftIO $ modifyIORef' ref (const (fn,cn,om,      mfn:fps))
         hpm <- GHC.hscParse' mod_summary
         hsc_env <- GHC.getHscEnv
         tc_gbl_env <- GHC.tcRnModule' hsc_env mod_summary False hpm
@@ -256,23 +255,9 @@ loadFromModSummary :: Maybe TypecheckedModule -> GHC.ModSummary -> RefactGhc ()
 loadFromModSummary mtm modSum = do
   logm $ "loadFromModSummary:modSum=" ++ show modSum
   t <- case mtm of
-    Nothing -> do
-      let modSumWithRaw = tweakModSummaryDynFlags modSum
-      p <- GHC.parseModule modSumWithRaw
-      t' <- GHC.typecheckModule p
-      let
-        tm = TypecheckedModule
-          { tmParsedModule = p
-          , tmRenamedSource = gfromJust "loadFromModSummary" $ GHC.tm_renamed_source t'
-          , tmTypecheckedSource = GHC.tm_typechecked_source t'
-          , tmMinfExports  = error $ "loadFromModSummary:not visible in ModuleInfo 1"
-          , tmMinfRdrEnv   = error $ "loadFromModSummary:not visible in ModuleInfo 2"
-          }
-      return tm
-    Just tm -> return tm
+         Nothing -> error $ "loadFromModSummary: TypecheckedModule not provided"
+         Just tm -> return tm
 
-  -- dflags <- GHC.getDynFlags
-  -- cppComments <- if (GHC.xopt GHC.Opt_Cpp dflags)
   cppComments <- if True
                   then do
                        -- ++AZ++:TODO: enable the CPP option check some time
@@ -286,6 +271,7 @@ loadFromModSummary mtm modSum = do
                        return []
 
   -- required for inscope queries. Is there a better way to do those?
+  -- TODO: ModSummary may have mapped file name instead of original. Does this matter?
   setGhcContext modSum
 
   (mfp,_modSum) <- canonicalizeModSummary modSum
@@ -446,12 +432,13 @@ applyRefac' clearSt refac source = do
                                return fname
          RSTarget tgt    -> do getTargetGhc tgt
                                return (GM.mpPath tgt)
-         RSMod  ms       -> do parseSourceFileGhc $ fileNameFromModSummary ms
-                               return $ fileNameFromModSummary ms
+         -- RSMod  ms       -> do parseSourceFileGhc $ fileNameFromModSummary ms
+         --                       return $ fileNameFromModSummary ms
          RSAlreadyLoaded -> do mfn <- getRefactFileName
                                case mfn of
                                  Just fname -> return fname
                                  Nothing -> error "applyRefac RSAlreadyLoaded: nothing loaded"
+    logm $ "applyRefac':(fileName,source)=" ++ show (fileName,source)
 
     res <- refac  -- Run the refactoring, updating the state as required
 

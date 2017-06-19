@@ -402,6 +402,7 @@ spec = do
          g <- clientModsAndFiles tm
          return g
       (mg,_s) <- ct $ runRefactGhc comp initialState testOptions
+      -- (mg,_s) <- ct $ runRefactGhc comp initialLogOnState testOptions
       showGhc (map GM.mpModule mg) `shouldBe` "[Main]"
 
     ------------------------------------

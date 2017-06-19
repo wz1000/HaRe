@@ -323,8 +323,9 @@ getRefactFileName = do
   mtm <- gets rsModule
   case mtm of
     Nothing  -> return Nothing
-    Just tm -> return $ Just (fileNameFromModSummary $ GHC.pm_mod_summary
-                              $ tmParsedModule $ rsTypecheckedMod tm)
+    -- Just tm -> return $ Just (fileNameFromModSummary $ GHC.pm_mod_summary
+    --                           $ tmParsedModule $ rsTypecheckedMod tm)
+    Just tm -> return $ Just (tmFileNameUnmapped $ rsTypecheckedMod tm)
 
 -- ---------------------------------------------------------------------
 

@@ -36,13 +36,15 @@ data RefacResult = RefacModified | RefacUnmodifed
 -- ---------------------------------------------------------------------
 
 data TypecheckedModule = TypecheckedModule
-  { tmParsedModule      :: !GHC.ParsedModule
+  { tmFileNameUnmapped  :: !FilePath -- ^ Full path of the original file, before
+                                     -- ghc-mod mapping. This may be different
+                                     -- from the one in the ModSummary, if
+                                     -- mapping has taken place.
+  , tmParsedModule      :: !GHC.ParsedModule
   , tmRenamedSource     :: !GHC.RenamedSource
   , tmTypecheckedSource :: !GHC.TypecheckedSource
-  -- , tmMinfExports       :: ![GHC.AvailInfo]
-  -- , tmMinfRdrEnv        :: !(Maybe GHC.GlobalRdrEnv)   -- Nothing for a compiled/package mod
-  , tmMinfExports       :: [GHC.AvailInfo]
-  , tmMinfRdrEnv        :: (Maybe GHC.GlobalRdrEnv)   -- Nothing for a compiled/package mod
+  , tmMinfExports       :: ![GHC.AvailInfo]
+  , tmMinfRdrEnv        :: !(Maybe GHC.GlobalRdrEnv)   -- Nothing for a compiled/package mod
   }
 
 -- TODO: improve this, or remove it's need
