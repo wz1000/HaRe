@@ -436,6 +436,8 @@ applyRefac' clearSt refac source = do
     -- management: store state now, set it to fresh, run refac, then
     -- restore the state. Fix this to store the modules in some kind of cache.
 
+    -- TODO: with the hook approach we cannot load a file if it is already
+    -- loaded, the GHC recompile check will not allow it. Need to keep track of that.
     fileName <- case source of
          RSFile fname    -> do parseSourceFileGhc fname
                                return fname
