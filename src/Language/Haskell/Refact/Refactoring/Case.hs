@@ -36,7 +36,7 @@ compIfToCase fileName beginPos endPos = do
        parseSourceFileGhc fileName
        parsed <- getRefactParsed
        oldAnns <- liftT getAnnsT
-       logm $ "Case.compIfToCase:parsed=" ++ (showAnnData oldAnns 0 parsed) -- ++AZ++
+       -- logm $ "Case.compIfToCase:parsed=" ++ (showAnnData oldAnns 0 parsed) -- ++AZ++
        let expr = locToExp beginPos endPos parsed
        case expr of
          Just exp1@(GHC.L _ (GHC.HsIf _ _ _ _))
