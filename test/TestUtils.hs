@@ -224,6 +224,7 @@ testOptions :: GM.Options
 testOptions = GM.defaultOptions {
     GM.optOutput     = GM.OutputOpts {
       GM.ooptLogLevel       = GM.GmError
+      -- GM.ooptLogLevel       = GM.GmDebug
       -- GM.ooptLogLevel       = GM.GmVomit
     , GM.ooptStyle          = GM.PlainStyle
     , GM.ooptLineSeparator  = GM.LineSeparator "\0"

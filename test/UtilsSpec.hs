@@ -77,6 +77,24 @@ spec = do
   -- -------------------------------------------------------------------
 
   describe "loading a file" $ do
+    it "loads the same file more than once" $ do
+      -- We are checking that loading via the GHC hook does not get defeated the
+      -- second time by the GHC recompile checker.
+      let testFileName = "./B.hs"
+      let
+        comp = do
+         parseSourceFileGhc testFileName
+         p1 <- getRefactParsed
+         parseSourceFileGhc testFileName
+         p2 <- getRefactParsed
+         return (p1,p2)
+      ((parsed1,parsed2),_s) <- ct $ runRefactGhc comp initialState testOptions
+      -- ((parsed1,parsed2),_s) <- ct $ runRefactGhc comp initialLogOnState testOptions
+
+      (showGhc parsed1) `shouldBe` "module B where\nbob :: Int -> Int -> Int\nbob x y = x + y"
+      (showGhc parsed2) `shouldBe` "module B where\nbob :: Int -> Int -> Int\nbob x y = x + y"
+
+
     it "loads a file having the LANGUAGE CPP pragma" $ do
       t <- ct $ parsedFileGhc "./BCpp.hs"
 
@@ -108,7 +126,7 @@ spec = do
       let dir = "./test/testdata/cabal/cabal1"
 
       let settings = defaultSettings { rsetEnabledTargets = (True,True,False,False)
-                                     , rsetVerboseLevel = Debug
+                                     -- , rsetVerboseLevel = Debug
                                      }
 
       r <-  cdAndDo dir $ rename settings testOptions "./src/main.hs" "baz1" (7, 1)
@@ -454,8 +472,8 @@ spec = do
          tm <- getRefactTargetModule
          g <- clientModsAndFiles tm
          return g
-      -- (mg,_s) <- cdAndDo testDir $ runRefactGhc comp initialState testOptions
-      (mg,_s) <- cdAndDo testDir $ runRefactGhc comp initialLogOnState testOptions
+      (mg,_s) <- cdAndDo testDir $ runRefactGhc comp initialState testOptions
+      -- (mg,_s) <- cdAndDo testDir $ runRefactGhc comp initialLogOnState testOptions
       showGhc (map GM.mpModule mg) `shouldBe` "[]"
 
 

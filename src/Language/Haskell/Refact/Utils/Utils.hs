@@ -140,13 +140,17 @@ parseSourceFileGhc targetFile = do
              return r
   liftIO $ modifyIORef' ref (const (mFileName,cfileName,Nothing, []))
   let
-    setTarget fileName = RefactGhc $ GM.runGmlT' [Left fileName] (installHooks ref) (return ())
+    setTarget fileName
+      = RefactGhc $ GM.runGmlTfm [Left fileName] (installHooks ref) True (return ())
+
   setTarget cfileName
+
   logm $ "parseSourceFileGhc:after setTarget"
   (_,_,mtm,fps) <- liftIO $ readIORef ref
   logm $ "parseSourceFileGhc:isJust mtm:" ++ show (isJust mtm)
   logm $ "parseSourceFileGhc:fps:" ++ show fps
   graph  <- GHC.getModuleGraph
+  -- logm $ "parseSourceFileGhc:graph=" ++ showGhc (map GHC.ms_location graph)
   cgraph <- canonicalizeGraph graph
   -- let mm = filter (\(mfn,_ms) -> mfn == Just cfileName) cgraph
   let mm = filter (\(mfn,_ms) -> mfn == Just mFileName) cgraph
