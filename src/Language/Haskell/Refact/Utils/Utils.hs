@@ -141,7 +141,7 @@ parseSourceFileGhc targetFile = do
   liftIO $ modifyIORef' ref (const (mFileName,cfileName,Nothing, []))
   let
     setTarget fileName
-      = RefactGhc $ GM.runGmlTfm [Left fileName] (installHooks ref) True (return ())
+      = RefactGhc $ GM.runGmlTfm [Left fileName] return True (updateHooks ref) (return ())
 
   setTarget cfileName
 
@@ -161,17 +161,23 @@ parseSourceFileGhc targetFile = do
 -- ---------------------------------------------------------------------
 
 
-installHooks :: (Monad m) => IORef HookIORefData -> GHC.DynFlags -> m GHC.DynFlags
-installHooks ref dflags = return $ dflags {
-    GHC.hooks = (GHC.hooks dflags) {
-
+updateHooks :: IORef HookIORefData -> GHC.Hooks -> GHC.Hooks
+updateHooks ref hooks = hooks {
 #if __GLASGOW_HASKELL__ <= 710
         GHC.hscFrontendHook   = Just $ hscFrontend ref
 #else
         GHC.hscFrontendHook   = Just $ runHscFrontend ref
 #endif
       }
+
+-- ---------------------------------------------------------------------
+
+installHooks :: (Monad m) => IORef HookIORefData -> GHC.DynFlags -> m GHC.DynFlags
+installHooks ref dflags = return $ dflags {
+    GHC.hooks = updateHooks ref (GHC.hooks dflags)
   }
+
+-- ---------------------------------------------------------------------
 
 #if __GLASGOW_HASKELL__ > 710
 runHscFrontend :: IORef HookIORefData -> GHC.ModSummary -> GHC.Hsc GHC.FrontendResult
