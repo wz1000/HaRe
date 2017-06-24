@@ -56,7 +56,7 @@ tmRenamedSource = maybe (error "failed to get renamedSource") id . GHC.tm_rename
 -- |Contents of IORef used to communicate with the GHC frontend hook. This has
 -- to be kept in the RefactGhc state because so ghc-mod caches GHC sessions, so
 -- it is not possible to change the IORef.
-type HookIORefData = (FilePath,FilePath,Maybe TypecheckedModule, [Maybe FilePath])
+type HookIORefData = (FilePath,Maybe TypecheckedModule)
 
 -- TODO: improve this, or remove it's need
 instance Show TypecheckedModule where
