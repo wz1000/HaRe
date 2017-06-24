@@ -50,10 +50,6 @@ module Language.Haskell.Refact.Utils.MonadFunctions
        -- * New ghc-exactprint interfacing
        , liftT
 
-       -- * For internal use
-       , getHookIORef
-       , setHookIORef
-
        -- * State flags for managing generic traversals
        , getRefactDone
        , setRefactDone
@@ -83,7 +79,6 @@ module Language.Haskell.Refact.Utils.MonadFunctions
        ) where
 
 import Control.Monad.State
-import Data.IORef
 import Data.List
 
 import qualified GHC           as GHC
@@ -385,16 +380,6 @@ addToNameMap ss n = do
           nm' = Map.insert ss n nm
           mtm' = Just tm { rsNameMap = nm'}
       put s { rsModule = mtm'}
-
--- ---------------------------------------------------------------------
-
-getHookIORef :: RefactGhc (Maybe (IORef HookIORefData))
-getHookIORef = gets rsHookIORef
-
-setHookIORef :: Maybe (IORef HookIORefData) -> RefactGhc ()
-setHookIORef mref = do
-  st <- get
-  put $ st { rsHookIORef = mref }
 
 -- ---------------------------------------------------------------------
 
