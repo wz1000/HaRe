@@ -15,7 +15,7 @@ module Language.Haskell.Refact.Utils.Utils
        -- * Managing the GHC / project environment
          getTargetGhc
        , parseSourceFileGhc
-       , parseSourceFileGhc'
+       , getTypecheckedModuleGhc
 
        -- * The bits that do the work
        , runRefacSession
@@ -126,8 +126,8 @@ getMappedFileName fname = RefactGhc doGetMappedFileName
 
 -- ---------------------------------------------------------------------
 
-parseSourceFileGhc' :: FilePath -> RefactGhc (Maybe TypecheckedModule)
-parseSourceFileGhc' targetFile = do
+getTypecheckedModuleGhc :: FilePath -> RefactGhc (Maybe TypecheckedModule)
+getTypecheckedModuleGhc targetFile = do
   logm $ "parseSourceFileGhc:targetFile=" ++ show targetFile
   cfileName <- liftIO $ canonicalizePath targetFile
   mFileName <- getMappedFileName cfileName
@@ -148,7 +148,7 @@ parseSourceFileGhc' targetFile = do
 -- | Parse a single source file into a GHC session
 parseSourceFileGhc :: FilePath -> RefactGhc ()
 parseSourceFileGhc targetFile = do
-  mtm <- parseSourceFileGhc' targetFile
+  mtm <- getTypecheckedModuleGhc targetFile
   case mtm of
     Nothing -> error $ "Couldn't get typechecked module for " ++ targetFile
     Just tm -> loadFromModSummary tm (GHC.pm_mod_summary $ tm_parsed_module tm)
