@@ -152,7 +152,6 @@ initialState = RefSt
   , rsStorage = StorageNone
   , rsCurrentTarget = Nothing
   , rsModule = Nothing
-  , rsHookIORef = Nothing
   }
 
 -- ---------------------------------------------------------------------
@@ -166,7 +165,6 @@ initialLogOnState = RefSt
   , rsStorage = StorageNone
   , rsCurrentTarget = Nothing
   , rsModule = Nothing
-  , rsHookIORef = Nothing
   }
 
 -- ---------------------------------------------------------------------
@@ -211,7 +209,6 @@ runRefactGhcStateLog comp logOn  = do
         , rsStorage = StorageNone
         , rsCurrentTarget = Nothing
         , rsModule = Nothing
-        , rsHookIORef = Nothing
         }
   -- putStrLn $ "runRefactGhcStateLog:initState=" ++ show initState
   -- putStrLn $ "runRefactGhcStateLog:testOptions=" ++ show testOptions

@@ -133,14 +133,7 @@ parseSourceFileGhc targetFile = do
   mFileName <- getMappedFileName cfileName
   logm $ "parseSourceFileGhc:cfileName=" ++ show cfileName
   logm $ "parseSourceFileGhc:maybeMapped=" ++ show mFileName
-  mref <- getHookIORef
-  ref <- case mref of
-           Just r -> return r
-           Nothing -> do
-             r <- liftIO $ newIORef (mFileName,cfileName,Nothing, [])
-             setHookIORef (Just r)
-             return r
-  liftIO $ modifyIORef' ref (const (mFileName,cfileName,Nothing, []))
+  ref <- liftIO $ newIORef (mFileName,cfileName,Nothing, [])
   let
     setTarget fileName
       = RefactGhc $ GM.runGmlTfm [Left fileName] return True (updateHooks ref) (return ())
@@ -226,37 +219,6 @@ hscFrontend ref mod_summary = do
         let p = p' {GHC.pm_mod_summary = mod_summary}
         tc <- GHC.typecheckModule p
         let tc_gbl_env = fst $ tm_internals_ tc
-
-        -- hsc_env <- GHC.getHscEnv
-        -- let hsc_env_tmp = hsc_env { GHC.hsc_dflags = GHC.ms_hspp_opts modSumWithRaw }
-        -- hpm <- liftIO $ GHC.hscParse hsc_env_tmp modSumWithRaw
-        -- let p = GHC.ParsedModule mod_summary
-        --                         (GHC.hpm_module      hpm)
-        --                         (GHC.hpm_src_files   hpm)
-        --                         (GHC.hpm_annotations hpm)
-
-        -- hsc_env' <- GHC.getHscEnv
-        -- (tc_gbl_env,rn_info) <- liftIO $ GHC.hscTypecheckRename hsc_env' mod_summary hpm
-
-        -- details <- liftIO $ GHC.makeSimpleDetails hsc_env' tc_gbl_env
-        -- safe    <- liftIO $ finalSafeMode (ms_hspp_opts ms) tc_gbl_env
-
-        -- let
-        --   tc =
-        --     TypecheckedModule {
-        --       tm_internals_          = (tc_gbl_env, details),
-        --       tm_parsed_module       = p,
-        --       tm_renamed_source      = rn_info,
-        --       tm_typechecked_source  = tcg_binds tc_gbl_env,
-        --       tm_checked_module_info = undefined
-        --         }
-            -- TypecheckedModule {
-            --   tm_parsed_module    = p,
-            --   tmRenamedSource     = gfromJust "hscFrontend" rn_info,
-            --   tmTypecheckedSource = GHC.tcg_binds tc_gbl_env,
-            --   tmMinfExports       = GHC.md_exports details,
-            --   tmMinfRdrEnv        = Just (GHC.tcg_rdr_env tc_gbl_env)
-            --   }
 
         liftIO $ modifyIORef' ref (const (fn,cn,Just tc, mfn:fps))
         return tc_gbl_env
@@ -369,7 +331,6 @@ runRefacSession settings opt comp = do
         , rsStorage       = StorageNone
         , rsCurrentTarget = Nothing
         , rsModule        = Nothing
-        , rsHookIORef     = Nothing
         }
 
   (refactoredMods,_s) <- runRefactGhc comp initialState opt
@@ -396,7 +357,6 @@ runMultRefacSession settings opt comps = do
         , rsStorage       = StorageNone
         , rsCurrentTarget = Nothing
         , rsModule        = Nothing
-        , rsHookIORef     = Nothing
         }
   results <- threadState opt initialState comps
   let (_, finState) = last results
