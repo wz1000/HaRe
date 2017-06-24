@@ -7,7 +7,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UndecidableInstances #-} -- for GHC.DataId
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-} -- for GHC.DataId
 
 module Language.Haskell.Refact.Utils.Utils
        (
@@ -69,6 +70,7 @@ import qualified Hooks         as GHC
 import qualified HscMain       as GHC
 import qualified HscTypes      as GHC
 import qualified TcRnMonad     as GHC
+import qualified Exception     as Exception
 
 -- import qualified GHC.SYB.Utils as SYB
 -- import qualified Data.Generics as SYB
@@ -179,6 +181,17 @@ installHooks ref dflags = return $ dflags {
 
 -- ---------------------------------------------------------------------
 
+newtype HareHsc a = HH { runHareHsc :: GHC.Hsc a }
+  deriving (Functor,Applicative,Monad,MonadIO,GHC.HasDynFlags)
+
+instance Exception.ExceptionMonad HareHsc where
+  gcatch = undefined
+  gmask = undefined
+
+instance GHC.GhcMonad HareHsc where
+  getSession = HH GHC.getHscEnv
+  setSession = error "Set session not defined for HareHsc"
+
 #if __GLASGOW_HASKELL__ > 710
 runHscFrontend :: IORef HookIORefData -> GHC.ModSummary -> GHC.Hsc GHC.FrontendResult
 runHscFrontend ref mod_summary
@@ -205,33 +218,45 @@ hscFrontend ref mod_summary = do
                    Just fileName -> fn == fileName
                    Nothing -> False
     if keepInfo
-      then do
+      then runHareHsc $ do
         -- liftIO $ putStrLn $ "hscFrontend:in keepInfo"
         let modSumWithRaw = tweakModSummaryDynFlags mod_summary
 
-        hsc_env <- GHC.getHscEnv
-        let hsc_env_tmp = hsc_env { GHC.hsc_dflags = GHC.ms_hspp_opts modSumWithRaw }
-        hpm <- liftIO $ GHC.hscParse hsc_env_tmp modSumWithRaw
-        let p = GHC.ParsedModule mod_summary
-                                (GHC.hpm_module      hpm)
-                                (GHC.hpm_src_files   hpm)
-                                (GHC.hpm_annotations hpm)
+        p' <- GHC.parseModule modSumWithRaw
+        let p = p' {GHC.pm_mod_summary = mod_summary}
+        tc <- GHC.typecheckModule p
+        let tc_gbl_env = fst $ tm_internals_ tc
 
-        hsc_env' <- GHC.getHscEnv
-        (tc_gbl_env,rn_info) <- liftIO $ GHC.hscTypecheckRename hsc_env' mod_summary hpm
+        -- hsc_env <- GHC.getHscEnv
+        -- let hsc_env_tmp = hsc_env { GHC.hsc_dflags = GHC.ms_hspp_opts modSumWithRaw }
+        -- hpm <- liftIO $ GHC.hscParse hsc_env_tmp modSumWithRaw
+        -- let p = GHC.ParsedModule mod_summary
+        --                         (GHC.hpm_module      hpm)
+        --                         (GHC.hpm_src_files   hpm)
+        --                         (GHC.hpm_annotations hpm)
 
-        details <- liftIO $ GHC.makeSimpleDetails hsc_env' tc_gbl_env
+        -- hsc_env' <- GHC.getHscEnv
+        -- (tc_gbl_env,rn_info) <- liftIO $ GHC.hscTypecheckRename hsc_env' mod_summary hpm
 
-        let
-          tc =
-            TypecheckedModule {
-              tmFileNameUnmapped  = cn,
-              tmParsedModule      = p,
-              tmRenamedSource     = gfromJust "hscFrontend" rn_info,
-              tmTypecheckedSource = GHC.tcg_binds tc_gbl_env,
-              tmMinfExports       = GHC.md_exports details,
-              tmMinfRdrEnv        = Just (GHC.tcg_rdr_env tc_gbl_env)
-              }
+        -- details <- liftIO $ GHC.makeSimpleDetails hsc_env' tc_gbl_env
+        -- safe    <- liftIO $ finalSafeMode (ms_hspp_opts ms) tc_gbl_env
+
+        -- let
+        --   tc =
+        --     TypecheckedModule {
+        --       tm_internals_          = (tc_gbl_env, details),
+        --       tm_parsed_module       = p,
+        --       tm_renamed_source      = rn_info,
+        --       tm_typechecked_source  = tcg_binds tc_gbl_env,
+        --       tm_checked_module_info = undefined
+        --         }
+            -- TypecheckedModule {
+            --   tm_parsed_module    = p,
+            --   tmRenamedSource     = gfromJust "hscFrontend" rn_info,
+            --   tmTypecheckedSource = GHC.tcg_binds tc_gbl_env,
+            --   tmMinfExports       = GHC.md_exports details,
+            --   tmMinfRdrEnv        = Just (GHC.tcg_rdr_env tc_gbl_env)
+            --   }
 
         liftIO $ modifyIORef' ref (const (fn,cn,Just tc, mfn:fps))
         return tc_gbl_env
