@@ -136,7 +136,7 @@ parseSourceFileGhc targetFile = do
   ref <- liftIO $ newIORef (mFileName,cfileName,Nothing, [])
   let
     setTarget fileName
-      = RefactGhc $ GM.runGmlTfm [Left fileName] return True (updateHooks ref) (return ())
+      = RefactGhc $ GM.runGmlTfm [Left fileName] return (Just $ updateHooks ref) (return ())
 
   setTarget cfileName
 
