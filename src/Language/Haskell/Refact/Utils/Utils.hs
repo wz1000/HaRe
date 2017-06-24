@@ -15,6 +15,7 @@ module Language.Haskell.Refact.Utils.Utils
        -- * Managing the GHC / project environment
          getTargetGhc
        , parseSourceFileGhc
+       , parseSourceFileGhc'
 
        -- * The bits that do the work
        , runRefacSession
@@ -125,15 +126,14 @@ getMappedFileName fname = RefactGhc doGetMappedFileName
 
 -- ---------------------------------------------------------------------
 
--- | Parse a single source file into a GHC session
-parseSourceFileGhc :: FilePath -> RefactGhc ()
-parseSourceFileGhc targetFile = do
+parseSourceFileGhc' :: FilePath -> RefactGhc (Maybe TypecheckedModule)
+parseSourceFileGhc' targetFile = do
   logm $ "parseSourceFileGhc:targetFile=" ++ show targetFile
   cfileName <- liftIO $ canonicalizePath targetFile
   mFileName <- getMappedFileName cfileName
   logm $ "parseSourceFileGhc:cfileName=" ++ show cfileName
   logm $ "parseSourceFileGhc:maybeMapped=" ++ show mFileName
-  ref <- liftIO $ newIORef (mFileName,cfileName,Nothing, [])
+  ref <- liftIO $ newIORef (mFileName,Nothing)
   let
     setTarget fileName
       = RefactGhc $ GM.runGmlTfm [Left fileName] return (Just $ updateHooks ref) (return ())
@@ -141,17 +141,17 @@ parseSourceFileGhc targetFile = do
   setTarget cfileName
 
   logm $ "parseSourceFileGhc:after setTarget"
-  (_,_,mtm,fps) <- liftIO $ readIORef ref
+  (_,mtm) <- liftIO $ readIORef ref
   logm $ "parseSourceFileGhc:isJust mtm:" ++ show (isJust mtm)
-  logm $ "parseSourceFileGhc:fps:" ++ show fps
-  graph  <- GHC.getModuleGraph
-  -- logm $ "parseSourceFileGhc:graph=" ++ showGhc (map GHC.ms_location graph)
-  cgraph <- canonicalizeGraph graph
-  -- let mm = filter (\(mfn,_ms) -> mfn == Just cfileName) cgraph
-  let mm = filter (\(mfn,_ms) -> mfn == Just mFileName) cgraph
-  case mm of
-    [(_,modSum)] -> loadFromModSummary mtm modSum
-    _ -> error $ "HaRe:unexpected error parsing " ++ targetFile
+  return mtm
+
+-- | Parse a single source file into a GHC session
+parseSourceFileGhc :: FilePath -> RefactGhc ()
+parseSourceFileGhc targetFile = do
+  mtm <- parseSourceFileGhc' targetFile
+  case mtm of
+    Nothing -> error $ "Couldn't get typechecked module for " ++ targetFile
+    Just tm -> loadFromModSummary tm (GHC.pm_mod_summary $ tm_parsed_module tm)
 
 -- ---------------------------------------------------------------------
 
@@ -204,7 +204,7 @@ hscFrontend ref mod_summary = do
     -- liftIO $ putStrLn $ "hscFrontend:entered:" ++ fileNameFromModSummary mod_summary
     (mfn,_) <- canonicalizeModSummary mod_summary
     -- liftIO $ putStrLn $ "hscFrontend:mfn:" ++ show mfn
-    (fn,cn,om,fps) <- liftIO $ readIORef ref
+    (fn,om) <- liftIO $ readIORef ref
     -- liftIO $ putStrLn $ "hscFrontend:(fn,cn,fps):" ++ show (fn,cn,fps)
     let
       keepInfo = case mfn of
@@ -220,10 +220,10 @@ hscFrontend ref mod_summary = do
         tc <- GHC.typecheckModule p
         let tc_gbl_env = fst $ tm_internals_ tc
 
-        liftIO $ modifyIORef' ref (const (fn,cn,Just tc, mfn:fps))
+        liftIO $ modifyIORef' ref (const (fn,Just tc))
         return tc_gbl_env
       else do
-        liftIO $ modifyIORef' ref (const (fn,cn,om,      mfn:fps))
+        liftIO $ modifyIORef' ref (const (fn,om))
         hpm <- GHC.hscParse' mod_summary
         hsc_env <- GHC.getHscEnv
         tc_gbl_env <- GHC.tcRnModule' hsc_env mod_summary False hpm
@@ -255,13 +255,9 @@ tweakModSummaryDynFlags ms =
 
 -- | In the existing GHC session, put the requested TypeCheckedModule
 -- into the RefactGhc monad
-loadFromModSummary :: Maybe TypecheckedModule -> GHC.ModSummary -> RefactGhc ()
-loadFromModSummary mtm modSum = do
+loadFromModSummary :: TypecheckedModule -> GHC.ModSummary -> RefactGhc ()
+loadFromModSummary t modSum = do
   logm $ "loadFromModSummary:modSum=" ++ show modSum
-  t <- case mtm of
-         Nothing -> error "loadFromModSummary: TypecheckedModule not provided"
-         Just tm -> return tm
-
   cppComments <- if True
                   then do
                        -- ++AZ++:TODO: enable the CPP option check some time
