@@ -5,6 +5,8 @@ module Language.Haskell.Refact.Utils.Types
         ApplyRefacResult
        , RefacResult(..)
        , TypecheckedModule(..)
+       , ModuleInfo(..)
+       , tmRenamedSource
        , HookIORefData
        -- *
        , TreeId(..)
@@ -18,6 +20,7 @@ module Language.Haskell.Refact.Utils.Types
 
 import qualified Avail      as GHC
 import qualified GHC        as GHC
+import           GHC (TypecheckedModule(..), ModuleInfo(..))
 import qualified RdrName    as GHC
 
 import Language.Haskell.GHC.ExactPrint
@@ -36,17 +39,19 @@ data RefacResult = RefacModified | RefacUnmodifed
 
 -- ---------------------------------------------------------------------
 
-data TypecheckedModule = TypecheckedModule
-  { tmFileNameUnmapped  :: !FilePath -- ^ Full path of the original file, before
-                                     -- ghc-mod mapping. This may be different
-                                     -- from the one in the ModSummary, if
-                                     -- mapping has taken place.
-  , tmParsedModule      :: !GHC.ParsedModule
-  , tmRenamedSource     :: !GHC.RenamedSource
-  , tmTypecheckedSource :: !GHC.TypecheckedSource
-  , tmMinfExports       :: ![GHC.AvailInfo]
-  , tmMinfRdrEnv        :: !(Maybe GHC.GlobalRdrEnv)   -- Nothing for a compiled/package mod
-  }
+tmRenamedSource = maybe (error "failed to get renamedSource") id . GHC.tm_renamed_source
+
+-- data TypecheckedModule = TypecheckedModule
+--   { tmFileNameUnmapped  :: !FilePath -- ^ Full path of the original file, before
+--                                      -- ghc-mod mapping. This may be different
+--                                      -- from the one in the ModSummary, if
+--                                      -- mapping has taken place.
+--   , tmParsedModule      :: !GHC.ParsedModule
+--   , tmRenamedSource     :: !GHC.RenamedSource
+--   , tmTypecheckedSource :: !GHC.TypecheckedSource
+--   , tmMinfExports       :: ![GHC.AvailInfo]
+--   , tmMinfRdrEnv        :: !(Maybe GHC.GlobalRdrEnv)   -- Nothing for a compiled/package mod
+--   }
 
 -- |Contents of IORef used to communicate with the GHC frontend hook. This has
 -- to be kept in the RefactGhc state because so ghc-mod caches GHC sessions, so

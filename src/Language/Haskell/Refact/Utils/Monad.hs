@@ -114,9 +114,6 @@ instance Show GHC.Name where
 
 deriving instance Show (GHC.Located GHC.Token)
 
-instance Show GHC.TypecheckedModule where
-  show t = showGhc (GHC.pm_parsed_source $ GHC.tm_parsed_module t)
-
 data RefactFlags = RefFlags
        { rsDone :: !Bool -- ^Current traversal has already made a change
        } deriving (Show)
