@@ -1303,7 +1303,6 @@ spec = do
     -- -----------------------------------
 
     it "finds free vars in TH files" $ do
-      t <- ct $ parsedFileGhc "./TH/Main.hs"
       let
         comp = do
           parseSourceFileGhc "./TH/Main.hs"
@@ -1311,7 +1310,8 @@ spec = do
           nm <- getRefactNameMap
           let fds' = hsFreeAndDeclaredRdr nm parsed
           return (fds')
-      ((fds),_s) <- ct $ runRefactGhc comp (initialState { rsModule = initRefactModule [] t }) testOptions
+      ((fds),_s) <- ct $ runRefactGhc comp initialState testOptions
+      -- ((fds),_s) <- ct $ runRefactGhc comp initialLogOnState testOptions
 
       (show fds) `shouldBe`
             "(FN [System.IO.putStrLn, pr],"++
