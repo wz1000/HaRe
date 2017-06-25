@@ -54,6 +54,8 @@ import qualified GhcMod             as GM
 import qualified GhcMod.Monad.Types as GM
 import qualified GhcMod.Target      as GM
 import qualified GhcMod.Types       as GM
+import qualified GhcMod.Logger      as GM
+import qualified GhcMod.Gap as Gap
 
 import Language.Haskell.Refact.Utils.GhcModuleGraph
 import Language.Haskell.Refact.Utils.GhcVersionSpecific
@@ -112,11 +114,8 @@ parseSourceFileGhc' targetFile = do
 -}
 -- ---------------------------------------------------------------------
 
-getMappedFileName :: FilePath -> RefactGhc FilePath
-getMappedFileName fname = RefactGhc doGetMappedFileName
-  where
-    doGetMappedFileName :: (GM.IOish m) => GM.GhcModT m FilePath
-    doGetMappedFileName = do
+getMappedFileName :: (GM.IOish m) => FilePath -> GM.GhcModT m FilePath
+getMappedFileName fname = do
       maybeMapped <- GM.lookupMMappedFile fname
       let
         mFileName = case maybeMapped of
@@ -126,32 +125,29 @@ getMappedFileName fname = RefactGhc doGetMappedFileName
 
 -- ---------------------------------------------------------------------
 
-getTypecheckedModuleGhc :: FilePath -> RefactGhc (Maybe TypecheckedModule)
+getTypecheckedModuleGhc :: GM.IOish m => FilePath -> GM.GhcModT m (String, (Maybe TypecheckedModule))
 getTypecheckedModuleGhc targetFile = do
-  logm $ "parseSourceFileGhc:targetFile=" ++ show targetFile
   cfileName <- liftIO $ canonicalizePath targetFile
   mFileName <- getMappedFileName cfileName
-  logm $ "parseSourceFileGhc:cfileName=" ++ show cfileName
-  logm $ "parseSourceFileGhc:maybeMapped=" ++ show mFileName
   ref <- liftIO $ newIORef (mFileName,Nothing)
   let
     setTarget fileName
-      = RefactGhc $ GM.runGmlTfm [Left fileName] return (Just $ updateHooks ref) (return ())
-
-  setTarget cfileName
-
-  logm $ "parseSourceFileGhc:after setTarget"
+      = GM.runGmlTWith' [Left fileName]
+                        return
+                        (Just $ updateHooks ref)
+                        ((fmap fst <$>) . GM.withLogger Gap.setNoMaxRelevantBindings)
+                        (return ())
+  diags <- either id id <$> setTarget cfileName
   (_,mtm) <- liftIO $ readIORef ref
-  logm $ "parseSourceFileGhc:isJust mtm:" ++ show (isJust mtm)
-  return mtm
+  return (diags, mtm)
 
 -- | Parse a single source file into a GHC session
 parseSourceFileGhc :: FilePath -> RefactGhc ()
 parseSourceFileGhc targetFile = do
-  mtm <- getTypecheckedModuleGhc targetFile
+  (_, mtm) <- RefactGhc $ getTypecheckedModuleGhc targetFile
   case mtm of
     Nothing -> error $ "Couldn't get typechecked module for " ++ targetFile
-    Just tm -> loadFromModSummary tm (GHC.pm_mod_summary $ tm_parsed_module tm)
+    Just tm -> loadTypecheckedModule tm
 
 -- ---------------------------------------------------------------------
 
@@ -255,8 +251,9 @@ tweakModSummaryDynFlags ms =
 
 -- | In the existing GHC session, put the requested TypeCheckedModule
 -- into the RefactGhc monad
-loadFromModSummary :: TypecheckedModule -> GHC.ModSummary -> RefactGhc ()
-loadFromModSummary t modSum = do
+loadTypecheckedModule :: TypecheckedModule -> RefactGhc ()
+loadTypecheckedModule t = do
+  let modSum =  GHC.pm_mod_summary $ tm_parsed_module t
   logm $ "loadFromModSummary:modSum=" ++ show modSum
   cppComments <- if True
                   then do
