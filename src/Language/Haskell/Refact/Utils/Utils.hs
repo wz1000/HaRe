@@ -16,6 +16,7 @@ module Language.Haskell.Refact.Utils.Utils
          getTargetGhc
        , parseSourceFileGhc
        , getTypecheckedModuleGhc
+       , loadTypecheckedModule
 
        -- * The bits that do the work
        , runRefacSession
