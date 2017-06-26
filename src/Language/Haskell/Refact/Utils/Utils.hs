@@ -174,9 +174,18 @@ installHooks ref dflags = return $ dflags {
 newtype HareHsc a = HH { runHareHsc :: GHC.Hsc a }
   deriving (Functor,Applicative,Monad,MonadIO,GHC.HasDynFlags)
 
+unHH (HH (GHC.Hsc x)) = x
+
 instance Exception.ExceptionMonad HareHsc where
-  gcatch = undefined
-  gmask = undefined
+  gcatch (HH (GHC.Hsc ma)) f = HH $ GHC.Hsc $ \e w -> do
+    let f' err = g e w
+          where (HH (GHC.Hsc g)) = f err
+    (a, w') <- ma e w `Exception.catch` f'
+    return (a, w')
+  gmask f =
+    HH $ GHC.Hsc $ \e w -> Exception.mask $ \io_restore ->
+      let h_restore (HH (GHC.Hsc m)) = HH $ GHC.Hsc $ \e' w' -> io_restore (m e' w')
+           in unHH (f h_restore) e w
 
 instance GHC.GhcMonad HareHsc where
   getSession = HH GHC.getHscEnv
