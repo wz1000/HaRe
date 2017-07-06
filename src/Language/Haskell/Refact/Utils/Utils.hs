@@ -43,7 +43,6 @@ module Language.Haskell.Refact.Utils.Utils
 import Control.Monad.Identity
 import Control.Monad.State
 import Data.List
-import Data.Maybe
 import Data.IORef
 
 -- import Language.Haskell.GHC.ExactPrint
@@ -55,8 +54,6 @@ import qualified GhcMod             as GM
 import qualified GhcMod.Monad.Types as GM
 import qualified GhcMod.Target      as GM
 import qualified GhcMod.Types       as GM
-import qualified GhcMod.Logger      as GM
-import qualified GhcMod.Gap as Gap
 
 import Language.Haskell.Refact.Utils.GhcModuleGraph
 import Language.Haskell.Refact.Utils.GhcVersionSpecific
@@ -126,8 +123,9 @@ getMappedFileName fname = do
 
 -- ---------------------------------------------------------------------
 
-getTypecheckedModuleGhc :: GM.IOish m => FilePath -> GM.GhcModT m (String, (Maybe TypecheckedModule))
-getTypecheckedModuleGhc targetFile = do
+getTypecheckedModuleGhc :: GM.IOish m
+  => (GM.GmlT m () -> GM.GmlT m a) -> FilePath -> GM.GhcModT m (a, (Maybe TypecheckedModule))
+getTypecheckedModuleGhc wrapper targetFile = do
   cfileName <- liftIO $ canonicalizePath targetFile
   mFileName <- getMappedFileName cfileName
   ref <- liftIO $ newIORef (mFileName,Nothing)
@@ -136,16 +134,16 @@ getTypecheckedModuleGhc targetFile = do
       = GM.runGmlTWith' [Left fileName]
                         return
                         (Just $ updateHooks ref)
-                        ((fmap fst <$>) . GM.withLogger Gap.setNoMaxRelevantBindings)
+                        wrapper
                         (return ())
-  diags <- either id id <$> setTarget cfileName
+  res <- setTarget cfileName
   (_,mtm) <- liftIO $ readIORef ref
-  return (diags, mtm)
+  return (res, mtm)
 
 -- | Parse a single source file into a GHC session
 parseSourceFileGhc :: FilePath -> RefactGhc ()
 parseSourceFileGhc targetFile = do
-  (_, mtm) <- RefactGhc $ getTypecheckedModuleGhc targetFile
+  (_, mtm) <- RefactGhc $ getTypecheckedModuleGhc id targetFile
   case mtm of
     Nothing -> error $ "Couldn't get typechecked module for " ++ targetFile
     Just tm -> loadTypecheckedModule tm
