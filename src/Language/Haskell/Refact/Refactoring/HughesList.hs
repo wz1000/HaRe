@@ -96,7 +96,8 @@ compFastHughesList fileName funNm pos argNum = do
 doHughesList :: FilePath -> String -> SimpPos -> Int -> IsoFuncStrings -> RefactGhc ()
 doHughesList fileName funNm pos argNum fStrs = do
   let mqual = Just "DList"
-  addSimpleImportDecl "Data.DList" mqual
+  loadHList
+  addSimpleImportDecl "HughesList.DList" mqual
   ty <- getDListTy mqual
   parsed <- getRefactParsed
   let
@@ -108,7 +109,7 @@ doHughesList fileName funNm pos argNum fStrs = do
     (Just tySig) = getTypeSig pos funNm parsed
     newResTy = getResultType ty
   iDecl <- dlistImportDecl mqual
-  iSt <- getInitState iDecl fStrs mqual newResTy
+  iSt <- getInitState iDecl fStrs "toList" "fromList" mqual newResTy
   bind' <- isoRefact argNum mqual rdr ty iSt funBind
   replaceFunBind pos bind'
   newTySig <- fixTypeSig argNum tySig
@@ -118,6 +119,18 @@ doHughesList fileName funNm pos argNum fStrs = do
                   Nothing -> ""
   fixClientFunctions modQual (numTypesOfBind funBind) argNum rdr
   addConstructorImport
+
+loadHList :: RefactGhc ()
+loadHList = do
+  let
+    modStr = "HughesList.DList"
+    modNm = GHC.mkModuleName modStr
+  newTarget <- GHC.guessTarget "HughesList/DList.hs" Nothing
+  GHC.addTarget newTarget
+  GHC.load (GHC.LoadUpTo modNm)
+  logm "Done loading dlist"
+  return ()
+  
 
 fixTypeSig :: Int -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
 fixTypeSig argNum =  traverseTypeSig argNum replaceList
@@ -135,7 +148,7 @@ fixTypeSig argNum =  traverseTypeSig argNum replaceList
 
 addConstructorImport :: RefactGhc ()
 addConstructorImport = do
-  let modNm = GHC.mkModuleName "Data.DList"
+  let modNm = GHC.mkModuleName "HughesList.DList"
       rdr = mkRdrName "DList"
   parsed <- getRefactParsed
   newP <- addImportDecl parsed modNm Nothing False False False Nothing False [rdr]
@@ -291,7 +304,7 @@ getDListTy mqual = do
         (Just pre) -> pre ++ "."
         Nothing -> ""
   --Should probably work on generating a unique name somehow
-  decl <- insertNewDecl $ "emdl = " ++ prefix ++ "empty"  
+  decl <- insertNewDecl $ "emdl = " ++ prefix ++ "empty"
   typeCheckModule
   renamed <- getRefactRenamed
   parsed <- getRefactParsed
@@ -317,7 +330,7 @@ dlistImportDecl :: Maybe String -> RefactGhc ParsedLImportDecl
 dlistImportDecl mqual = do
   dflags <- GHC.getSessionDynFlags
   let pres = case mqual of
-               Nothing -> parseImport dflags "HaRe" "import Data.DList"
-               (Just q) -> parseImport dflags "HaRe" ("import qualified Data.DList as " ++ q)
+               Nothing -> parseImport dflags "HaRe" "import HughesList.DList"
+               (Just q) -> parseImport dflags "HaRe" ("import qualified HughesList.DList as " ++ q)
   (_, dec) <- handleParseResult "dlistImportDecl" pres
   return dec

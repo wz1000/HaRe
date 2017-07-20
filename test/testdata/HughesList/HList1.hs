@@ -1,4 +1,4 @@
-module HList1 where
+module HughesList.HList1 where
 
 data Tree a = Leaf
             | Node (Tree a) a (Tree a)

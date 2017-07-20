@@ -262,8 +262,9 @@ Executable gaHTML
 
 Executable hlist1
   Main-Is: HughesList/HList1.hs
+  other-Modules : HughesList.DList
   Build-Depends:          base >= 4.0 && < 5
-                        , dlist
+                        , deepseq
   default-language:    Haskell2010
 
 -- ---------------------------------------------------------------------
@@ -271,7 +272,7 @@ Executable hlist1
 Executable hlist2
   Main-Is: HughesList/HList2.hs
   Build-Depends:          base >= 4.0 && < 5
-                        , dlist
+                        , deepseq
   default-language:    Haskell2010
 
 -- ---------------------------------------------------------------------
@@ -279,7 +280,7 @@ Executable hlist2
 Executable hlist3
   Main-Is: HughesList/HList3.hs
   Build-Depends:          base >= 4.0 && < 5
-                        , dlist
+                        , deepseq
   default-language:    Haskell2010
 
 -- ---------------------------------------------------------------------
@@ -287,7 +288,7 @@ Executable hlist3
 Executable hlist4
   Main-Is: HughesList/HList4.hs
   Build-Depends:          base >= 4.0 && < 5
-                        , dlist
+                        , deepseq
   default-language:    Haskell2010
 
   -- ---------------------------------------------------------------------
@@ -295,12 +296,12 @@ Executable hlist4
 Executable fhlist1
   Main-Is: HughesList/FHList1.hs
   Build-Depends:          base >= 4.0 && < 5
-                        , dlist
+                        , deepseq
   default-language:    Haskell2010
 -- ---------------------------------------------------------------------
   
 Executable fhlist2
   Main-Is: HughesList/FHList2.hs
   Build-Depends:          base >= 4.0 && < 5
-                        , dlist
-  default-language:    Haskell2010  
+                        , deepseq
+  default-language:    Haskell2010

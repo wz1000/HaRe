@@ -1,6 +1,6 @@
 module HList2 where
-import qualified Data.DList as DList
-import Data.DList (DList)
+import qualified HughesList.DList as DList
+import HughesList.DList (DList)
 
 data Tree a = Leaf
             | Node (Tree a) a (Tree a)

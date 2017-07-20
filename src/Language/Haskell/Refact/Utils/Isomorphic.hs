@@ -66,46 +66,76 @@ skipCurrent = do
 
 doIsoRefact :: ParsedLExpr -> IsoRefact ParsedLExpr
 doIsoRefact expr = do
-  st <- get
   b1 <- isoDone
   b2 <- skipCurrent
   if b1 || b2
-    then return expr
+    then do
+    lift $ logm "Skipping this expr: "
+    lift $ logm (SYB.showData SYB.Parser 3 expr)
+    return expr
     else doIsoRefact' expr
   where doIsoRefact' :: ParsedLExpr -> IsoRefact ParsedLExpr
         doIsoRefact' (GHC.L l (GHC.HsApp le re)) = do
           le' <- doIsoRefact le
+          wrapWithAbs <- shouldInsertAbs          
           re' <- doIsoRefact re
-          return (GHC.L l (GHC.HsApp le' re'))
+          lift $ logm "POST RHS REFACT IN APP CASE"
+          let newApp = (GHC.L l (GHC.HsApp le' re'))
+          if wrapWithAbs
+            then do
+            absRdr <- getAbsFun
+            let var = GHC.HsVar absRdr
+            pApp <- lift $ wrapInPars newApp
+            lVar <- lift $ locate var
+            lift $ addAnnVal lVar
+            let fullApp = GHC.HsApp lVar pApp
+            lift $ locate fullApp
+            else return newApp
         doIsoRefact' (GHC.L l (GHC.OpApp le op rn re)) = do
           op' <- doIsoRefact op
           lift $ addBackquotes op'
           le' <- doIsoRefact le
           re' <- doIsoRefact re
           return (GHC.L l (GHC.OpApp le' op' rn re'))
+        doIsoRefact' lam@(GHC.L l (GHC.HsLam mg)) = do
+          lift $ logm "Found lambda"
+          lift $ logm (SYB.showData SYB.Parser 3 lam)
+          return lam
         doIsoRefact' var@(GHC.L l (GHC.HsVar rdr)) = do
           st <- get          
           let tq = typeQueue st
               fs = funcs st              
           typed <- lift getRefactTyped
           mId <- lift (getIdFromVar var)
-          let id = gfromJust ("Trying to get id for: " ++ SYB.showData SYB.Parser 3 rdr) mId
+          let id = gfromJust ("Tried to get id for: " ++ SYB.showData SYB.Parser 3 rdr) mId
               goalType = gfromJust "Getting goal type" $ head tq
               currTy = GHC.idType id
               currRes = getResultType currTy
               keyOcc = GHC.rdrNameOcc rdr
-              mVal = (GHC.occNameString keyOcc) `M.lookup` (eqFuns fs)          
+              mVal = (GHC.occNameString keyOcc) `M.lookup` (eqFuns fs)
           case mVal of
             Nothing -> do
               -- If this happens we have a problem and need to insert a fromList higher up the tree
               -- Need to figure out how to handle this case
               lift $ logm $ "No map on var: " ++ (SYB.showData SYB.Parser 3 keyOcc) ++ ": " ++ show (GHC.getUnique keyOcc)
+              --pop the current goal type
+              popTQ
+              --Since we aren't changing the function we don't have to modify any of the right sub-trees
+              dontSearchSubTrees currTy
+              --Then wrap the whole application with the abstraction function
+              lift $ logm "Nothing case of mVal"
+              printQueue
+              insertAbsToT
               return var
             (Just (oNm, ty)) -> do
               if compType (getResultType ty) goalType
                 then do
                 let changedTypes = typeDifference ty currTy
                     newE = (GHC.L l (GHC.HsVar oNm))
+                lift $ logm $ "Swapping " ++  (SYB.showData SYB.Parser 3 keyOcc)
+                lift $ logm $ "CURRENT TYPE: \n" ++ showType 3 currTy
+                lift $ logm $ "NEW VAR TYPE: \n" ++ showType 3 ty
+--                mapM_ (\t -> lift $ logm (SYB.showData SYB.TypeChecker 3 t)) changedTypes
                 oldAnns <- lift fetchAnnsFinal
                 case M.lookup (mkAnnKey var) oldAnns of
                   Nothing -> lift (mergeRefactAnns $ copyAnn var newE oldAnns)
@@ -120,6 +150,7 @@ doIsoRefact expr = do
                 lift $ logm (showType 3 (getResultType ty))
                 lift $ logm (showType 3 (getResultType goalType))
                 return var
+--- TODO: This case is still specific to the hughes list. Need to figure out how to extend this function dynamically.
         doIsoRefact' eLst@(GHC.L l (GHC.ExplicitList ty mSyn lst)) = do
           if (length lst) == 1
             then do
@@ -152,6 +183,10 @@ typeDifference new old = let lst1 = tail $ breakType new
                    then Nothing
                    else (Just x)) lst1 lst2
 
+dontSearchSubTrees :: GHC.Type -> IsoRefact ()
+dontSearchSubTrees ty = let argNums = (length (breakType ty)) - 1 in
+  addToTQ (replicate argNums Nothing)
+
 popTQ :: IsoRefact ()
 popTQ = do
   st <- get
@@ -162,7 +197,6 @@ addToTQ lst = do
   st <- get
   let tq = typeQueue st
   put $ st {typeQueue = lst ++ tq}
-
 
 -- Breaks up a function type into a list of the types of the parameters
 breakType :: GHC.Type -> [GHC.Type]
@@ -201,15 +235,47 @@ data IsomorphicFuncs = IF {
   projFun :: GHC.RdrName,
   absFun :: GHC.RdrName,
   eqFuns :: M.Map String (GHC.RdrName, GHC.Type)
-  }        
+  }
 
 data IsoRefactState = IsoState {
   funcs :: IsomorphicFuncs,
-  typeQueue :: [Maybe GHC.Type]
+  typeQueue :: [Maybe GHC.Type],
+  insertAbs :: Bool
                                }
 
 instance Show IsoRefactState where
-  show (IsoState fs tq) = "There are currently " ++ show (length tq) ++ " types in the queue"
+  show (IsoState fs tq _) = "There are currently " ++ show (length tq) ++ " types in the queue"
+
+printQueue :: IsoRefact ()
+printQueue = do
+  st <- get
+  let tq = typeQueue st
+  lift $ logm "Current Type queue: "
+  mapM_ (\t -> lift $ logm (SYB.showData SYB.TypeChecker 3 t)) tq
+    where printType :: Maybe GHC.Type -> IsoRefact ()
+          printType mTy = do
+            case mTy of
+              Nothing -> lift $ logm "NOTHING"
+              Just ty -> lift $ logm (showType 3 ty)
+            lift $ logm "---------------"
+
+getAbsFun :: IsoRefact GHC.RdrName
+getAbsFun = do
+  st <- get
+  let fs = funcs st
+  return $ absFun fs
+
+insertAbsToT :: IsoRefact ()
+insertAbsToT = do
+  st <- get
+  put (st {insertAbs = True})
+
+shouldInsertAbs :: IsoRefact Bool
+shouldInsertAbs = do
+  st <- get
+  let insAbs = insertAbs st
+  put $ st {insertAbs = False}
+  return insAbs
 
 type IsoRefact = StateT IsoRefactState RefactGhc
 
@@ -255,11 +321,10 @@ getResultType ty = ty
 
 modMGAltsRHS :: (ParsedLExpr -> RefactGhc ParsedLExpr) -> ParsedBind -> RefactGhc ParsedBind
 modMGAltsRHS f bnd = do
-  applyTP (full_tdTP (idTP `adhocTP` comp)) bnd --SYB.everywhereM (SYB.mkM comp)
+  applyTP (stop_tdTP (failTP `adhocTP` comp)) bnd
   where 
     comp :: GHC.GRHS GHC.RdrName ParsedLExpr -> RefactGhc (GHC.GRHS GHC.RdrName ParsedLExpr)
     comp (GHC.GRHS lst expr) = do
-      logm "Inside comp"
       newExpr <- f expr
       return (GHC.GRHS lst newExpr)
 
@@ -275,10 +340,10 @@ getTypeFromRdr nm a = SYB.something (Nothing `SYB.mkQ` comp) a
         comp _ = Nothing
         occNm = (GHC.occName nm)
 
-getInitState :: ParsedLImportDecl -> IsoFuncStrings -> Maybe String -> GHC.Type -> RefactGhc IsoRefactState
-getInitState iDecl fStrs mqual fstResTy = do
-  funcs <- mkFuncs iDecl "toList" "fromList" fStrs mqual
-  return $ IsoState funcs [Just fstResTy]
+getInitState :: ParsedLImportDecl -> IsoFuncStrings -> String -> String -> Maybe String -> GHC.Type -> RefactGhc IsoRefactState
+getInitState iDecl fStrs absStr projStr mqual fstResTy = do
+  funcs <- mkFuncs iDecl absStr projStr fStrs mqual
+  return $ IsoState funcs [Just fstResTy] False
 
 type IsoFuncStrings = [(String,String)]
 
