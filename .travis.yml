@@ -86,3 +86,7 @@ script:
 notifications:
   irc: "irc.freenode.org#haskell-refactorer"
 
+
+branches:
+   except:
+      - mmp-refactoring
