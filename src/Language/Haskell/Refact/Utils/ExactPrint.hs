@@ -17,6 +17,7 @@ module Language.Haskell.Refact.Utils.ExactPrint
   , addEmptyAnn
   , addAnnVal
   , addAnn
+  , addAnnKeyword
   , zeroDP
   , handleParseResult
   , getAllAnns
@@ -210,6 +211,10 @@ addAnn a ann = do
   currAnns <- fetchAnnsFinal
   let k = mkAnnKey a
   setRefactAnns $ Map.insert k ann currAnns
+
+-- Add a new annotation keyword and delta position to the end of the annsDP list
+addAnnKeyword :: (SYB.Data a) => GHC.Located a -> (KeywordId, DeltaPos) -> RefactGhc ()
+addAnnKeyword a dp = undefined
 
 --Resets the given AST chunk's delta position to zero.
 zeroDP :: (SYB.Data a) => GHC.Located a -> RefactGhc ()

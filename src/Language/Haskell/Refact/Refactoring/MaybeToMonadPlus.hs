@@ -136,19 +136,17 @@ doRewriteAsBind fileName pos funNm = do
     (newRhs, _) <- liftT $ cloneT rhs
     let rhs = justToReturn newRhs
     lam <- wrapInLambda funNm newPat rhs
-    lam_par <- locate $ GHC.HsPar lam
 --    logm $ "New pat: " ++ (SYB.showData SYB.Parser 3 newPat)
     let (GHC.L _ (GHC.VarPat nm)) = newPat
         newNm = mkNewNm nm
-    locate newNm
-    new_rhs <- createBindGRHS newNm lam_par
+    new_rhs <- createBindGRHS newNm lam
     replaceGRHS funNm new_rhs newNm
-    prsed <- getRefactParsed
-    --logm $ "Final parsed: " ++ (SYB.showData SYB.Parser 3 prsed)
-    currAnns <- fetchAnnsFinal
+
     --logm $ "Final anns: " ++ (show currAnns)
     fixType funNm
     addMonadImport
+    prsed <- getRefactParsed
+    logExactprint "Final parsed: " prsed
       where mkNewNm rdr = let str = GHC.occNameString $ GHC.rdrNameOcc rdr in
               GHC.Unqual $ GHC.mkVarOcc ("m_" ++ str)
 
@@ -320,7 +318,7 @@ fixType' funNm argPos = do
   logm "Fixing type"
   parsed <- getRefactParsed
   let m_sig = getSigD funNm parsed
-      (GHC.L sigL (GHC.SigD sig)) = fromJust m_sig
+      (GHC.L sigL (GHC.SigD sig)) = gfromJust "fixType'" m_sig
   fixedClass <- fixTypeClass sig
   --This needs to be fixed to replace only the correct argument and output type
   replacedMaybe <- replaceMaybeWithVariable fixedClass
@@ -385,17 +383,16 @@ fixType funNm = do
   currAnns <- fetchAnnsFinal
   dFlags <- GHC.getSessionDynFlags
   let m_sig = getSigD funNm parsed
-      (GHC.L sigL (GHC.SigD sig)) = fromJust m_sig
-      iType = fromJust $ getInnerType sig
+      (GHC.L sigL (GHC.SigD sig)) = gfromJust "fixType: getting sig" m_sig
+      iType = gfromJust "fixType: iType" $ getInnerType sig
       strTy = exactPrint iType currAnns
       tyStr = funNm ++ " :: (MonadPlus m) => m" ++ strTy ++ " -> m" ++ strTy
-      pRes = parseDecl dFlags "MaybeToMonadPlus.hs" tyStr
-  logm $ "Parsed: " ++ (showData Parser 3 parsed)
-  logm $ "Type string: " ++ tyStr
+      pRes = parseDecl dFlags "MaybeToMonadPlus.hs" tyStr  
+  --logm $ "Type string: " ++ tyStr
   (anns, newSig) <- handleParseResult "MaybeToMonadPlus.fixType" pRes
   newParsed <- replaceAtLocation sigL newSig
   let newAnns = Map.union currAnns anns
-  putRefactParsed newParsed newAnns
+  putRefactParsed newParsed newAnns  
   addNewLines 2 newSig
 
 getSigD :: (Data a) => String -> a -> Maybe (GHC.LHsDecl GHC.RdrName)
