@@ -16,7 +16,6 @@ module Language.Haskell.Refact.Utils.ExactPrint
   , addEmptyAnn
   , addAnnVal
   , addAnn
-  , addAnnKeyword
   , zeroDP
   , setDP
   , handleParseResult

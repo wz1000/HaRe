@@ -43,7 +43,7 @@ doMaybeToPlus :: FilePath -> SimpPos -> String -> Int -> RefactGhc ()
 doMaybeToPlus fileName pos@(row,col) funNm argNum = do
   parsed <- getRefactParsed
   -- Add test that position defines function with name `funNm`
-  let mBind = getHsBind pos funNm parsed
+  let mBind = getHsBind pos parsed
   case mBind of
     Nothing -> error "Function bind not found"
     Just funBind -> do
@@ -82,7 +82,7 @@ isOutputType funNm argNum pos funBind = do
 replaceConstructors :: SimpPos -> String -> Int -> RefactGhc ()
 replaceConstructors pos funNm argNum = do
   parsed <- getRefactParsed
-  let (Just bind) = getHsBind pos funNm parsed
+  let (Just bind) = getHsBind pos parsed
   newBind <- applyInGRHSs bind replaceNothingAndJust
   replaceBind pos newBind
   fixType' funNm argNum
@@ -125,7 +125,7 @@ replaceBind pos newBind = do
 doRewriteAsBind :: FilePath -> SimpPos -> String -> RefactGhc ()
 doRewriteAsBind fileName pos funNm = do
   parsed <- getRefactParsed
-  let bind = gfromJust "doRewriteAsBind" $ getHsBind pos funNm parsed
+  let bind = gfromJust "doRewriteAsBind" $ getHsBind pos parsed
       matches = GHC.mg_alts . GHC.fun_matches $ bind
   if (length matches) > 1
     then error "Multiple matches not supported"
@@ -217,6 +217,8 @@ justToReturn ast = SYB.everywhere (SYB.mkT worker) ast
           then GHC.mkDataOcc "return"
           else nm
 
+{-
+
 --Takes a single match and returns a tuple containing the grhs and the pattern
 --Assumptions:
   -- Only a single pattern will be returned. Which pattern is returned depends on the behaviour of SYB.something. 
@@ -226,6 +228,7 @@ getVarAndRHS match = do
   return (pat , GHC.m_grhss match)
     where varPat lPat@(GHC.L _ (GHC.VarPat _ )) = Just lPat
           varPat _ = Nothing
+
 
 --Looks up the function binding at the given position. Returns nothing if the position does not contain a binding.
 getHsBind :: (Data a) => SimpPos -> String -> a -> Maybe (GHC.HsBind GHC.RdrName)
@@ -237,7 +240,7 @@ getHsBind pos funNm a =
     where isBind (bnd@(GHC.FunBind (GHC.L _ name) _ _ _ _ _) :: GHC.HsBind GHC.RdrName)
             | name == rNm = (Just bnd)
           isBind _ = Nothing
-
+-}
 
 --This function takes in the name of a function and determines if the binding contains the case "Nothing = Nothing"
 --If the Nothing to Nothing case is found then it is removed from the parsed source.
@@ -246,7 +249,7 @@ containsNothingToNothing funNm argNum pos a = do
   dFlags <- GHC.getSessionDynFlags
   parsed <- getRefactParsed
   let nToNStr = funNm ++ " Nothing = Nothing"
-      bind = gfromJust "containsNothingToNothing" $ getHsBind pos funNm parsed
+      bind = gfromJust "containsNothingToNothing" $ getHsBind pos parsed
       mg = GHC.fun_matches bind
       (GHC.L _ alt) = (GHC.mg_alts mg) !! 0
 --  logm $ "mg_alts: " ++ (SYB.showData SYB.Parser 3 alt)
