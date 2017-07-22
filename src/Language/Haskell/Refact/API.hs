@@ -22,7 +22,6 @@ module Language.Haskell.Refact.API
        , logDataWithAnns
        , logExactprint
        , logParsedSource
-
  -- * from `Language.Haskell.Refact.Utils.Utils`
 
        -- ** Managing the GHC / project environment
@@ -43,7 +42,7 @@ module Language.Haskell.Refact.API
        , getModuleName
        , clientModsAndFiles
        , serverModsAndFiles
-       , lookupAnns  
+       -- , lookupAnns
 
        , stripCallStack
 
@@ -136,6 +135,8 @@ module Language.Haskell.Refact.API
     , hsFDsFromInsideRdr, hsFDNamesFromInsideRdr, hsFDNamesFromInsideRdrPure
     , hsVisibleDsRdr
     , rdrName2Name, rdrName2NamePure
+    , eqRdrNamePure
+    , sameNameSpace
 
     -- *** Property checking
     ,isVarId,isConId,isOperator,isTopLevelPN,isLocalPN,isNonLibraryName -- ,isTopLevelPNT
@@ -204,7 +205,7 @@ module Language.Haskell.Refact.API
     , everywhereStaged
     , everywhereStaged'
     , listifyStaged
-    , everywhereButMStaged
+    , everywhereButM
 
     -- ** Scrap Your Zipper versions
     , zeverywhereStaged
@@ -232,38 +233,48 @@ module Language.Haskell.Refact.API
  -- * from `Language.Haskell.Refact.Utils.ExactPrint'`
   , replace
   , setRefactAnns
+  , mergeRefactAnns
   , setAnnKeywordDP
   , copyAnn
   , clearPriorComments
   , balanceAllComments
+
   , exactPrintParsed
+  , exactPrintExpr
   , zeroDP
+  , setDP
   , handleParseResult
-  , getAllAnns
   , removeAnns
   , synthesizeAnns
   , addNewKeyword
   , addNewKeywords
- -- * from `Language.Haskell.Refact.Utils.Compare`
-  , constructComp
-  , locate
+
   , addEmptyAnn
   , addAnnVal
   , addAnn
--- , Compare
 
    -- from Language.Haskell.Refact.Utils.Synonyms
  , UnlocParsedHsBind
  , ParsedGRHSs
  , ParsedMatchGroup
  , ParsedLMatch
+ , ParsedExpr
+ , ParsedLStmt
+ , ParsedLExpr
+ , ParsedBind
 
  -- from Language.Haskell.Refact.Utils.Transform
   , addSimpleImportDecl
   , wrapInLambda
   , wrapInPars
+  , removePars
   , addNewLines
+  , wrapInParsWithDPs
   , locate
+-- from Language.Haskell.Refact.Utils.Query
+  , getVarAndRHS
+  , getHsBind
+  , isHsVar
  ) where
 
 import Language.Haskell.Refact.Utils.ExactPrint
@@ -279,5 +290,5 @@ import Language.Haskell.Refact.Utils.Utils
 import Language.Haskell.Refact.Utils.Variables
 import Language.Haskell.Refact.Utils.Transform
 import Language.Haskell.GHC.ExactPrint.Utils
-import Language.Haskell.Refact.Utils.Compare
 import Language.Haskell.Refact.Utils.Synonyms
+import Language.Haskell.Refact.Utils.Query

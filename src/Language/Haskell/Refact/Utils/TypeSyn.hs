@@ -12,7 +12,6 @@ module Language.Haskell.Refact.Utils.TypeSyn where
 import qualified GHC        as GHC
 import qualified Name       as GHC
 import qualified Outputable as GHC
-import qualified HsExpr     as GHC
 
 type HsExpP    = GHC.HsExpr GHC.RdrName
 type HsPatP    = GHC.Pat GHC.RdrName
@@ -50,9 +49,7 @@ instance Show GHC.NameSpace where
 
 instance GHC.Outputable GHC.NameSpace where
   ppr x = GHC.text $ show x
-{-
-instance GHC.Outputable (GHC.MatchGroup GHC.Name GHC.Type) where
-  ppr mg = GHC.text "MatchGroup" GHC.<+> GHC.ppr (GHC.mg_alts mg)
+
 
 
 instance GHC.Outputable (GHC.MatchGroup GHC.Name (GHC.LHsExpr GHC.Name)) where
@@ -79,11 +76,14 @@ instance GHC.Outputable (GHC.HsTupArg GHC.Name) where
   ppr (GHC.Missing _typ) = GHC.text "Missing"
 
 
+#if !(defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,0,1,1)))
 instance GHC.Outputable (GHC.ConDeclField GHC.Name) where
   ppr (GHC.ConDeclField name typ doc) = GHC.text "ConDeclField"
                                           GHC.<+> GHC.ppr name
                                           GHC.<+> GHC.ppr typ
                                           GHC.<+> GHC.ppr doc
+#endif
+
 #if __GLASGOW_HASKELL__ <= 710
 instance GHC.Outputable (GHC.TyFamEqn GHC.Name (GHC.LHsTyVarBndrs GHC.Name)) where
   ppr (GHC.TyFamEqn name pats rhs) = GHC.text "TyFamEqn"
@@ -93,5 +93,3 @@ instance GHC.Outputable (GHC.TyFamEqn GHC.Name (GHC.LHsTyVarBndrs GHC.Name)) whe
 #endif
 
 -- ---------------------------------------------------------------------
-
--}

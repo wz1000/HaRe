@@ -1,10 +1,13 @@
+{-# LANGUAGE CPP #-}
 module Language.Haskell.Refact.Utils.Transform
   (
     addSimpleImportDecl
   , wrapInLambda
   , wrapInPars
+  , wrapInParsWithDPs
   , addNewLines
   , locate
+  , removePars
   ) where
 
 import qualified GHC as GHC
@@ -40,7 +43,15 @@ addSimpleImportDecl modName = do
 wrapInLambda :: String -> GHC.LPat GHC.RdrName -> ParsedGRHSs -> RefactGhc (GHC.LHsExpr GHC.RdrName)
 wrapInLambda funNm varPat rhs = do
   match <- mkLamMatch varPat rhs  
+  --logm $ "Match: " ++ (SYB.showData SYB.Parser 3 match)
+#if __GLASGOW_HASKELL__ <= 710
   let mg = GHC.MG [match] [] GHC.PlaceHolder GHC.Generated
+  currAnns <- fetchAnnsFinal
+#else
+  lMatchLst <- locate [match]
+  let mg = GHC.MG lMatchLst [] GHC.PlaceHolder GHC.Generated
+#endif
+  currAnns <- fetchAnnsFinal
   --logm $ "Anns :" ++ (show $ getAllAnns currAnns match)
   l_lam <- locate (GHC.HsLam mg)
   let key = mkAnnKey l_lam
@@ -54,22 +65,38 @@ wrapInLambda funNm varPat rhs = do
   --This function makes a match suitable for use inside of a lambda expression. 
 mkLamMatch :: GHC.LPat GHC.RdrName -> GHC.GRHSs GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> RefactGhc (GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName))
 mkLamMatch varPat rhs = do
+#if __GLASGOW_HASKELL__ <= 710
   lMatch@(GHC.L l m) <- locate (GHC.Match Nothing [varPat] Nothing rhs)
+#else
+  lMatch@(GHC.L l m) <- locate (GHC.Match GHC.NonFunBindMatch [varPat] Nothing rhs)
+#endif
   let dp = [(G GHC.AnnRarrow, DP (0,1))]
       newAnn = annNone {annsDP = dp, annEntryDelta = DP (0,0)}
   zeroDP varPat
   addAnn lMatch newAnn
   return lMatch
 
---Wraps a given expression in parenthesis and add the appropriate annotations, returns the modified ast chunk. 
-wrapInPars :: GHC.LHsExpr GHC.RdrName -> RefactGhc (GHC.LHsExpr GHC.RdrName)
-wrapInPars expr = do
+wrapInParsWithDPs :: DeltaPos -> DeltaPos -> GHC.LHsExpr GHC.RdrName -> RefactGhc (GHC.LHsExpr GHC.RdrName)
+wrapInParsWithDPs openDP closeDP expr = do
   newAst <- locate (GHC.HsPar expr)
-  let dp = [(G GHC.AnnOpenP, DP (0,1)), (G GHC.AnnCloseP, DP (0,0))]
+  let dp = [(G GHC.AnnOpenP, openDP), (G GHC.AnnCloseP, closeDP)]
       newAnn = annNone {annsDP = dp}
   addAnn newAst newAnn
   return newAst
 
+
+--Wraps a given expression in parenthesis and add the appropriate annotations, returns the modified ast chunk. 
+wrapInPars :: GHC.LHsExpr GHC.RdrName -> RefactGhc (GHC.LHsExpr GHC.RdrName)
+wrapInPars = wrapInParsWithDPs (DP (0,1)) (DP (0,0))
+
+--Does the opposite of wrapInPars
+removePars :: ParsedLExpr -> RefactGhc ParsedLExpr
+removePars (GHC.L _ (GHC.HsPar expr)) = do
+  setDP (DP (0,1)) expr
+  return expr
+removePars expr = return expr
+
+  
 --Takes a piece of AST and adds an n row offset
 addNewLines :: (Data a) => Int -> GHC.Located a -> RefactGhc ()
 addNewLines n ast = do

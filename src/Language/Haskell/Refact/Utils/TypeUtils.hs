@@ -46,7 +46,8 @@ module Language.Haskell.Refact.Utils.TypeUtils
    , hsQualifier
 
     -- ** Property checking
-    ,isVarId,isConId,isOperator,isTopLevelPN,isLocalPN,isNonLibraryName
+    ,isVarId,isConId,isOperator
+    ,isTopLevelPN,isLocalPN,isNonLibraryName
     ,isQualifiedPN, isFunOrPatName, isTypeSig, isTypeSigDecl
     ,isFunBindP,isFunBindR,isPatBindP,isPatBindR,isSimplePatBind,isSimplePatDecl
     ,isComplexPatBind,isComplexPatDecl,isFunOrPatBindP,isFunOrPatBindR
@@ -132,10 +133,12 @@ import Language.Haskell.GHC.ExactPrint.Utils
 
 
 -- Modules from GHC
+import qualified Avail         as GHC
 import qualified FastString    as GHC
 import qualified GHC           as GHC
 import qualified Module        as GHC
 import qualified Name          as GHC
+import qualified NameSet       as GHC
 import qualified Outputable    as GHC
 import qualified RdrName       as GHC
 import qualified TyCon         as GHC
@@ -206,19 +209,16 @@ isInScopeAndUnqualifiedGhc ::
   -> RefactGhc Bool   -- ^ The result.
 isInScopeAndUnqualifiedGhc n maybeExising = do
   names <- ghandle handler (GHC.parseName n)
-  logm $ "isInScopeAndUnqualifiedGhc:(n,(maybeExising,names))=" ++ (show n) ++ ":" ++  (showGhc (maybeExising,names))
-  ctx <- GHC.getContext
-  logm $ "isInScopeAndUnqualifiedGhc:ctx=" ++ (showGhc ctx)
   let nameList = case maybeExising of
                   Nothing -> names
                   Just n' -> filter (\x -> (showGhcQual x) /= (showGhcQual n')) names
-  logm $ "isInScopeAndUnqualifiedGhc:(n,nameList)=" ++ (show n) ++ ":" ++  (showGhc nameList)
+  -- logm $ "isInScopeAndUnqualifiedGhc:(n,nameList)=" ++ (show n) ++ ":" ++  (showGhc nameList)
   return $ nameList /= []
 
   where
     handler:: SomeException -> RefactGhc [GHC.Name]
-    handler e = do
-      logm $ "isInScopeAndUnqualifiedGhc.handler e=" ++ (show e)
+    handler _e = do
+      -- logm $ "isInScopeAndUnqualifiedGhc.handler e=" ++ (show _e)
       return []
 
 -- ---------------------------------------------------------------------
@@ -262,10 +262,10 @@ equivalentNameInNewMod old = do
   let eqModules (GHC.Module pk1 mn1) (GHC.Module pk2 mn2) = mn1 == mn2 && pk1 == pk2
 
   gnames <- GHC.getNamesInScope
-  logm $ "equivalentNameInNewMod:gnames=" ++ showGhcQual (map (\n -> (GHC.nameModule n,n)) gnames)
+  -- logm $ "equivalentNameInNewMod:gnames=" ++ showGhcQual (map (\n -> (GHC.nameModule n,n)) gnames)
   let clientModule = GHC.nameModule old
   logm $ "equivalentNameInNewMod:(old,clientModule)=" ++ showGhcQual (old,clientModule)
-  let clientInscopes = filter (\n -> clientModule == GHC.nameModule n) gnames
+  -- let clientInscopes = filter (\n -> clientModule == GHC.nameModule n) gnames
   let clientInscopes = filter (\n -> eqModules clientModule (GHC.nameModule n)) gnames
   logm $ "equivalentNameInNewMod:clientInscopes=" ++ showGhcQual clientInscopes
   let newNames = filter (\n -> showGhcQual n == showGhcQual old) clientInscopes
@@ -378,8 +378,14 @@ modIsExported modName (_g,_emps,mexps,_mdocs)
 isExported :: GHC.Name -> RefactGhc Bool
 isExported n = do
   typechecked <- getTypecheckedModule
-  let modInfo = GHC.tm_checked_module_info typechecked
-  return $ GHC.modInfoIsExportedName modInfo n
+  -- let modInfo = GHC.tm_checked_module_info typechecked
+  -- return $ GHC.modInfoIsExportedName modInfo n
+  return $ GHC.elemNameSet n (GHC.availsToNameSet (tmMinfExports typechecked))
+
+
+-- modInfoIsExportedName :: ModuleInfo -> Name -> Bool
+-- modInfoIsExportedName minf name = elemNameSet name (availsToNameSet (minf_exports minf))
+
 
 -- ---------------------------------------------------------------------
 
@@ -398,7 +404,7 @@ causeNameClashInExports::  NameMap
                         -> GHC.Name          -- ^ The original name
                         -> GHC.Name          -- ^ The new name
                         -> GHC.ModuleName    -- ^ The identity of the module
-                        -> GHC.ParsedSource -- ^ The AST of the module
+                        -> GHC.ParsedSource  -- ^ The AST of the module
                         -> Bool              -- ^ The result
 
 -- Note that in the abstract representation of exps, there is no qualified entities.
@@ -459,7 +465,7 @@ usedWithoutQualR name t = isJust $ SYB.something (inName) t
 getModule :: RefactGhc GHC.Module
 getModule = do
   typechecked <- getTypecheckedModule
-  return $ GHC.ms_mod $ GHC.pm_mod_summary $ GHC.tm_parsed_module typechecked
+  return $ GHC.ms_mod $ GHC.pm_mod_summary $ tmParsedModule typechecked
 
 -- ---------------------------------------------------------------------
 
@@ -488,7 +494,7 @@ isOperator mid = mid /= [] && isOpSym (ghead "isOperator" mid) &&
 
 -- | Returns True if a string lexically is an identifier.
 -- *This function should not be exported.*
-isId::String->Bool
+isId :: String -> Bool
 isId mid = mid/=[] && isLegalIdTail (tail mid) && not (isReservedId mid)
   where
     isLegalIdTail tail' = all isLegal tail'
@@ -507,9 +513,13 @@ isId mid = mid/=[] && isLegalIdTail (tail mid) && not (isReservedId mid)
 isTopLevelPN::GHC.Name -> RefactGhc Bool
 isTopLevelPN n = do
   typechecked <- getTypecheckedModule
-  let maybeNames = GHC.modInfoTopLevelScope $ GHC.tm_checked_module_info typechecked
+  let maybeNames = modInfoTopLevelScope typechecked
   let names = fromMaybe [] maybeNames
   return $ n `elem` names
+
+modInfoTopLevelScope :: TypecheckedModule -> Maybe [GHC.Name]
+modInfoTopLevelScope tm
+  = fmap (map GHC.gre_name . GHC.globalRdrEnvElts) (tmMinfRdrEnv tm)
 
 
 -- |Return True if a PName is a local PName.
@@ -845,7 +855,8 @@ addImportDecl (GHC.L l p) modName pkgQual source safe qualify alias hide idNames
        impDecl <- mkImpDecl
        newSpan <- liftT uniqueSrcSpanT
        let newImp = GHC.L newSpan impDecl
-       liftT $ addSimpleAnnT newImp (DP (1,0)) [((G GHC.AnnImport),DP (0,0))]
+           qAnns = getQualAnns alias qualify
+       liftT $ addSimpleAnnT newImp (DP (1,0)) ([((G GHC.AnnImport),DP (0,0))]++qAnns)
        return (GHC.L l p { GHC.hsmodImports = (imp++[newImp])})
   where
 
@@ -859,7 +870,10 @@ addImportDecl (GHC.L l p) modName pkgQual source safe qualify alias hide idNames
        newEnts <- mkNewEntList idNames
        let lNewEnts = GHC.L newSpan2 newEnts
        -- logm $ "addImportDecl.mkImpDecl:adding anns for:" ++ showGhc lNewEnts
-       liftT $ addSimpleAnnT lNewEnts (DP (0,1)) [((G GHC.AnnHiding),DP (0,0)),((G GHC.AnnOpenP),DP (0,1)),((G GHC.AnnCloseP),DP (0,0))]
+           newEntsAnns = if hide
+             then [((G GHC.AnnHiding),DP (0,0)),((G GHC.AnnOpenP),DP (0,1)),((G GHC.AnnCloseP),DP (0,0))]
+             else [((G GHC.AnnOpenP),DP (0,0)),((G GHC.AnnCloseP),DP (0,0))]
+       liftT $ addSimpleAnnT lNewEnts (DP (0,1)) newEntsAnns
        let lmodname = GHC.L newSpan1 modName
        liftT $ addSimpleAnnT lmodname (DP (0,1)) [((G GHC.AnnVal),DP (0,0))]
        return $ GHC.ImportDecl
@@ -877,6 +891,10 @@ addImportDecl (GHC.L l p) modName pkgQual source safe qualify alias hide idNames
                                        else
                                             (Just (hide, lNewEnts)))
                         }
+     getQualAnns Nothing _ = []
+     getQualAnns (Just _) q = let cond = if q then [((G GHC.AnnQualified), DP (0,1))] else [] in
+         [((G GHC.AnnAs), DP (0,1)),((G GHC.AnnVal), (DP (0,1)))] ++ cond
+
 
 -- ---------------------------------------------------------------------
 
@@ -1043,10 +1061,11 @@ mkNewEnt :: Bool -> GHC.RdrName -> RefactGhc (GHC.LIE GHC.RdrName)
 mkNewEnt addCommaAnn pn = do
   newSpan <- liftT uniqueSrcSpanT
   let lpn = GHC.L newSpan pn
-  if addCommaAnn
-    then liftT $ addSimpleAnnT lpn (DP (0,0)) [((G GHC.AnnVal),DP (0,0)),((G GHC.AnnComma),DP (0,0))]
-    else liftT $ addSimpleAnnT lpn (DP (0,0)) [((G GHC.AnnVal),DP (0,0))]
-  return (GHC.L newSpan (GHC.IEVar lpn))
+  let lie = GHC.L newSpan (GHC.IEVar lpn)
+  liftT $ addSimpleAnnT lpn (DP (0,0)) [((G GHC.AnnVal),DP (0,0))]
+  when addCommaAnn $
+    liftT $ addSimpleAnnT lie (DP (0,0)) [((G GHC.AnnComma),DP (0,0))]
+  return lie
 
 -- | Represents the operation type we want to select on addItemsToImport'
 data ImportType = Hide     -- ^ Used for addHiding
@@ -1061,7 +1080,7 @@ addItemsToImport ::
   -> Either [GHC.RdrName] [GHC.LIE GHC.RdrName] -- ^ The items to be added
   -> GHC.ParsedSource      -- ^ The current module
   -> RefactGhc GHC.ParsedSource -- ^ The result
-addItemsToImport mn mc ns r = addItemsToImport' mn r ns Import
+addItemsToImport mn _mc ns r = addItemsToImport' mn r ns Import
 
 -- | Add identifiers (given by the third argument) to the explicit entity list
 --   in the declaration importing the specified module name. If the ImportType
@@ -1573,7 +1592,7 @@ addItemsToExport mod@(HsModule _  (SN modName (SrcLoc _ c row col))  Nothing _ _
 addActualParamsToRhs :: (SYB.Data t) =>
                         GHC.Name -> [GHC.RdrName] -> t -> RefactGhc t
 addActualParamsToRhs pn paramPNames rhs = do
-    logm $ "addActualParamsToRhs:entered:(pn,paramPNames)=" ++ showGhc (pn,paramPNames)
+    -- logm $ "addActualParamsToRhs:entered:(pn,paramPNames)=" ++ showGhc (pn,paramPNames)
     nameMap <- getRefactNameMap
     let
        worker :: (GHC.LHsExpr GHC.RdrName) -> RefactGhc (GHC.LHsExpr GHC.RdrName)
@@ -1584,7 +1603,7 @@ addActualParamsToRhs pn paramPNames rhs = do
 #endif
         | eqRdrNamePure nameMap (GHC.L l2 pname) pn
           = do
-              logDataWithAnns "addActualParamsToRhs:oldExp=" oldExp
+              -- logDataWithAnns "addActualParamsToRhs:oldExp=" oldExp
               newExp' <- foldlM addParamToExp oldExp paramPNames
 
               edp <- liftT $ getEntryDPT oldExp
@@ -1600,14 +1619,15 @@ addActualParamsToRhs pn paramPNames rhs = do
        addParamToExp expr param = do
          ss1 <- liftT $ uniqueSrcSpanT
          ss2 <- liftT $ uniqueSrcSpanT
-         logm $ "addActualParamsToRhs.addParamsToExp:(ss1,ss2):" ++ showGhc (ss1,ss2)
+         -- logm $ "addActualParamsToRhs.addParamsToExp:(ss1,ss2):" ++ showGhc (ss1,ss2)
          registerRdrName (GHC.L ss2 param)
 #if __GLASGOW_HASKELL__ <= 710
          let var   = GHC.L ss2 (GHC.HsVar param)
+         liftT $ addSimpleAnnT var (DP (0,0)) [(G GHC.AnnVal,DP (0,1))]
 #else
          let var   = GHC.L ss2 (GHC.HsVar (GHC.L ss2 param))
+         liftT $ addSimpleAnnT (GHC.L ss2 param) (DP (0,0)) [(G GHC.AnnVal,DP (0,1))]
 #endif
-         liftT $ addSimpleAnnT var (DP (0,0)) [(G GHC.AnnVal,DP (0,1))]
          let expr' = GHC.L ss1 (GHC.HsApp expr var)
          liftT $ addSimpleAnnT expr' (DP (0,0)) []
          return expr'
@@ -1817,10 +1837,10 @@ rmDecl:: (SYB.Data t)
 
 rmDecl pn incSig t = do
   setStateStorage StorageNone
-  t' <- everywhereMStaged' SYB.Parser (SYB.mkM   inModule
-                                      `SYB.extM` inLet
-                                      `SYB.extM` inMatch
-                                      ) t -- top down
+  t' <- everywhereM' (SYB.mkM   inModule
+                     `SYB.extM` inLet
+                     `SYB.extM` inMatch
+                     ) t -- top down
          -- applyTP (once_tdTP (failTP `adhocTP` inBinds)) t
   storage <- getStateStorage
   let decl' = case storage of
@@ -2129,11 +2149,8 @@ renamePN::(SYB.Data t)
 renamePN oldPN newName useQual t = do
   -- logm $ "renamePN: (oldPN,newName)=" ++ (showGhc (oldPN,newName))
   -- logm $ "renamePN: t=" ++ (SYB.showData SYB.Parser 0 t)
-  -- nm <- getRefactNameMap
   newNameQual   <- rdrNameFromName True  newName
   newNameUnqual <- rdrNameFromName False newName
-  -- newNameRdr    <- rdrNameFromName useQual newName
-  -- logm $ "renamePN: (newNameQual,newNameUnqual,newNameRdr)=" ++ showGhc (newNameQual,newNameUnqual,newNameRdr)
 
   let
     cond :: NameMap -> GHC.Located GHC.RdrName -> Bool
@@ -2164,22 +2181,6 @@ renamePN oldPN newName useQual t = do
 
     -- ---------------------------------
 
-    renameLRdr :: HowToQual -> GHC.Located GHC.RdrName -> RefactGhc (GHC.Located GHC.RdrName)
-    renameLRdr useQual' old@(GHC.L _ n) = do
-     nm <- getRefactNameMap
-     if cond nm old
-       then do
-          logDataWithAnns "renamePN:rename old :" old
-          -- let nn = newNameCalcBool useQual' n
-          let nn = newNameCalc useQual' n
-          new <- makeNewName old nn
-          logDataWithAnns "renamePN:rename new :" new
-          logDataWithAnns "renamePN:rename old2 :" old
-          return new
-       else return old
-
-    -- ---------------------------------
-
     renameVar :: HowToQual -> GHC.LHsExpr GHC.RdrName -> RefactGhc (GHC.LHsExpr GHC.RdrName)
 #if __GLASGOW_HASKELL__ <= 710
     renameVar useQual' x@(GHC.L l (GHC.HsVar n)) = do
@@ -2205,6 +2206,21 @@ renamePN oldPN newName useQual t = do
 
     -- ---------------------------------
 
+    renameLRdr :: HowToQual -> GHC.Located GHC.RdrName -> RefactGhc (GHC.Located GHC.RdrName)
+    renameLRdr useQual' old@(GHC.L _ n) = do
+     nm <- getRefactNameMap
+     if cond nm old
+       then do
+          -- logDataWithAnns "renamePN:rename old :" old
+          let nn = newNameCalc useQual' n
+          new <- makeNewName old nn
+          -- logDataWithAnns "renamePN:rename new :" new
+          -- logDataWithAnns "renamePN:rename old2 :" old
+          return new
+       else return old
+
+    -- ---------------------------------
+
     renameTyVar :: HowToQual -> (GHC.Located (GHC.HsType GHC.RdrName)) -> RefactGhc (GHC.Located (GHC.HsType GHC.RdrName))
 #if __GLASGOW_HASKELL__ <= 710
     renameTyVar useQual' x@(GHC.L l (GHC.HsTyVar n)) = do
@@ -2214,7 +2230,7 @@ renamePN oldPN newName useQual t = do
      nm <- getRefactNameMap
      if cond nm (GHC.L l n)
        then do
-          logm $ "renamePN:renameTyVar at :" ++ (showGhc l)
+          -- logm $ "renamePN:renameTyVar at :" ++ (showGhc l)
           let nn = newNameCalc useQual' n
 #if __GLASGOW_HASKELL__ <= 710
           ss' <- liftT $ uniqueSrcSpanT
@@ -2240,8 +2256,7 @@ renamePN oldPN newName useQual t = do
      nm <- getRefactNameMap
      if cond nm (GHC.L l n)
        then do
-          logm $ "renamePN:renameHsTyVarBndr at :" ++ (showGhc l)
-          -- let nn = newNameCalcBool useQual' n
+          -- logm $ "renamePN:renameHsTyVarBndr at :" ++ (showGhc l)
           let nn = newNameCalc useQual' n
 #if __GLASGOW_HASKELL__ <= 710
           addToNameMap l newName
@@ -2334,7 +2349,7 @@ renamePN oldPN newName useQual t = do
      nm <- getRefactNameMap
      if cond nm (GHC.L l n)
        then do
-          logm $ "renamePNworker:renameLPat at :" ++ (showGhc l)
+          -- logm $ "renamePNworker:renameLPat at :" ++ (showGhc l)
           let nn = newNameCalc useQual' n
 #if __GLASGOW_HASKELL__ <= 710
           ss' <- liftT $ uniqueSrcSpanT
@@ -2354,7 +2369,7 @@ renamePN oldPN newName useQual t = do
     renameMatch :: HowToQual -> GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName)
                 -> RefactGhc (GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName))
     renameMatch _useQual (GHC.Match mln pats ty grhss) = do
-     logm $ "renamePN.renameMatch entered:"
+     -- logm $ "renamePN.renameMatch entered:"
      pats'  <- renameTransform _useQual pats
      ty'    <- renameTransform _useQual ty
      grhss' <- renameTransform _useQual grhss
@@ -2398,10 +2413,10 @@ renamePN oldPN newName useQual t = do
     renameTypeSig _useQual (GHC.TypeSig ns typ)
 #endif
      = do
-         logm $ "renamePN:renameTypeSig"
+         -- logm $ "renamePN:renameTypeSig"
          ns'  <- mapM (renameLRdr NoQualify) ns
          typ' <- renameTransform _useQual typ
-         logm $ "renamePN:renameTypeSig done"
+         -- logm $ "renamePN:renameTypeSig done"
 #if __GLASGOW_HASKELL__ <= 710
          return (GHC.TypeSig ns' typ' p)
 #else
@@ -2430,6 +2445,9 @@ renamePN oldPN newName useQual t = do
         match      = const True :: GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> Bool
         importDecl = const True :: GHC.ImportDecl GHC.RdrName -> Bool
 
+    -- The function that does the actual renaming. It is split out here so it
+    -- can be called recursively.
+    renameTransform :: (SYB.Data t) => HowToQual -> t -> RefactGhc t
     renameTransform useQual' t' =
             (everywhereMSkip ( -- top-down, skipping Located Names for Sig/Match
                    SYB.mkM   (renameVar         useQual')
@@ -2442,8 +2460,7 @@ renamePN oldPN newName useQual t = do
                   `SYB.extM` (renameImportDecl  useQual')
                   `SYB.extM` (renameMatch       useQual')
                    ) t')
-  t' <- renameTransform useQual t
-  return t'
+  renameTransform useQual t
 
 -- ---------------------------------------------------------------------
 
@@ -2503,7 +2520,7 @@ useLoc (GHC.L l _) = GHC.srcSpanStart l
 findIdForName :: GHC.Name -> RefactGhc (Maybe GHC.Id)
 findIdForName n = do
   tm <- getTypecheckedModule
-  let t = GHC.tm_typechecked_source tm
+  let t = tmTypecheckedSource tm
   let r = SYB.somethingStaged SYB.Parser Nothing (Nothing `SYB.mkQ` worker) t
       worker (i::GHC.Id)
          | (GHC.nameUnique n) ==  (GHC.varUnique i) = Just i

@@ -19,14 +19,12 @@ module Language.Haskell.Refact.HaRe
  , rename,          compRename
  , addOneParameter, compAddOneParameter
  , rmOneParameter,  compRmOneParameter
- , deleteDef
+ , deleteDef,       compDeleteDef
  -- , swapArgs
- , multRename
  , roundTrip
- , introduceTypeSyn
- , unwrapTypeSyn
- , maybeToMonadPlus
-
+-- , introduceTypeSyn
+-- , unwrapTypeSyn
+ , genApplicative, compGenApplicative
  )
 where
 
@@ -35,13 +33,12 @@ import Language.Haskell.Refact.Refactoring.Case
 import Language.Haskell.Refact.Refactoring.DupDef
 import Language.Haskell.Refact.Refactoring.MoveDef
 import Language.Haskell.Refact.Refactoring.Renaming
-import Language.Haskell.Refact.Refactoring.IntroduceTypeSyn
+--import Language.Haskell.Refact.Refactoring.IntroduceTypeSyn
 import Language.Haskell.Refact.Refactoring.DeleteDef
-import Language.Haskell.Refact.Refactoring.UnwrapTypeSyn
+--import Language.Haskell.Refact.Refactoring.UnwrapTypeSyn
+import Language.Haskell.Refact.Refactoring.GenApplicative
 -- import Language.Haskell.Refact.Refactoring.SwapArgs
 import Language.Haskell.Refact.Refactoring.RoundTrip
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.Types
-import Language.Haskell.Refact.Refactoring.MultiRename
-import Language.Haskell.Refact.Refactoring.MaybeToMonadPlus
 import qualified Language.Haskell.GhcMod as GM (Options(..),defaultOptions)

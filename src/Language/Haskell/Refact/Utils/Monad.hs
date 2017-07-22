@@ -51,6 +51,7 @@ import Distribution.Helper
 import Exception
 import qualified Language.Haskell.GhcMod             as GM
 import qualified Language.Haskell.GhcMod.Internal    as GM
+import qualified Language.Haskell.GhcMod.Monad.Out   as GM
 import qualified Language.Haskell.GhcMod.Monad.Types as GM
 import Language.Haskell.Refact.Utils.Types
 import Language.Haskell.GHC.ExactPrint
@@ -96,7 +97,7 @@ logSettings = defaultSettings { rsetVerboseLevel = Debug }
 data RefactStashId = Stash !String deriving (Show,Eq,Ord)
 
 data RefactModule = RefMod
-        { rsTypecheckedMod  :: !GHC.TypecheckedModule
+        { rsTypecheckedMod  :: !TypecheckedModule
         , rsNameMap         :: NameMap
           -- ^ Mapping from the names in the ParsedSource to the renamed
           -- versions. Note: No strict mark, can be computed lazily.
@@ -166,7 +167,7 @@ type Targets = [Either FilePath GHC.ModuleName]
 
 -- |Result of parsing a Haskell source file. It is simply the
 -- TypeCheckedModule produced by GHC.
-type ParseResult = GHC.TypecheckedModule
+type ParseResult = TypecheckedModule
 
 -- |Provide some temporary storage while the refactoring is taking
 -- place
@@ -204,6 +205,7 @@ newtype RefactGhc a = RefactGhc
                )
 
 -- ---------------------------------------------------------------------
+
 runRefactGhc ::
   RefactGhc a -> RefactState -> GM.Options -> IO (a, RefactState)
 runRefactGhc comp initState opt = do
@@ -215,6 +217,10 @@ runRefactGhc comp initState opt = do
 -- ---------------------------------------------------------------------
 
 instance GM.GmOut (StateT RefactState IO) where
+  gmoAsk = lift GM.gmoAsk
+
+instance GM.GmOut IO where
+  gmoAsk = GM.gmoAsk
 
 instance GM.MonadIO (StateT RefactState IO) where
   liftIO = liftIO
@@ -247,9 +253,13 @@ cabalModuleGraphs = RefactGhc doCabalModuleGraphs
   where
     doCabalModuleGraphs :: (GM.IOish m) => GM.GhcModT m [GM.GmModuleGraph]
     doCabalModuleGraphs = do
-      mcs <- GM.cabalResolvedComponents
-      let graph = map GM.gmcHomeModuleGraph $ Map.elems mcs
-      return $ graph
+      crdl <- GM.cradle
+      case GM.cradleCabalFile crdl of
+        Just _ -> do
+          mcs <- GM.cabalResolvedComponents
+          let graph = map GM.gmcHomeModuleGraph $ Map.elems mcs
+          return $ graph
+        Nothing -> return []
 
 -- ---------------------------------------------------------------------
 

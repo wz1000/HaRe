@@ -12,15 +12,14 @@ module Language.Haskell.Refact.Utils.ExactPrint
   , setAnnKeywordDP
   , clearPriorComments
   , balanceAllComments
-  , exactPrintParsed
   , locate
   , addEmptyAnn
   , addAnnVal
   , addAnn
   , addAnnKeyword
   , zeroDP
+  , setDP
   , handleParseResult
-  , getAllAnns
   , removeAnns
   , synthesizeAnns
   , addNewKeyword
@@ -35,7 +34,6 @@ import Control.Monad
 import Language.Haskell.GHC.ExactPrint.Transform
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Utils
-import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.Refact.Utils.GhcUtils
 
 import Language.Haskell.Refact.Utils.Monad
@@ -174,24 +172,11 @@ balanceAllComments la
       unless (null decls) $ moveTrailingComments t (last decls)
       return t
 
--- ---------------------------------------------------------------------
---Useful helper function that logs the current refact parsed
-
-exactPrintParsed :: RefactGhc ()
-exactPrintParsed = do
-  parsed <- getRefactParsed
-  anns <- fetchAnnsFinal
-  let str = exactPrint parsed anns
-  logm str
-
--- ---------------------------------------------------------------------
-
 --This generates a unique location and wraps the given ast chunk with that location
 --Also adds an empty annotation at that location
 locate :: (SYB.Data a) => a -> RefactGhc (GHC.Located a)
 locate ast = do
   loc <- liftT uniqueSrcSpanT
-  anns <- fetchAnnsFinal
   let res = (GHC.L loc ast)
   addEmptyAnn res
   return res
@@ -212,19 +197,20 @@ addAnn a ann = do
   let k = mkAnnKey a
   setRefactAnns $ Map.insert k ann currAnns
 
--- Add a new annotation keyword and delta position to the end of the annsDP list
-addAnnKeyword :: (SYB.Data a) => GHC.Located a -> (KeywordId, DeltaPos) -> RefactGhc ()
-addAnnKeyword a dp = undefined
 
---Resets the given AST chunk's delta position to zero.
-zeroDP :: (SYB.Data a) => GHC.Located a -> RefactGhc ()
-zeroDP ast = do
+--Sets the entry delta position of an ast chunk
+setDP :: (SYB.Data a) => DeltaPos -> GHC.Located a -> RefactGhc ()
+setDP dp ast = do
   currAnns <- fetchAnnsFinal
   let k = mkAnnKey ast
       mv = Map.lookup k currAnns
   case mv of
     Nothing -> return ()
-    Just v -> addAnn ast (v {annEntryDelta = DP (0,0)})
+    Just v -> addAnn ast (v {annEntryDelta = dp})
+
+--Resets the given AST chunk's delta position to zero.
+zeroDP :: (SYB.Data a) => GHC.Located a -> RefactGhc ()
+zeroDP = setDP (DP (0,0))
 
 --This just pulls out the successful result from an exact print parser or throws an error if the parse was unsuccessful.
 handleParseResult :: String -> Either (GHC.SrcSpan, String) (Anns, a) -> RefactGhc (Anns, a)
@@ -232,23 +218,6 @@ handleParseResult msg e = case e of
   (Left (_, errStr)) -> error $ "The parse from: " ++ msg ++ " with error: " ++ errStr
   (Right res) -> return res
 
--- Retrieves all annotations that correspond to all subtrees of the provided ast chunk
-getAllAnns :: (SYB.Data a) => Anns -> a -> Anns
-getAllAnns anns = generic `SYB.ext2Q` located
-  where generic :: SYB.Data a => a -> Anns
-        generic a = foldr Map.union Map.empty (SYB.gmapQ (getAllAnns anns) a) 
-        located :: (SYB.Data b, SYB.Data loc) => GHC.GenLocated loc b -> Anns
-        located a = case (located' a) of
-          Nothing -> Map.empty
-          Just as -> as
-          where located' :: (SYB.Data b, SYB.Data loc) => GHC.GenLocated loc b -> Maybe Anns
-                located' a@(GHC.L ss b) = do
-                  s <- (SYB.cast ss) :: (Maybe GHC.SrcSpan)
-                  let k = mkAnnKey (GHC.L s b)
-                  v <- Map.lookup k anns
-                  let rst = getAllAnns anns b
-                  return $ Map.singleton k v `Map.union` rst
-        
 -- This creates an empty annotation for every located item where an annotation does not already exist in the given AST chunk
 synthesizeAnns :: (SYB.Data a) => a -> RefactGhc a
 synthesizeAnns = generic `SYB.ext2M` located
