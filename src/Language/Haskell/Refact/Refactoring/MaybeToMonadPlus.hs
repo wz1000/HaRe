@@ -3,7 +3,6 @@ module Language.Haskell.Refact.Refactoring.MaybeToMonadPlus where
 
 import Language.Haskell.Refact.API
 import qualified Language.Haskell.GhcMod as GM
-import qualified Language.Haskell.GhcMod.Internal as GM
 import System.Directory
 import qualified GHC as GHC
 import Data.Generics as SYB
