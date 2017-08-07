@@ -16,7 +16,7 @@ import qualified RdrName       as GHC
 import Data.List
 import Data.Maybe
 
-import qualified GhcMod       as GM
+import qualified GhcModCore   as GM
 import qualified GhcMod.Types as GM
 import Language.Haskell.Refact.API
 

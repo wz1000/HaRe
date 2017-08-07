@@ -50,7 +50,7 @@ import Data.IORef
 --import Data.Time.Clock
 import Distribution.Helper
 import Exception
-import qualified GhcMod             as GM
+import qualified GhcModCore         as GM
 import qualified GhcMod.Monad.Out   as GM
 import qualified GhcMod.Monad.Types as GM
 import qualified GhcMod.Target      as GM

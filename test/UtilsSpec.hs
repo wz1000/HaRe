@@ -77,6 +77,14 @@ spec = do
   -- -------------------------------------------------------------------
 
   describe "loading a file" $ do
+    it "loads a single file" $ do
+      t <- ct $ parsedFileGhc "./B.hs"
+
+      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      (showGhc parsed) `shouldBe` "module B where\nbob :: Int -> Int -> Int\nbob x y = x + y"
+
+     -- ---------------------------------
+
     it "loads the same file more than once" $ do
       -- We are checking that loading via the GHC hook does not get defeated the
       -- second time by the GHC recompile checker.
@@ -94,6 +102,7 @@ spec = do
       (showGhc parsed1) `shouldBe` "module B where\nbob :: Int -> Int -> Int\nbob x y = x + y"
       (showGhc parsed2) `shouldBe` "module B where\nbob :: Int -> Int -> Int\nbob x y = x + y"
 
+     -- ---------------------------------
 
     it "loads a file having the LANGUAGE CPP pragma" $ do
       t <- ct $ parsedFileGhc "./BCpp.hs"

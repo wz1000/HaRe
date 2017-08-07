@@ -15,7 +15,7 @@ module Language.Haskell.Refact.Utils.Utils
        -- * Managing the GHC / project environment
          getTargetGhc
        , parseSourceFileGhc
-       , getTypecheckedModuleGhc
+       -- , getTypecheckedModuleGhc
        , loadTypecheckedModule
 
        -- * The bits that do the work
@@ -45,12 +45,14 @@ import Control.Monad.State
 import Data.List
 import Data.IORef
 
+import Haskell.Ide.Engine.ModuleLoader
+
 -- import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Preprocess
 import Language.Haskell.GHC.ExactPrint.Print
 import Language.Haskell.GHC.ExactPrint.Utils
 
-import qualified GhcMod             as GM
+import qualified GhcModCore         as GM
 import qualified GhcMod.Monad.Types as GM
 import qualified GhcMod.Target      as GM
 import qualified GhcMod.Types       as GM
@@ -123,6 +125,9 @@ getMappedFileName fname = do
 
 -- ---------------------------------------------------------------------
 
+{-
+ -- Now moved into haskell-ide-engine/hie-plugin-api
+
 getTypecheckedModuleGhc :: GM.IOish m
   => (GM.GmlT m () -> GM.GmlT m a) -> FilePath -> GM.GhcModT m (a, (Maybe TypecheckedModule))
 getTypecheckedModuleGhc wrapper targetFile = do
@@ -139,6 +144,7 @@ getTypecheckedModuleGhc wrapper targetFile = do
   res <- setTarget cfileName
   (_,mtm) <- liftIO $ readIORef ref
   return (res, mtm)
+-}
 
 -- | Parse a single source file into a GHC session
 parseSourceFileGhc :: FilePath -> RefactGhc ()
