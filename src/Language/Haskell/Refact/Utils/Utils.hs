@@ -45,17 +45,17 @@ import Control.Monad.State
 import Data.List
 import Data.IORef
 
-import Haskell.Ide.Engine.ModuleLoader
 
 -- import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Preprocess
 import Language.Haskell.GHC.ExactPrint.Print
 import Language.Haskell.GHC.ExactPrint.Utils
 
-import qualified GhcModCore         as GM
-import qualified GhcMod.Monad.Types as GM
-import qualified GhcMod.Target      as GM
-import qualified GhcMod.Types       as GM
+import qualified GhcModCore          as GM
+import qualified GhcMod.ModuleLoader as GM
+import qualified GhcMod.Monad.Types  as GM
+import qualified GhcMod.Target       as GM
+import qualified GhcMod.Types        as GM
 
 import Language.Haskell.Refact.Utils.GhcModuleGraph
 import Language.Haskell.Refact.Utils.GhcVersionSpecific
@@ -125,31 +125,10 @@ getMappedFileName fname = do
 
 -- ---------------------------------------------------------------------
 
-{-
- -- Now moved into haskell-ide-engine/hie-plugin-api
-
-getTypecheckedModuleGhc :: GM.IOish m
-  => (GM.GmlT m () -> GM.GmlT m a) -> FilePath -> GM.GhcModT m (a, (Maybe TypecheckedModule))
-getTypecheckedModuleGhc wrapper targetFile = do
-  cfileName <- liftIO $ canonicalizePath targetFile
-  mFileName <- getMappedFileName cfileName
-  ref <- liftIO $ newIORef (mFileName,Nothing)
-  let
-    setTarget fileName
-      = GM.runGmlTWith' [Left fileName]
-                        return
-                        (Just $ updateHooks ref)
-                        wrapper
-                        (return ())
-  res <- setTarget cfileName
-  (_,mtm) <- liftIO $ readIORef ref
-  return (res, mtm)
--}
-
 -- | Parse a single source file into a GHC session
 parseSourceFileGhc :: FilePath -> RefactGhc ()
 parseSourceFileGhc targetFile = do
-  (_, mtm) <- RefactGhc $ getTypecheckedModuleGhc id targetFile
+  (_, mtm) <- RefactGhc $ GM.getTypecheckedModuleGhc id targetFile
   case mtm of
     Nothing -> error $ "Couldn't get typechecked module for " ++ targetFile
     Just tm -> loadTypecheckedModule tm

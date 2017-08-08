@@ -128,7 +128,6 @@ Library
                                , ghc-exactprint >= 0.5.3.0
                                , ghc-mod-core == 5.9.0.*
                                , ghc-syb-utils
-                               , hie-plugin-api
                                , hslogger
                                , monad-control
                                , mtl
@@ -274,7 +273,6 @@ test-suite spec
     , ghc-exactprint >= 0.5.3.0
     , ghc-mod-core == 5.9.0.*
     , ghc-syb-utils
-    , hie-plugin-api
     , hslogger
     , hspec
     , mtl
