@@ -303,7 +303,7 @@ test-suite spec
 --   main-is:       doctests.hs
 --   build-depends: base        >= 4.0  && < 4.9
 --                , doctest >= 0.8
---                , ghc-mod
+--                , ghc-mod-core
 --   Hs-Source-Dirs:
 --     -- src
 --     test

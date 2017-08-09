@@ -43,7 +43,6 @@ module Language.Haskell.Refact.Utils.Utils
 import Control.Monad.Identity
 import Control.Monad.State
 import Data.List
-import Data.IORef
 
 
 -- import Language.Haskell.GHC.ExactPrint
@@ -52,9 +51,6 @@ import Language.Haskell.GHC.ExactPrint.Print
 import Language.Haskell.GHC.ExactPrint.Utils
 
 import qualified GhcModCore          as GM
-import qualified GhcMod.ModuleLoader as GM
-import qualified GhcMod.Monad.Types  as GM
-import qualified GhcMod.Target       as GM
 import qualified GhcMod.Types        as GM
 
 import Language.Haskell.Refact.Utils.GhcModuleGraph
@@ -66,17 +62,7 @@ import System.Directory
 import System.FilePath.Posix
 
 import qualified Digraph       as GHC
-import qualified DynFlags      as GHC
 import qualified GHC           as GHC
--- import qualified SrcLoc        as GHC
-import qualified Hooks         as GHC
-import qualified HscMain       as GHC
-import qualified HscTypes      as GHC
-import qualified TcRnMonad     as GHC
-import qualified Exception     as Exception
-
--- import qualified GHC.SYB.Utils as SYB
--- import qualified Data.Generics as SYB
 
 import qualified Data.Map      as Map
 import qualified Data.Set      as Set
@@ -98,32 +84,6 @@ getTargetGhc :: TargetModule -> RefactGhc ()
 getTargetGhc (GM.ModulePath _mn fp) = parseSourceFileGhc fp
 
 -- ---------------------------------------------------------------------
-{-
--- | Parse a single source file into a GHC session
-parseSourceFileGhc' :: FilePath -> RefactGhc ()
-parseSourceFileGhc' targetFile = do
-  logm $ "parseSourceFileGhc:targetFile=" ++ show targetFile
-  setTargetSession targetFile
-  graph  <- GHC.getModuleGraph
-  cgraph <- canonicalizeGraph graph
-  cfileName <- liftIO $ canonicalizePath targetFile
-  let mm = filter (\(mfn,_ms) -> mfn == Just cfileName) cgraph
-  case mm of
-    [(_,modSum)] -> loadFromModSummary Nothing modSum
-    _ -> error $ "HaRe:unexpected error parsing " ++ targetFile
--}
--- ---------------------------------------------------------------------
-
-getMappedFileName :: (GM.IOish m) => FilePath -> GM.GhcModT m FilePath
-getMappedFileName fname = do
-      maybeMapped <- GM.lookupMMappedFile fname
-      let
-        mFileName = case maybeMapped of
-          Just (GM.FileMapping mfname _isTemp) -> mfname
-          Nothing -> fname
-      return mFileName
-
--- ---------------------------------------------------------------------
 
 -- | Parse a single source file into a GHC session
 parseSourceFileGhc :: FilePath -> RefactGhc ()
@@ -132,113 +92,6 @@ parseSourceFileGhc targetFile = do
   case mtm of
     Nothing -> error $ "Couldn't get typechecked module for " ++ targetFile
     Just tm -> loadTypecheckedModule tm
-
--- ---------------------------------------------------------------------
-
-
-updateHooks :: IORef HookIORefData -> GHC.Hooks -> GHC.Hooks
-updateHooks ref hooks = hooks {
-#if __GLASGOW_HASKELL__ <= 710
-        GHC.hscFrontendHook   = Just $ hscFrontend ref
-#else
-        GHC.hscFrontendHook   = Just $ runHscFrontend ref
-#endif
-      }
-
--- ---------------------------------------------------------------------
-
-installHooks :: (Monad m) => IORef HookIORefData -> GHC.DynFlags -> m GHC.DynFlags
-installHooks ref dflags = return $ dflags {
-    GHC.hooks = updateHooks ref (GHC.hooks dflags)
-  }
-
--- ---------------------------------------------------------------------
-
-newtype HareHsc a = HH { runHareHsc :: GHC.Hsc a }
-  deriving (Functor,Applicative,Monad,MonadIO,GHC.HasDynFlags)
-
-unHH (HH (GHC.Hsc x)) = x
-
-instance Exception.ExceptionMonad HareHsc where
-  gcatch (HH (GHC.Hsc ma)) f = HH $ GHC.Hsc $ \e w -> do
-    let f' err = g e w
-          where (HH (GHC.Hsc g)) = f err
-    (a, w') <- ma e w `Exception.catch` f'
-    return (a, w')
-  gmask f =
-    HH $ GHC.Hsc $ \e w -> Exception.mask $ \io_restore ->
-      let h_restore (HH (GHC.Hsc m)) = HH $ GHC.Hsc $ \e' w' -> io_restore (m e' w')
-           in unHH (f h_restore) e w
-
-instance GHC.GhcMonad HareHsc where
-  getSession = HH GHC.getHscEnv
-  setSession = error "Set session not defined for HareHsc"
-
-#if __GLASGOW_HASKELL__ > 710
-runHscFrontend :: IORef HookIORefData -> GHC.ModSummary -> GHC.Hsc GHC.FrontendResult
-runHscFrontend ref mod_summary
-    = GHC.FrontendTypecheck `fmap` hscFrontend ref mod_summary
-#endif
-
--- ---------------------------------------------------------------------
--- | Given a 'ModSummary', parses and typechecks it, returning the
--- 'TcGblEnv' resulting from type-checking.
--- Based on GHC.hscFileFrontend
---
--- This gets called on every module compiled when loading the wanted target.
--- When it is the wanted target, keep the ParsedSource and TypecheckedSource,
--- with API Annotations enabled.
-hscFrontend :: IORef HookIORefData -> GHC.ModSummary -> GHC.Hsc GHC.TcGblEnv
-hscFrontend ref mod_summary = do
-    -- liftIO $ putStrLn $ "hscFrontend:entered:" ++ fileNameFromModSummary mod_summary
-    (mfn,_) <- canonicalizeModSummary mod_summary
-    -- liftIO $ putStrLn $ "hscFrontend:mfn:" ++ show mfn
-    (fn,om) <- liftIO $ readIORef ref
-    -- liftIO $ putStrLn $ "hscFrontend:(fn,cn,fps):" ++ show (fn,cn,fps)
-    let
-      keepInfo = case mfn of
-                   Just fileName -> fn == fileName
-                   Nothing -> False
-    if keepInfo
-      then runHareHsc $ do
-        -- liftIO $ putStrLn $ "hscFrontend:in keepInfo"
-        let modSumWithRaw = tweakModSummaryDynFlags mod_summary
-
-        p' <- GHC.parseModule modSumWithRaw
-        let p = p' {GHC.pm_mod_summary = mod_summary}
-        tc <- GHC.typecheckModule p
-        let tc_gbl_env = fst $ tm_internals_ tc
-
-        liftIO $ modifyIORef' ref (const (fn,Just tc))
-        return tc_gbl_env
-      else do
-        liftIO $ modifyIORef' ref (const (fn,om))
-        hpm <- GHC.hscParse' mod_summary
-        hsc_env <- GHC.getHscEnv
-        tc_gbl_env <- GHC.tcRnModule' hsc_env mod_summary False hpm
-        return tc_gbl_env
-
--- ---------------------------------------------------------------------
-{-
-setTargetSession :: FilePath -> RefactGhc ()
--- setTargetSession targetFile = RefactGhc $ GM.runGmlT' [Left targetFile] setDynFlags (return ())
-setTargetSession targetFile = RefactGhc $ GM.runGmlT' [Left targetFile] return (return ())
-
--- setDynFlags :: GHC.DynFlags -> GHC.Ghc GHC.DynFlags
--- setDynFlags df = return (GHC.gopt_set df GHC.Opt_KeepRawTokenStream)
--}
--- ---------------------------------------------------------------------
-
--- |For GHC 7.10.2, setting 'GHC.Opt_KeepRawTokenStream' prevents the pragmas at
--- the top of a source file from being read if there is a comment mixed in them
--- anywhere. To work around this, we need to inject that setting into the cached
--- dynflags in the 'GHC.ModSummary' before parsing it for refactoring, otherwise
--- all comments will be discarded.
--- See https://ghc.haskell.org/trac/ghc/ticket/10942
-tweakModSummaryDynFlags :: GHC.ModSummary -> GHC.ModSummary
-tweakModSummaryDynFlags ms =
-  let df = GHC.ms_hspp_opts ms
-  in ms { GHC.ms_hspp_opts = GHC.gopt_set df GHC.Opt_KeepRawTokenStream }
 
 -- ---------------------------------------------------------------------
 
