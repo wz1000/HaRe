@@ -91,3 +91,4 @@ notifications:
 branches:
    except:
       - hughes-list
+      - monadification
