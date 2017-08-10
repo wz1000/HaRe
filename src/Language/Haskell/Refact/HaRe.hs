@@ -43,4 +43,4 @@ import Language.Haskell.Refact.Refactoring.HughesList
 import Language.Haskell.Refact.Refactoring.RoundTrip
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.Types
-import qualified Language.Haskell.GhcMod as GM (Options(..),defaultOptions)
+import qualified GhcMod as GM (Options(..),defaultOptions)
