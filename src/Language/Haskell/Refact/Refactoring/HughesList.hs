@@ -7,7 +7,7 @@ module Language.Haskell.Refact.Refactoring.HughesList
 
 import Language.Haskell.Refact.API
 import Language.Haskell.Refact.Utils.Types
-import qualified Language.Haskell.GhcMod as GM
+import qualified GhcMod as GM (Options(..))
 import System.Directory
 import qualified GHC.SYB.Utils as SYB
 import Data.Generics as SYB

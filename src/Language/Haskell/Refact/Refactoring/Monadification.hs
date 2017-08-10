@@ -2,7 +2,7 @@ module Language.Haskell.Refact.Refactoring.Monadification
   (monadification,compMonadification) where
 
 import Language.Haskell.Refact.API
-import qualified Language.Haskell.GhcMod as GM
+import qualified GhcMod as GM (Options(..))
 import System.Directory (canonicalizePath)
 
 monadification :: RefactSettings -> GM.Options -> FilePath -> IO [FilePath]

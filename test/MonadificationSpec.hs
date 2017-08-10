@@ -3,7 +3,7 @@ module MonadificationSpec (main, spec) where
 import Test.Hspec
 import System.Directory
 import TestUtils
-import Language.Haskell.Refact.Refactoring.HughesList
+import Language.Haskell.Refact.Refactoring.Monadification
 
 main :: IO ()
 main = do

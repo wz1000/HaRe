@@ -35,7 +35,6 @@ import Language.Haskell.Refact.Utils.Utils
 import Language.Haskell.Refact.Utils.TypeUtils
 import Language.Haskell.Refact.Utils.Synonyms
 import Language.Haskell.Refact.Utils.ExactPrint
-import qualified Language.Haskell.GhcMod.Types as GM
 
 
 -- The goal of this module is to provide basic transformations of the ast and
