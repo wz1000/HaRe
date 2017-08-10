@@ -70,6 +70,7 @@ module Language.Haskell.Refact.Utils.MonadFunctions
        , fileNameFromModSummary
        , mkNewGhcNamePure
 
+       , logData
        , logDataWithAnns
        , logAnns
        , logParsedSource
@@ -447,6 +448,11 @@ getStateStorage :: RefactGhc StateStorage
 getStateStorage = do
   storage <- gets rsStorage
   return storage
+
+-- ---------------------------------------------------------------------
+
+logData :: (SYB.Data a) => String -> a -> RefactGhc ()
+logData str ast = logm $ str ++ (SYB.showData SYB.Parser 3 ast)
 
 -- ---------------------------------------------------------------------
 

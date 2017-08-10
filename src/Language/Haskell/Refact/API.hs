@@ -17,7 +17,7 @@ module Language.Haskell.Refact.API
        , getRefacSettings
        , defaultSettings
        , logSettings
-       
+       , logData
        , logm
        , logDataWithAnns
        , logExactprint
@@ -261,6 +261,7 @@ module Language.Haskell.Refact.API
    -- from Language.Haskell.Refact.Utils.Synonyms
  , UnlocParsedHsBind
  , ParsedGRHSs
+ , ParsedGRHS
  , ParsedMatchGroup
  , ParsedMatch
  , ParsedLMatch
