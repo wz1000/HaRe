@@ -39,7 +39,8 @@ compGenApplicative fileName pos = do
 doGenApplicative :: FilePath -> SimpPos -> RefactGhc ()
 doGenApplicative fileName pos = do
   parsed <- getRefactParsed
-  let funBind = case getHsBind pos parsed of
+  let (Just lrdr) = locToRdrName pos parsed
+      funBind = case getHsBind (GHC.unLoc lrdr) parsed of
                   (Just fb) -> fb
                   Nothing -> error "That location is not the start of a function"
       (retRhs, doStmts) = case (getReturnRhs funBind, getDoStmts funBind) of
