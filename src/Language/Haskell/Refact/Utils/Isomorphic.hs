@@ -1,3 +1,4 @@
+{-#LANGUAGE CPP #-}
 module Language.Haskell.Refact.Utils.Isomorphic
   (isoRefact
  , IsomorphicFuncs(..)
@@ -22,7 +23,11 @@ import qualified GHC as GHC
 import qualified RdrName as GHC
 import qualified OccName as GHC
 import qualified Id as GHC
+#if __GLASGOW_HASKELL__ <= 710
 import qualified TypeRep as GHC
+#else
+import qualified TyCoRep as GHC
+#endif
 import qualified TyCon as GHC
 import qualified TcRnDriver as GHC
 import qualified ErrUtils as GHC

@@ -228,5 +228,9 @@ rmFun nm = do
   putRefactParsed newP mempty
     where filterDeclLst :: [GHC.LHsDecl GHC.RdrName] -> [GHC.LHsDecl GHC.RdrName]
           filterDeclLst = filter (\dec -> not $ isFun dec)
+#if __GLASGOW_HASKELL__ <= 710
           isFun (GHC.L _ (GHC.ValD (GHC.FunBind lNm _ _ _ _ _))) = (GHC.unLoc lNm) == nm
+#else
+          isFun (GHC.L _ (GHC.ValD (GHC.FunBind lNm _ _ _ _))) = (GHC.unLoc lNm) == nm
+#endif
           isFun _ = False

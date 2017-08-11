@@ -46,7 +46,11 @@ getFunName :: (SYB.Data t) => String -> t -> Maybe GHC.Name
 getFunName str = SYB.something (Nothing `SYB.mkQ` comp)
   where
     comp :: GHC.HsBind GHC.Name -> Maybe GHC.Name
+#if __GLASGOW_HASKELL__ <= 710
     comp (GHC.FunBind lid _ _ _ _ _)
+#else
+    comp (GHC.FunBind lid _ _ _ _ )
+#endif
       | (GHC.unLoc lid) `isNameString` str = Just (GHC.unLoc lid)
       | otherwise = Nothing
     comp _ = Nothing
@@ -125,6 +129,11 @@ getIdFromVar (GHC.L l var) = do
   typed <- getRefactTyped
   let (mElem :: Maybe (GHC.LHsExpr GHC.Id)) = lookupByLoc l typed
   return $ mElem >>= (\e -> SYB.something (Nothing `SYB.mkQ` comp) e)
-  where comp (GHC.HsVar id) = Just id
-        comp _ = Nothing
+  where
+#if __GLASGOW_HASKELL__ <= 710
+    comp (GHC.HsVar id) = Just id
+#else
+    comp (GHC.HsVar id) = Just (GHC.unLoc id)
+#endif
+    comp _ = Nothing
 
