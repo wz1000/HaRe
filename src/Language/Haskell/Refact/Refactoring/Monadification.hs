@@ -32,9 +32,15 @@ doMonadification fileName = do
       (Just fFunBind) = getHsBind (GHC.unLoc fRdr) parsed
       (Just hRdr) = locToRdrName (11,1) parsed
       (Just hFunBind) = getHsBind (GHC.unLoc hRdr) parsed
-  logData "doMonadification" fFunBind
+  fName <- rdrName2Name fRdr
+  hName <- rdrName2Name hRdr
+  let nmsList = [fName,hName]
+  monadifyFunBind nmsList fFunBind
+  monadifyFunBind nmsList hFunBind
   return ()
 
+monadifyFunBind :: [GHC.Name] -> ParsedBind -> RefactGhc ParsedBind
+monadifyFunBind nms bnd = replaceBndRHS (modMatchRHSExpr (monadifyFunRHS nms)) bnd 
 
 replaceBndRHS :: (ParsedLMatch -> RefactGhc ParsedLMatch) -> ParsedBind -> RefactGhc ParsedBind
 replaceBndRHS fun fb@(GHC.FunBind _ _ _ _ _ _) = SYB.everywhereM (SYB.mkM fun) fb
@@ -107,9 +113,12 @@ appendToQueue :: [(Maybe GHC.RdrName, ParsedLExpr)] -> MonadifyState ()
 appendToQueue lst = state (\s -> let oldQ = queue s in
                               ((), s {queue = oldQ ++ lst}))
 
+isQueueEmpty :: MonadifyState Bool
+isQueueEmpty = get >>= (\s -> return (null (queue s)))
+
 monadifyFunRHS :: [GHC.Name] -> ParsedLExpr -> RefactGhc ParsedLExpr
 monadifyFunRHS fNames e = let initState = initMS fNames in
-                              evalStateT (monadifyExpr e) initState 
+                              evalStateT (monadifyExpr e) initState                              
 
     --This function handles the top expression from the rhs of a function
 monadifyExpr :: ParsedLExpr -> MonadifyState ParsedLExpr
@@ -136,13 +145,54 @@ lookupRenamedExpr parsedElem = do
 --Wraps the given expression with a return call
 --If the expression isn't a HsPar it will be parenthisized first
 wrapWithReturn :: ParsedLExpr -> RefactGhc ParsedLExpr
-wrapWithReturn e = undefined
+wrapWithReturn e@(GHC.L _ (GHC.HsPar _)) = do
+  retVar <- locate (GHC.HsVar returnRdr)
+  addAnnVal retVar
+  locate (GHC.HsApp retVar e)
+wrapWithReturn e = do
+  retVar <- locate (GHC.HsVar returnRdr)
+  addAnnVal retVar
+  pE <- wrapInPars e
+  locate (GHC.HsApp retVar pE)
+
+returnRdr :: GHC.RdrName
+returnRdr = mkRdrName "return"
 
 --Takes the expressions from the queue and binds those expressions
---with a lambda expression of the given 
+--with a lambda expression made from the given expression and the variable from the top of the queue
 composeWithBinds :: ParsedLExpr -> MonadifyState ParsedLExpr
-composeWithBinds = undefined
-            
+composeWithBinds e = do
+  done <- isQueueEmpty
+  if done
+    then return e
+    else do
+    ((Just var), lhsExpr) <- popQueue
+    --Make lambda
+    lamPat <- lift $ mkVarPat var
+    lamRHS <- lift $ mkGRHSs lhsExpr
+    lambda <- lift $ wrapInLambda lamPat lamRHS
+    --locate + annVal bindRdr
+    lBindOp <- lift (locate (GHC.HsVar bindRdr))
+    lift $ addAnnVal lBindOp
+    --opApp lhsExpr locBnd lambda
+    let opApp = (GHC.OpApp lhsExpr lBindOp GHC.PlaceHolder lambda)
+    lOpApp <- lift $ locate opApp
+    composeWithBinds lOpApp
+    
+mkGRHSs :: ParsedLExpr -> RefactGhc ParsedGRHSs
+mkGRHSs rhsExpr = do
+  let grhs = (GHC.GRHS [] rhsExpr)
+  lGrhs <- locate grhs
+  return (GHC.GRHSs [lGrhs] GHC.EmptyLocalBinds)
+
+mkVarPat :: GHC.RdrName -> RefactGhc (GHC.LPat GHC.RdrName)
+mkVarPat nm = do
+  let pat = (GHC.VarPat nm)
+  locate pat
+
+bindRdr :: GHC.RdrName
+bindRdr = mkRdrName ">>="
+    
 --If this is called with a subtree that is a call to a monadified function
 --It stores the original expression in the queue and returns a HsVar with the new name
 stripMonArgs :: ParsedLExpr -> MonadifyState ParsedLExpr
