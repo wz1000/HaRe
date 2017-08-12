@@ -37,6 +37,7 @@ doMonadification fileName = do
   let nmsList = [fName,hName]
   monadifyFunBind (4,1) nmsList fFunBind
   monadifyFunBind (11,1) nmsList hFunBind
+  --logParsedSource "After monadification"
   return ()
 
 
@@ -58,12 +59,13 @@ modMatchRHSExpr fun = comp
 
 isFunCall :: [GHC.Name] -> GHC.HsExpr GHC.Name -> Bool
 isFunCall nms (GHC.HsVar nm2) = elem nm2 nms
-isFunCall nms (GHC.HsPar (GHC.L _ (GHC.HsVar nm2))) = elem nm2 nms
+isFunCall nms (GHC.HsPar e) = isFunCall nms (GHC.unLoc e)
 isFunCall nms (GHC.HsApp lhs _) = isFunCall nms (GHC.unLoc lhs)
 isFunCall _ _ = False
 
 isModFunCall :: ParsedLExpr -> MonadifyState Bool
 isModFunCall e = do
+  lift $ logExactprint "isModFunCall" e
   renE <- lift $ lookupRenamedExpr e 
   st <- get
   return $ isFunCall (funNames st) (GHC.unLoc renE)
@@ -121,8 +123,9 @@ isQueueEmpty :: MonadifyState Bool
 isQueueEmpty = get >>= (\s -> return (null (queue s)))
 
 monadifyFunRHS :: [GHC.Name] -> ParsedLExpr -> RefactGhc ParsedLExpr
-monadifyFunRHS fNames e = let initState = initMS fNames in
-                              evalStateT (monadifyExpr e) initState                              
+monadifyFunRHS fNames e = let initState = initMS fNames in do
+  newE <- evalStateT (monadifyExpr e) initState
+  return newE
 
     --This function handles the top expression from the rhs of a function
 monadifyExpr :: ParsedLExpr -> MonadifyState ParsedLExpr
@@ -130,6 +133,7 @@ monadifyExpr expr = do
   st <- get
   strippedExpr <- applyAtArgSubTrees stripMonArgs expr
   isMonadCall <- isModFunCall expr
+  lift $ logm ("isMonadCall: " ++ (show isMonadCall))
   newE <- if isMonadCall
     -- In this case the expression is monadic and doesn't need to be wrapped in a return
           then
@@ -197,7 +201,10 @@ mkGRHSs rhsExpr = do
 mkVarPat :: GHC.RdrName -> RefactGhc (GHC.LPat GHC.RdrName)
 mkVarPat nm = do
   let pat = (GHC.VarPat nm)
-  locate pat
+  lPat <- locate pat
+  addAnnVal lPat
+  return lPat
+  
 
 bindRdr :: GHC.RdrName
 bindRdr = mkRdrName ">>="
