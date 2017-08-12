@@ -35,12 +35,16 @@ doMonadification fileName = do
   fName <- rdrName2Name fRdr
   hName <- rdrName2Name hRdr
   let nmsList = [fName,hName]
-  monadifyFunBind nmsList fFunBind
-  monadifyFunBind nmsList hFunBind
+  monadifyFunBind (4,1) nmsList fFunBind
+  monadifyFunBind (11,1) nmsList hFunBind
   return ()
 
-monadifyFunBind :: [GHC.Name] -> ParsedBind -> RefactGhc ParsedBind
-monadifyFunBind nms bnd = replaceBndRHS (modMatchRHSExpr (monadifyFunRHS nms)) bnd 
+
+
+monadifyFunBind :: SimpPos -> [GHC.Name] -> ParsedBind -> RefactGhc ()
+monadifyFunBind pos nms bnd = do
+  newBnd <- replaceBndRHS (modMatchRHSExpr (monadifyFunRHS nms)) bnd
+  replaceFunBind pos newBnd
 
 replaceBndRHS :: (ParsedLMatch -> RefactGhc ParsedLMatch) -> ParsedBind -> RefactGhc ParsedBind
 replaceBndRHS fun fb@(GHC.FunBind _ _ _ _ _ _) = SYB.everywhereM (SYB.mkM fun) fb
@@ -149,9 +153,14 @@ wrapWithReturn e@(GHC.L _ (GHC.HsPar _)) = do
   retVar <- locate (GHC.HsVar returnRdr)
   addAnnVal retVar
   locate (GHC.HsApp retVar e)
+wrapWithReturn e@(GHC.L _ (GHC.HsVar _)) = do
+  retVar <- locate (GHC.HsVar returnRdr)
+  addAnnVal retVar
+  locate (GHC.HsApp retVar e)
 wrapWithReturn e = do
   retVar <- locate (GHC.HsVar returnRdr)
   addAnnVal retVar
+  zeroDP e
   pE <- wrapInPars e
   locate (GHC.HsApp retVar pE)
 

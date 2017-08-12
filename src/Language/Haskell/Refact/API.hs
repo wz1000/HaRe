@@ -287,6 +287,7 @@ module Language.Haskell.Refact.API
   , constructHsVar
   , insertNewDecl
   , rmFun
+  , replaceFunRhs
 -- from Language.Haskell.Refact.Utils.Query
   , getVarAndRHS
   , getHsBind

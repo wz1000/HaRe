@@ -92,48 +92,6 @@ checkPreconditions retRhs doStmts boundVars = do
 gContains :: (Data t, Eq a, Data a) => a -> t -> Bool
 gContains item t = SYB.everything (||) (False `SYB.mkQ` (\b -> item == b)) t
 
-replaceFunRhs :: SimpPos -> ParsedLExpr -> RefactGhc ()
-replaceFunRhs pos newRhs = do
-  parsed <- getRefactParsed
-  let rdrNm = locToRdrName pos parsed
-  case rdrNm of
-    Nothing -> error "replaceFunRhs: Position does not correspond to a binding."
-    (Just (GHC.L _ rNm)) -> do
-      newParsed <- everywhereMStaged SYB.Parser (SYB.mkM (worker rNm)) parsed
-      putRefactParsed newParsed emptyAnns
-      logParsedSource "GenApplicative.replaceFunRhs"
-  where worker :: GHC.RdrName -> ParsedBind -> RefactGhc (GHC.HsBind GHC.RdrName)
-#if __GLASGOW_HASKELL__ <= 710
-        worker rNm fBind@(GHC.FunBind (GHC.L _ fNm) _ mg _ _ _)
-#else
-        worker rNm fBind@(GHC.FunBind (GHC.L _ fNm) mg _ _ _)
-#endif
-          | fNm == rNm = do
-              newMg <- replaceMG mg
-              return $ fBind{GHC.fun_matches = newMg}
-          | otherwise = return fBind
-        worker _ bind = return bind
-        replaceMG :: ParsedMatchGroup -> RefactGhc ParsedMatchGroup
-        replaceMG mg = do
-#if __GLASGOW_HASKELL__ <= 710
-          let [(GHC.L l match)] = GHC.mg_alts mg
-#else
-          let (GHC.L _ [(GHC.L l match)]) = GHC.mg_alts mg
-#endif
-              oldGrhss = GHC.m_grhss match
-              newGrhss = mkGrhss oldGrhss newRhs
-              newLMatch = (GHC.L l (match{GHC.m_grhss = newGrhss}))
-#if __GLASGOW_HASKELL__ <= 710
-          return mg{GHC.mg_alts = [newLMatch]}
-#else
-          lMatchLst <- locate [newLMatch]
-          return mg{GHC.mg_alts = lMatchLst}
-#endif
-        mkGrhss old newExpr = let [(GHC.L l (GHC.GRHS lst _))] = GHC.grhssGRHSs old in
-          old{GHC.grhssGRHSs = [(GHC.L l (GHC.GRHS lst newExpr))]}
-
-
-
 processReturnStatement :: ParsedExpr -> [GHC.RdrName] -> RefactGhc (Maybe ParsedLExpr)
 processReturnStatement retExpr boundVars
   | isJustBoundVar retExpr boundVars = return Nothing
