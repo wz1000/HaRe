@@ -63,13 +63,7 @@ wrapInLambda varPat rhs = do
   lMatchLst <- locate [match]
   let mg = GHC.MG lMatchLst [] GHC.PlaceHolder GHC.Generated
 #endif
-  currAnns <- fetchAnnsFinal
-  --logm $ "Anns :" ++ (show $ getAllAnns currAnns match)
   let l_lam = (GHC.L l (GHC.HsLam mg))
-      key = mkAnnKey l_lam
-      dp = [(G GHC.AnnLam, DP (0,0))]
-      newAnn = annNone {annsDP = dp}
-  setRefactAnns $ Map.insert key newAnn currAnns
   par_lam <- wrapInPars l_lam
   return par_lam
 
@@ -81,7 +75,7 @@ mkMatch varPat rhs = do
 #else
   lMatch@(GHC.L l m) <- locate (GHC.Match GHC.NonFunBindMatch [varPat] Nothing rhs)
 #endif
-  let dp = [(G GHC.AnnRarrow, DP (0,1))]
+  let dp = [(G GHC.AnnRarrow, DP (0,1)),(G GHC.AnnLam, DP (0,0))]
       newAnn = annNone {annsDP = dp, annEntryDelta = DP (0,-1)}
   zeroDP varPat
   addAnn lMatch newAnn
