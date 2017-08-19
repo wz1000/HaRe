@@ -165,6 +165,7 @@ module Language.Haskell.Refact.API
     ,locToNameRdr
     ,locToNameRdrPure
     ,locToRdrName
+    ,locToId
     ,getName
 
  -- * Program transformation
@@ -280,6 +281,7 @@ module Language.Haskell.Refact.API
   , addNewLines
   , wrapInParsWithDPs
   , locate
+  , locWithAnnVal
   , replaceTypeSig
   , replaceFunBind
   , addBackquotes
@@ -288,6 +290,7 @@ module Language.Haskell.Refact.API
   , insertNewDecl
   , rmFun
   , replaceFunRhs
+  , traverseTypeSig
 -- from Language.Haskell.Refact.Utils.Query
   , getVarAndRHS
   , getHsBind

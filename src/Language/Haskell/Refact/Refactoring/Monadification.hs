@@ -9,6 +9,8 @@ import qualified GHC.SYB.Utils as SYB
 import Data.Generics as SYB
 import qualified GHC as GHC
 import Control.Monad.State
+import Language.Haskell.GHC.ExactPrint.Types
+import Language.Haskell.GHC.ExactPrint
 
 monadification :: RefactSettings -> GM.Options -> FilePath -> IO [FilePath]
 monadification settings cradle fileName = do
@@ -24,7 +26,6 @@ compMonadification fileName = do
     RefacModified -> return ()
   return [refRes]
 
-
 doMonadification :: FilePath -> RefactGhc ()
 doMonadification fileName = do
   parsed <- getRefactParsed
@@ -38,9 +39,11 @@ doMonadification fileName = do
   monadifyFunBind (4,1) nmsList fFunBind
   monadifyFunBind (11,1) nmsList hFunBind
   --logParsedSource "After monadification"
+  addMonadToSig (4,1)
+  addMonadToSig (11,1)
+  finParsed <- getRefactParsed
+  --logDataWithAnns "Post monadification refactoring" finParsed
   return ()
-
-
 
 monadifyFunBind :: SimpPos -> [GHC.Name] -> ParsedBind -> RefactGhc ()
 monadifyFunBind pos nms bnd = do
@@ -65,7 +68,6 @@ isFunCall _ _ = False
 
 isModFunCall :: ParsedLExpr -> MonadifyState Bool
 isModFunCall e = do
-  lift $ logExactprint "isModFunCall" e
   renE <- lift $ lookupRenamedExpr e 
   st <- get
   return $ isFunCall (funNames st) (GHC.unLoc renE)
@@ -95,6 +97,14 @@ data MS = MS {
   queue :: [(Maybe GHC.RdrName, ParsedLExpr)],
   funNames :: [GHC.Name]
                      }
+
+showQueue :: [(Maybe GHC.RdrName, ParsedLExpr)] -> RefactGhc String
+showQueue [] = return ""
+showQueue ((mNm,expr):rst) = do
+  anns <- fetchAnnsFinal
+  let str = exactPrint expr anns
+  rStr <- showQueue rst
+  return $ "(" ++ (SYB.showData SYB.Parser 3 mNm) ++ ", " ++ str ++ ")\n" ++ rStr
 
 initMS :: [GHC.Name] -> MS
 initMS fns = let iNS = initNS "hare" in
@@ -127,13 +137,21 @@ monadifyFunRHS fNames e = let initState = initMS fNames in do
   newE <- evalStateT (monadifyExpr e) initState
   return newE
 
+printQueueStatus :: MonadifyState ()
+printQueueStatus = do
+  st <- get
+  let q = queue st
+  lift $ logm ("The queue has " ++ (show $ length q) ++ " elements")
+  qStat <- lift (showQueue q)
+  lift $ logm qStat
+  
+
     --This function handles the top expression from the rhs of a function
 monadifyExpr :: ParsedLExpr -> MonadifyState ParsedLExpr
 monadifyExpr expr = do
   st <- get
   strippedExpr <- applyAtArgSubTrees stripMonArgs expr
   isMonadCall <- isModFunCall expr
-  lift $ logm ("isMonadCall: " ++ (show isMonadCall))
   newE <- if isMonadCall
     -- In this case the expression is monadic and doesn't need to be wrapped in a return
           then
@@ -182,7 +200,7 @@ composeWithBinds e = do
     ((Just var), lhsExpr) <- popQueue
     --Make lambda
     lamPat <- lift $ mkVarPat var
-    lamRHS <- lift $ mkGRHSs lhsExpr
+    lamRHS <- lift $ mkGRHSs e
     lambda <- lift $ wrapInLambda lamPat lamRHS
     --locate + annVal bindRdr
     lBindOp <- lift (locate (GHC.HsVar bindRdr))
@@ -226,7 +244,7 @@ stripMonArgs e = do
     --locate (HsVar newName)
     --push the new name and original expression onto the queue
     nm <- newName
-    lE <- lift (locate (GHC.HsVar nm))
+    lE <- lift (locWithAnnVal (GHC.HsVar nm))
     pushQueue ((Just nm), e)
     return lE  
           else
@@ -250,3 +268,50 @@ applyAtArgSubTrees f (GHC.L l (GHC.HsApp lhs rhs)) = do
   newRhs <- f rhs
   return (GHC.L l (GHC.HsApp newLhs newRhs))
 applyAtArgSubTrees _ ast = return ast
+
+getTypeSigByName :: (Data t) => GHC.RdrName -> t -> Maybe (GHC.Sig GHC.RdrName)
+getTypeSigByName nm t = SYB.something (Nothing `SYB.mkQ` comp) t
+  where comp :: GHC.Sig GHC.RdrName -> Maybe (GHC.Sig GHC.RdrName)
+        comp s@(GHC.TypeSig [(GHC.L _ x)] _ _) = if nm == x
+                                       then Just s
+                                       else Nothing
+        comp _ = Nothing
+
+
+--This adds the monad class constraint to the front of a
+--binds type signature and wraps the result type with the monad type variable
+--It may also not affect anything if there is no signature found
+addMonadToSig :: SimpPos -> RefactGhc ()
+addMonadToSig pos = do
+  parsed <- getRefactParsed
+  let (Just (GHC.L _ rdrNm)) = locToRdrName pos parsed
+      tySig = getTypeSigByName rdrNm parsed
+  case tySig of
+    (Just sig) -> do
+      newSig <- modTySig sig
+      replaceTypeSig pos newSig
+    Nothing -> return ()
+    where modTySig :: GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
+          modTySig (GHC.TypeSig nms ty pstRn) = (modType ty)  >>= (\nTy -> return (GHC.TypeSig nms nTy pstRn))
+          modTySig _ = error "addMonadToSig: modTySig called with an unknown constructor."
+          modType :: GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
+          modType (GHC.L l (GHC.HsForAllTy flg mSpn bndrs (GHC.L l2 cntxt) ty)) = do            
+            lMonTy <- locWithAnnVal (GHC.HsTyVar (mkRdrName "Monad"))
+            zeroDP lMonTy
+            lVarTy <- locWithAnnVal (GHC.HsTyVar (mkRdrName "m"))
+            newTy <- wrapResTy (mkRdrName "m") ty
+            let appTy = (GHC.HsAppTy lMonTy lVarTy)
+            lAppTy <- locWithAnnVal appTy
+            zeroDP lAppTy
+            newCntxt <- if (null cntxt)
+                        then do
+              lCntxt <- locate [lAppTy]
+              (addNewKeyword (G GHC.AnnDarrow, DP (0,1)) lCntxt)
+              zeroDP lCntxt
+              return lCntxt
+                        else return (GHC.L l2 (lAppTy:cntxt))
+            setDP  (DP (0,1)) newTy            
+            return (GHC.L l (GHC.HsForAllTy flg mSpn bndrs newCntxt newTy))
+          wrapResTy :: GHC.RdrName -> GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
+          wrapResTy rdr (GHC.L l (GHC.HsFunTy lTy rTy)) = (wrapResTy rdr rTy) >>= (\nRTy -> return (GHC.L l (GHC.HsFunTy lTy nRTy)))
+          wrapResTy rdr locTy = locWithAnnVal (GHC.HsTyVar rdr) >>= (\ lTyVar -> locate (GHC.HsAppTy lTyVar locTy))

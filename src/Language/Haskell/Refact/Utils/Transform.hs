@@ -7,6 +7,7 @@ module Language.Haskell.Refact.Utils.Transform
   , wrapInParsWithDPs
   , addNewLines
   , locate
+  , locWithAnnVal
   , removePars
   , replaceTypeSig
   , replaceFunBind
@@ -16,6 +17,7 @@ module Language.Haskell.Refact.Utils.Transform
   , insertNewDecl
   , rmFun
   , replaceFunRhs
+  , traverseTypeSig
   ) where
 
 import qualified GHC as GHC
@@ -51,8 +53,17 @@ addSimpleImportDecl modName mqual = do
   newP <- addImportDecl parsed modNm' Nothing False False (isJust mqual) mqual False []
   putRefactParsed newP mempty
 
---Takes in a lhs pattern and a rhs. Wraps those in a lambda and adds the annotations associated with the lambda. Returns the new located lambda expression
 
+
+--Locates an piece of abstract syntax and adds a AnnVal annotation at the new location
+locWithAnnVal :: Data a => a -> RefactGhc (GHC.Located a)
+locWithAnnVal a = do
+  lA <- locate a
+  addAnnVal lA
+  return lA
+
+
+--Takes in a lhs pattern and a rhs. Wraps those in a lambda and adds the annotations associated with the lambda. Returns the new located lambda expression
 wrapInLambda :: GHC.LPat GHC.RdrName -> ParsedGRHSs -> RefactGhc (GHC.LHsExpr GHC.RdrName)
 wrapInLambda varPat rhs = do
   match@(GHC.L l match') <- mkMatch varPat rhs
@@ -270,3 +281,30 @@ replaceFunRhs pos newRhs = do
 #endif
         mkGrhss old newExpr = let [(GHC.L l (GHC.GRHS lst _))] = GHC.grhssGRHSs old in
           old{GHC.grhssGRHSs = [(GHC.L l (GHC.GRHS lst newExpr))]}
+
+
+--This function will apply the given function to the appropriate type signature element.
+--The int denotes which argument the function should be applied to starting at one
+--For example when: "traverseTypeSig 2 g"
+--Is applied to the signature "f :: Int -> (Int -> String) -> String"
+--g will be applied to "(Int -> String)"
+--You also need to handle spacing before the type signature element
+traverseTypeSig :: Int -> (GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)) -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
+traverseTypeSig argNum f (GHC.TypeSig lst ty rn) = do
+  newTy <- comp argNum ty
+  return (GHC.TypeSig lst newTy rn)
+  where
+    comp argNum (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt ty)) =
+      case ty of
+        (GHC.L _ (GHC.HsFunTy _ _)) -> comp' argNum ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt res)))
+        _ -> f ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt res)))
+    comp' 1 (GHC.L l (GHC.HsFunTy lhs rhs)) = do
+      resLHS <- f lhs
+      let funTy = (GHC.L l (GHC.HsFunTy resLHS rhs))
+      zeroDP funTy
+      return funTy
+    comp' 1 lTy = f lTy 
+    comp' n (GHC.L l (GHC.HsFunTy lhs rhs)) = comp' (n-1) rhs >>= (\res -> return (GHC.L l (GHC.HsFunTy lhs res)))
+    comp' _ lHsTy@(GHC.L _ ty) = return lHsTy
+        
+traverseTypeSig _ _ sig = error $ "traverseTypeSig: Unsupported constructor: " ++ show (toConstr sig)

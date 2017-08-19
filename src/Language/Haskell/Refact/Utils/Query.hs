@@ -137,3 +137,7 @@ getIdFromVar (GHC.L l var) = do
 #endif
     comp _ = Nothing
 
+getFunBindType :: SimpPos -> RefactGhc (Maybe GHC.Type)
+getFunBindType pos = do
+  typedMod <- getTypecheckedModule
+  return undefined

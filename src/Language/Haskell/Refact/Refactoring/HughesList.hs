@@ -153,32 +153,6 @@ addConstructorImport = do
   parsed <- getRefactParsed
   newP <- addImportDecl parsed modNm Nothing False False False Nothing False [rdr]
   putRefactParsed newP mempty
-
---This function will apply the given function to the appropriate type signature element.
---The int denotes which argument the function should be applied to starting at one
---For example when: "traverseTypeSig 2 g"
---Is applied to the signature "f :: Int -> (Int -> String) -> String"
---g will be applied to "(Int -> String)"
---You also need to handle spacing before the type signature element
-traverseTypeSig :: Int -> (GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)) -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
-traverseTypeSig argNum f (GHC.TypeSig lst ty rn) = do
-  newTy <- comp argNum ty
-  return (GHC.TypeSig lst newTy rn)
-  where
-    comp argNum (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt ty)) =
-      case ty of
-        (GHC.L _ (GHC.HsFunTy _ _)) -> comp' argNum ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt res)))
-        _ -> f ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy flg msp bndrs cntxt res)))
-    comp' 1 (GHC.L l (GHC.HsFunTy lhs rhs)) = do
-      resLHS <- f lhs
-      let funTy = (GHC.L l (GHC.HsFunTy resLHS rhs))
-      zeroDP funTy
-      return funTy
-    comp' 1 lTy = f lTy 
-    comp' n (GHC.L l (GHC.HsFunTy lhs rhs)) = comp' (n-1) rhs >>= (\res -> return (GHC.L l (GHC.HsFunTy lhs res)))
-    comp' _ lHsTy@(GHC.L _ ty) = return lHsTy
-        
-traverseTypeSig _ _ sig = error $ "traverseTypeSig: Unsupported constructor: " ++ show (toConstr sig)
          
 numTypesOfBind :: ParsedBind -> Int
 numTypesOfBind bnd = let mg = GHC.fun_matches bnd
