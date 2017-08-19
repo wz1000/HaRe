@@ -11,6 +11,8 @@ import qualified GHC as GHC
 import Control.Monad.State
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint
+import qualified Bag as GHC
+import qualified BasicTypes as GHC (RecFlag)
 
 monadification :: RefactSettings -> GM.Options -> FilePath -> [SimpPos] -> IO [FilePath]
 monadification settings cradle fileName posLst = do
@@ -71,11 +73,12 @@ isFunCall :: [GHC.Name] -> GHC.HsExpr GHC.Name -> Bool
 isFunCall nms (GHC.HsVar nm2) = elem nm2 nms
 isFunCall nms (GHC.HsPar e) = isFunCall nms (GHC.unLoc e)
 isFunCall nms (GHC.HsApp lhs _) = isFunCall nms (GHC.unLoc lhs)
+isFunCall nms (GHC.HsLet _ e) = isFunCall nms (GHC.unLoc e)
 isFunCall _ _ = False
 
 isModFunCall :: ParsedLExpr -> MonadifyState Bool
 isModFunCall e = do
-  renE <- lift $ lookupRenamedExpr e 
+  renE <- lift $ lookupRenamedExpr e
   st <- get
   return $ isFunCall (funNames st) (GHC.unLoc renE)
 
@@ -101,11 +104,11 @@ newName = state (\s -> let n = names s
 
 data MS = MS {
   names :: NameState,
-  queue :: [(Maybe GHC.RdrName, ParsedLExpr)],
+  queue :: [(GHC.LPat GHC.RdrName, ParsedLExpr)],
   funNames :: [GHC.Name]
                      }
 
-showQueue :: [(Maybe GHC.RdrName, ParsedLExpr)] -> RefactGhc String
+showQueue :: [(GHC.LPat GHC.RdrName, ParsedLExpr)] -> RefactGhc String
 showQueue [] = return ""
 showQueue ((mNm,expr):rst) = do
   anns <- fetchAnnsFinal
@@ -119,7 +122,7 @@ initMS fns = let iNS = initNS "hare" in
 
 type MonadifyState = StateT MS RefactGhc
 
-popQueue :: MonadifyState (Maybe GHC.RdrName, ParsedLExpr)
+popQueue :: MonadifyState (GHC.LPat GHC.RdrName, ParsedLExpr)
 popQueue = state (\s -> let (e:es) = queue s
                    in (e, s {queue = es}))
 
@@ -129,10 +132,10 @@ popQueue = state (\s -> let (e:es) = queue s
 
 --TODO: Not sure if the queue should be a Maybe because I don't think there is a
 --case where a pure function would be monadified with the >> operator
-pushQueue :: (Maybe GHC.RdrName, ParsedLExpr) -> MonadifyState ()
+pushQueue :: (GHC.LPat GHC.RdrName, ParsedLExpr) -> MonadifyState ()
 pushQueue e = appendToQueue [e]
 
-appendToQueue :: [(Maybe GHC.RdrName, ParsedLExpr)] -> MonadifyState ()
+appendToQueue :: [(GHC.LPat GHC.RdrName, ParsedLExpr)] -> MonadifyState ()
 appendToQueue lst = state (\s -> let oldQ = queue s in
                               ((), s {queue = oldQ ++ lst}))
 
@@ -151,15 +154,17 @@ printQueueStatus = do
   lift $ logm ("The queue has " ++ (show $ length q) ++ " elements")
   qStat <- lift (showQueue q)
   lift $ logm qStat
-  
+
+isLet (GHC.L _ (GHC.HsLet _ _)) = True
+isLet _ = False
 
     --This function handles the top expression from the rhs of a function
 monadifyExpr :: ParsedLExpr -> MonadifyState ParsedLExpr
 monadifyExpr expr = do
   st <- get
-  strippedExpr <- applyAtArgSubTrees stripMonArgs expr
+  strippedExpr <- applyAtArgSubTrees (stripMonArgs True) expr
   isMonadCall <- isModFunCall expr
-  newE <- if isMonadCall
+  newE <- if isMonadCall || isLet expr
     -- In this case the expression is monadic and doesn't need to be wrapped in a return
           then
             return strippedExpr
@@ -190,7 +195,12 @@ wrapWithReturn e = do
   retVar <- locate (GHC.HsVar returnRdr)
   addAnnVal retVar
   zeroDP e
-  pE <- wrapInPars e
+  isPared <- isWrappedInPars e
+  pE <- if isPared
+        then do
+    setDP (DP (0,1)) e
+    return e
+        else wrapInPars e
   locate (GHC.HsApp retVar pE)
 
 returnRdr :: GHC.RdrName
@@ -204,11 +214,11 @@ composeWithBinds e = do
   if done
     then return e
     else do
-    ((Just var), lhsExpr) <- popQueue
+    (pat, lhsExpr) <- popQueue
     --Make lambda
-    lamPat <- lift $ mkVarPat var
+    --lamPat <- lift $ mkVarPat var
     lamRHS <- lift $ mkGRHSs e
-    lambda <- lift $ wrapInLambda lamPat lamRHS
+    lambda <- lift $ wrapInLambda pat lamRHS
     --locate + annVal bindRdr
     lBindOp <- lift (locate (GHC.HsVar bindRdr))
     lift $ addAnnVal lBindOp
@@ -236,23 +246,24 @@ bindRdr = mkRdrName ">>="
     
 --If this is called with a subtree that is a call to a monadified function
 --It stores the original expression in the queue and returns a HsVar with the new name
-stripMonArgs :: ParsedLExpr -> MonadifyState ParsedLExpr
-stripMonArgs e = do
+stripMonArgs :: Bool -> ParsedLExpr -> MonadifyState ParsedLExpr
+stripMonArgs wrap e = do
   st <- get
   let oldQ = queue st
   put (st {queue = []})
-  stripped <- applyAtArgSubTrees stripMonArgs e
+  stripped <- applyAtArgSubTrees (stripMonArgs wrap) e
   newQ <- get >>= (\s -> return (queue s))
   modify (\s -> s {queue = oldQ})
   isMonadCall <- isModFunCall e
-  resE <- if isMonadCall 
+  resE <- if isMonadCall && wrap
           then do
     --If this expression is a call to monad then we need to generate a new name
     --locate (HsVar newName)
     --push the new name and original expression onto the queue
     nm <- newName
     lE <- lift (locWithAnnVal (GHC.HsVar nm))
-    pushQueue ((Just nm), e)
+    pat <- lift (mkVarPat nm)
+    pushQueue (pat, e)
     return lE  
           else
     --otherwise just return the stripped expression
@@ -274,7 +285,118 @@ applyAtArgSubTrees f (GHC.L l (GHC.HsApp lhs rhs)) = do
   newLhs <- applyAtArgSubTrees f lhs
   newRhs <- f rhs
   return (GHC.L l (GHC.HsApp newLhs newRhs))
+applyAtArgSubTrees f (GHC.L l (GHC.HsLet locBnds expr)) = do
+  renamed <- lift getRefactRenamed
+  let renExpr = getNamedExprByPos l renamed
+  mBnds <- filterBinds renExpr
+  newExpr <- f expr
+  retExpr <- lift $ wrapWithReturn newExpr
+  lift $ logm ("newEXPR::::: " ++ (SYB.showData SYB.Parser 3 newExpr) )
+  case mBnds of
+    Just bnds -> return (GHC.L l (GHC.HsLet bnds retExpr))
+    Nothing -> return retExpr
 applyAtArgSubTrees _ ast = return ast
+
+getNamedExprByPos :: (Data a) => GHC.SrcSpan -> a -> GHC.LHsExpr GHC.Name
+getNamedExprByPos pos a = let res = SYB.something (Nothing `SYB.mkQ` comp) a in
+  gfromJust "getNamedExprByPos: No expression found." res
+  where comp ::  GHC.LHsExpr GHC.Name -> Maybe (GHC.LHsExpr GHC.Name)
+        comp e@(GHC.L l _) = if l == pos
+                             then (Just e)
+                             else Nothing
+        comp _ = Nothing
+
+getParsedExprByPos :: (Data a) => GHC.SrcSpan -> a -> ParsedLExpr
+getParsedExprByPos = getParsedByPos
+
+getParsedBindByPos :: (Data a) => GHC.SrcSpan -> a -> ParsedLBind
+getParsedBindByPos = getParsedByPos
+
+getParsedByPos pos a = let res = SYB.something (Nothing `SYB.mkQ` comp) a in
+  gfromJust "getNamedExprByPos: No expression found." res
+  where comp e@(GHC.L l _) = if l == pos
+                             then (Just e)
+                             else Nothing
+        comp _ = Nothing
+
+filterBinds :: GHC.LHsExpr GHC.Name -> MonadifyState (Maybe (GHC.HsLocalBinds GHC.RdrName))
+filterBinds (GHC.L l (GHC.HsLet locBnds _)) = case locBnds of
+  (GHC.HsValBinds (GHC.ValBindsOut lst _)) -> do
+    newLst <- mMapMaybe handleBind (reverse lst)
+    case newLst of
+      [] -> return Nothing
+      lst -> return (Just (GHC.HsValBinds (GHC.ValBindsIn (GHC.listToBag (reverse lst)) [])))    
+filterBinds _ = error "filterBinds: Called with a non-let expression."
+
+{- This is what handles an expression on the rhs of a let
+   any monadic calls inside of the expression are stripped and added to the queue before
+   the top level let expression 
+
+Assuming mon and mon2 are monadic
+let f = mon (mon2 4) 5 in
+expr ===>
+(mon2 4) >>= (\hare1 -> mon hare1 5 >>= (f -> expr))
+-}  
+
+handleBind :: (GHC.RecFlag, GHC.LHsBinds GHC.Name) -> MonadifyState (Maybe (GHC.LHsBindLR GHC.RdrName GHC.RdrName))
+handleBind (_, bg) = do
+  let [(GHC.L l bnd)] = GHC.bagToList bg
+  parsed <- lift getRefactParsed
+  let pBnd = getParsedBindByPos l parsed
+  case pBnd of
+    (GHC.L l fb@(GHC.FunBind (GHC.L _ id) _ mg _ _ _)) -> do
+      let expr = getExprFromMG mg
+      isModCall <- isModFunCall expr
+      newExpr <- stripMonArgs False expr
+      if isModCall
+        then do
+        pat <- lift (mkVarPat id)
+        pushQueue (pat,newExpr)
+        return Nothing
+        else return (Just (GHC.L l (fb {GHC.fun_matches = replaceMGExpr newExpr mg})))
+    (GHC.L l pb@(GHC.PatBind pat grhss _ _ _)) -> do
+      let expr = getExprFromGRHSs grhss
+      newExpr <- stripMonArgs False expr
+      isModCall <- isModFunCall expr
+      if isModCall
+        then do
+        pushQueue (pat, newExpr)
+        return Nothing
+        else return (Just (GHC.L l (pb {GHC.pat_rhs = replaceGRHSsExpr newExpr grhss})))
+      
+
+replaceMGExpr :: ParsedLExpr -> ParsedMatchGroup -> ParsedMatchGroup
+replaceMGExpr e = SYB.everywhere (SYB.mkT (replaceGRHSExpr e))
+
+replaceGRHSsExpr :: ParsedLExpr -> ParsedGRHSs -> ParsedGRHSs
+replaceGRHSsExpr e = SYB.everywhere (SYB.mkT (replaceGRHSExpr e))
+
+replaceGRHSExpr :: ParsedLExpr -> ParsedGRHS -> ParsedGRHS
+replaceGRHSExpr e (GHC.GRHS stmts _) = (GHC.GRHS stmts e)
+replaceGRHSExpr _ grhs = grhs
+
+getExprFromGRHSs :: ParsedGRHSs -> ParsedLExpr
+getExprFromGRHSs grhs = let res = SYB.something (Nothing `SYB.mkQ` comp) grhs in
+  gfromJust "getExprFromMG" res
+  where comp :: ParsedLExpr -> Maybe ParsedLExpr
+        comp e = Just e 
+
+getExprFromMG :: ParsedMatchGroup -> ParsedLExpr
+getExprFromMG mg = let res = SYB.something (Nothing `SYB.mkQ` comp) mg in
+  gfromJust "getExprFromMG" res
+  where comp :: ParsedLExpr -> Maybe ParsedLExpr
+        comp e = Just e
+                       
+
+mMapMaybe :: Monad m => (a -> m (Maybe b)) -> [a] -> m [b]
+mMapMaybe _ [] = return []
+mMapMaybe f (x:xs) = do
+  mElem <- f x
+  rst <- mMapMaybe f xs
+  case mElem of
+    Nothing -> return rst
+    (Just elem) -> return (elem:rst)
+  
 
 getTypeSigByName :: (Data t) => GHC.RdrName -> t -> Maybe (GHC.Sig GHC.RdrName)
 getTypeSigByName nm t = SYB.something (Nothing `SYB.mkQ` comp) t

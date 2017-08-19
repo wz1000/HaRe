@@ -270,8 +270,10 @@ module Language.Haskell.Refact.API
  , ParsedLStmt
  , ParsedLExpr
  , ParsedBind
+ , ParsedLBind
  , ParsedLDecl
  , ParsedLImportDecl
+ , ParsedBindBag
 
  -- from Language.Haskell.Refact.Utils.Transform
   , addSimpleImportDecl
@@ -301,6 +303,7 @@ module Language.Haskell.Refact.API
   , astCompare
   , lookupByLoc
   , getIdFromVar
+  , isWrappedInPars
 -- from Language.Haskell.Refact.Refactoring.IsomorphicRefactoring
   , isoRefact
   , IsomorphicFuncs(..)

@@ -19,6 +19,8 @@ import Control.Applicative
 import FastString
 import RdrName
 import Language.Haskell.Refact.Utils.MonadFunctions
+import qualified Data.Map as Map
+import Language.Haskell.GHC.ExactPrint.Types
 
 --Takes a single match and returns a tuple containing the grhs and the pattern
 --Assumptions:
@@ -141,3 +143,17 @@ getFunBindType :: SimpPos -> RefactGhc (Maybe GHC.Type)
 getFunBindType pos = do
   typedMod <- getTypecheckedModule
   return undefined
+
+--This checks if a syntax element is wrapped in parenthesis
+--by checking the annotatations contain AnnCloseP and AnnOpenP
+isWrappedInPars :: (Data a) => (GHC.Located a) -> RefactGhc Bool
+isWrappedInPars a = do
+  anns <- fetchAnnsFinal
+  let key = mkAnnKey a
+      mAnn = Map.lookup key anns
+  case mAnn of
+    Nothing -> return False
+    (Just ann) -> return (containsPars ann)
+      where containsPars :: Annotation -> Bool
+            containsPars ann = let keywords = map fst (annsDP ann) in
+              (elem (G GHC.AnnCloseP) keywords) && (elem (G GHC.AnnOpenP) keywords)
