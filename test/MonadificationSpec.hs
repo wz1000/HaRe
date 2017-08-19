@@ -13,7 +13,7 @@ spec :: Spec
 spec = do
   describe "doMonadification" $ do
     it "Monadify simple evaluator" $ do
-      res <- ct $ monadification logTestSettings testOptions "./Monadification/M1.hs"
+      res <- ct $ monadification logTestSettings testOptions "./Monadification/M1.hs" [(4,1),(11,1)]
       res' <- ct $ mapM makeRelativeToCurrentDirectory res
       res' `shouldBe` ["Monadification/M1.hs"]
       diff <- ct $ compareFiles "./Monadification/M1.refactored.hs"

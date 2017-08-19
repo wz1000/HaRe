@@ -12,35 +12,42 @@ import Control.Monad.State
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint
 
-monadification :: RefactSettings -> GM.Options -> FilePath -> IO [FilePath]
-monadification settings cradle fileName = do
+monadification :: RefactSettings -> GM.Options -> FilePath -> [SimpPos] -> IO [FilePath]
+monadification settings cradle fileName posLst = do
   absFileName <- canonicalizePath fileName
-  runRefacSession settings cradle (compMonadification fileName)
+  runRefacSession settings cradle (compMonadification fileName posLst)
 
 
-compMonadification :: FilePath -> RefactGhc [ApplyRefacResult]
-compMonadification fileName = do
-  (refRes@((_fp,ismod),_), ()) <- applyRefac (doMonadification fileName ) (RSFile fileName)
+compMonadification :: FilePath -> [SimpPos] -> RefactGhc [ApplyRefacResult]
+compMonadification fileName posLst = do
+  (refRes@((_fp,ismod),_), ()) <- applyRefac (doMonadification fileName posLst) (RSFile fileName)
   case ismod of
     RefacUnmodifed -> error "Monadification failed"
     RefacModified -> return ()
   return [refRes]
 
-doMonadification :: FilePath -> RefactGhc ()
-doMonadification fileName = do
+doMonadification :: FilePath -> [SimpPos] -> RefactGhc ()
+doMonadification fileName posLst = do
+  nmsList <- getNames posLst
+  mapM_ (monadifyFunc nmsList) posLst
+
+getNames :: [SimpPos] -> RefactGhc [GHC.Name]
+getNames posLst = mapM lookupNm posLst
+  where lookupNm pos = do
+          parsed <- getRefactParsed
+          let rdr = gfromJust ("Unable to find name at " ++ (show pos)) (locToRdrName pos parsed)
+          rdrName2Name rdr
+
+
+
+monadifyFunc :: [GHC.Name] -> SimpPos -> RefactGhc ()
+monadifyFunc nmsList pos = do
   parsed <- getRefactParsed
-  let (Just fRdr) = locToRdrName (4,1) parsed
-      (Just fFunBind) = getHsBind (GHC.unLoc fRdr) parsed
-      (Just hRdr) = locToRdrName (11,1) parsed
-      (Just hFunBind) = getHsBind (GHC.unLoc hRdr) parsed
-  fName <- rdrName2Name fRdr
-  hName <- rdrName2Name hRdr
-  let nmsList = [fName,hName]
-  monadifyFunBind (4,1) nmsList fFunBind
-  monadifyFunBind (11,1) nmsList hFunBind
+  let (Just rdr) = locToRdrName pos parsed
+      (Just funBind) = getHsBind (GHC.unLoc rdr) parsed
+  monadifyFunBind pos nmsList funBind
   --logParsedSource "After monadification"
-  addMonadToSig (4,1)
-  addMonadToSig (11,1)
+  addMonadToSig pos
   finParsed <- getRefactParsed
   --logDataWithAnns "Post monadification refactoring" finParsed
   return ()
