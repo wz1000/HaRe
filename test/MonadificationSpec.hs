@@ -20,9 +20,18 @@ spec = do
                                 "./Monadification/M1.hs.expected"     
       diff `shouldBe` []
     it "Monadify simple evaluator" $ do
-      res <- ct $ monadification logTestSettings testOptions "./Monadification/M2.hs" [(15,1)]
+      res <- ct $ monadification defaultTestSettings testOptions "./Monadification/M2.hs" [(15,1)]
       res' <- ct $ mapM makeRelativeToCurrentDirectory res
       res' `shouldBe` ["Monadification/M2.hs"]
       diff <- ct $ compareFiles "./Monadification/M2.refactored.hs"
                                 "./Monadification/M2.hs.expected"     
       diff `shouldBe` []
+    it "Monadify function with partial evaluation and case expressions" $ do
+      res <- ct $ monadification logTestSettings testOptions "./Monadification/test.hs" [(4,1),(7,1),(10,1)]
+      res' <- ct $ mapM makeRelativeToCurrentDirectory res
+      res' `shouldBe` ["Monadification/test.hs"]
+      diff <- ct $ compareFiles "./Monadification/test.refactored.hs"
+                                "./Monadification/test.hs.expected"     
+      diff `shouldBe` []
+      
+    

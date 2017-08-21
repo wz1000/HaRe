@@ -17,7 +17,7 @@ import qualified BasicTypes as GHC (RecFlag)
 monadification :: RefactSettings -> GM.Options -> FilePath -> [SimpPos] -> IO [FilePath]
 monadification settings cradle fileName posLst = do
   absFileName <- canonicalizePath fileName
-  runRefacSession settings cradle (compMonadification fileName posLst)
+  runRefacSession settings cradle (compMonadification absFileName posLst)
 
 
 compMonadification :: FilePath -> [SimpPos] -> RefactGhc [ApplyRefacResult]
@@ -176,6 +176,8 @@ monadifyExpr expr = do
 lookupRenamedExpr :: ParsedLExpr -> RefactGhc (GHC.LHsExpr GHC.Name) 
 lookupRenamedExpr parsedElem = do
   (grp,_ ,_, _) <- getRefactRenamed
+  logData "getRenamedElem of: " parsedElem
+  --logData "Renamed group: " grp
   let (strtPos,endPos) = getStartEndLoc parsedElem
       (mRenExpr :: Maybe (GHC.LHsExpr GHC.Name)) = locToExp strtPos endPos (GHC.hs_valds grp)
   return $ gfromJust "lookupRenamedExpr: Renamed expression not found" mRenExpr
@@ -290,11 +292,13 @@ applyAtArgSubTrees f (GHC.L l (GHC.HsLet locBnds expr)) = do
   let renExpr = getNamedExprByPos l renamed
   mBnds <- filterBinds renExpr
   newExpr <- f expr
-  retExpr <- lift $ wrapWithReturn newExpr
-  lift $ logm ("newEXPR::::: " ++ (SYB.showData SYB.Parser 3 newExpr) )
+  isMonExpr <- isModFunCall newExpr
+  rE <- if isMonExpr
+        then return newExpr
+        else lift $ wrapWithReturn newExpr
   case mBnds of
-    Just bnds -> return (GHC.L l (GHC.HsLet bnds retExpr))
-    Nothing -> return retExpr
+    Just bnds -> return (GHC.L l (GHC.HsLet bnds rE))
+    Nothing -> return rE
 applyAtArgSubTrees _ ast = return ast
 
 getNamedExprByPos :: (Data a) => GHC.SrcSpan -> a -> GHC.LHsExpr GHC.Name

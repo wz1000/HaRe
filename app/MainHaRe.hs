@@ -93,6 +93,10 @@ main = do
                          "Delete a definition"
                          runCmd
                          deleteDefOpts
+              addCommand "monadify"
+                         "Monadify a set of functions"
+                         runCmd
+                         monadifyOpts
     run global
 
 -- ---------------------------------------------------------------------
@@ -110,6 +114,7 @@ data HareParams = DemoteCmd      FilePath Row Col
                 | RmOneParam     FilePath Row Col
                 | GenApplicative FilePath Row Col
                 | DeleteDef      FilePath Row Col
+                | Monadify       FilePath [(Row,Col)]
                deriving Show
 
 runCmd :: HareParams -> (RefactSettings,GM.Options) -> IO ()
@@ -142,6 +147,9 @@ runCmd (GenApplicative fileName r c) (opt, gOpt)
 
 runCmd (DeleteDef fileName r c) (opt, gOpt)
   = runFunc $ deleteDef opt gOpt fileName (r,c)
+
+runCmd (Monadify fileName posLst) (opt, gOpt)
+  = runFunc $ monadification opt gOpt fileName posLst
 
 rmOneParamCmdOpts :: Parser HareParams
 rmOneParamCmdOpts =
@@ -319,6 +327,26 @@ deleteDefOpts =
 
 
 -- ---------------------------------------------------------------------
+monadifyOpts :: Parser HareParams
+monadifyOpts =
+    Monadify
+      <$> strArgument
+            ( metavar "FILE"
+           <> help "Specify Haskell file to process"
+            )
+      <*> some
+            ((,) <$>
+             argument auto
+             ( metavar "line"
+               <> help "The line the declaration is on")
+             <*> argument auto
+             ( metavar "col"
+               <> help "The col the declaration starts at"))
+
+
+
+-- ---------------------------------------------------------------------
+
 
 allOptsParser :: Parser (RefactSettings,GM.Options)
 allOptsParser = (,) <$> globalOptsParser <*> globalArgSpec
