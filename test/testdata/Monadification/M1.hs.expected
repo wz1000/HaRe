@@ -1,0 +1,11 @@
+module M1 where
+
+f :: Monad m => [a] -> b -> m b
+f [] y = return y
+f x y = (h y) >>= (\hare1 -> f (g x) hare1)
+
+g :: [a] -> [a]
+g x = tail x
+
+h :: Monad m => a -> m a
+h x = return (id x)

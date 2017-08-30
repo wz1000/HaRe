@@ -26,20 +26,24 @@ module Language.Haskell.Refact.Utils.MonadFunctions
 
        , getRefactInscopes
 
+       , getRefactTyped
+       
        , getRefactRenamed
        , putRefactRenamed
 
        , getRefactParsed
        , putRefactParsed
-
+       
        -- * Annotations
        -- , addRefactAnns
        , setRefactAnns
        , mergeRefactAnns
 
        -- *
+       , getRefactParsedMod
        , putParsedModule
        , clearParsedModule
+       , typeCheckModule
        , getRefactFileName
        , getRefactTargetModule
        , getRefactModule
@@ -66,6 +70,7 @@ module Language.Haskell.Refact.Utils.MonadFunctions
        , fileNameFromModSummary
        , mkNewGhcNamePure
 
+       , logData
        , logDataWithAnns
        , logAnns
        , logParsedSource
@@ -76,6 +81,7 @@ module Language.Haskell.Refact.Utils.MonadFunctions
        , initRefactModule
        , initTokenCacheLayout
        , initRdrNameMap
+       , showOutputable
        ) where
 
 import Control.Monad.State
@@ -86,6 +92,8 @@ import qualified GhcMonad      as GHC
 import qualified Module        as GHC
 import qualified Name          as GHC
 import qualified Unique        as GHC
+import qualified HscTypes      as GHC (md_exports)
+import qualified TcRnTypes     as GHC (tcg_rdr_env)
 #if __GLASGOW_HASKELL__ > 710
 import qualified Var
 #endif
@@ -101,8 +109,10 @@ import Language.Haskell.GHC.ExactPrint.Utils
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.TypeSyn
 import Language.Haskell.Refact.Utils.Types
-
 import qualified Data.Map as Map
+
+import qualified GHC.SYB.Utils as SYB
+import Outputable
 
 -- ---------------------------------------------------------------------
 
@@ -139,6 +149,9 @@ setRefactStreamModified rr = do
 getRefactInscopes :: RefactGhc InScopes
 getRefactInscopes = GHC.getNamesInScope
 
+getRefactTyped :: RefactGhc GHC.TypecheckedSource
+getRefactTyped = getTypecheckedModule >>= (\tm -> return $ tmTypecheckedSource tm)
+
 getRefactRenamed :: RefactGhc GHC.RenamedSource
 getRefactRenamed = do
   mtm <- gets rsModule
@@ -157,11 +170,7 @@ putRefactRenamed renamed = do
 
 getRefactParsed :: RefactGhc GHC.ParsedSource
 getRefactParsed = do
-  mtm <- gets rsModule
-  let tm = gfromJust "getRefactParsed" mtm
-  let t  = rsTypecheckedMod tm
-
-  let pm = tmParsedModule t
+  pm <- getRefactParsedMod
   return $ GHC.pm_parsed_source pm
 
 putRefactParsed :: GHC.ParsedSource -> Anns -> RefactGhc ()
@@ -225,6 +234,13 @@ modifyAnns tk f = tk'
 
 -- ----------------------------------------------------------------------
 
+getRefactParsedMod :: RefactGhc (GHC.ParsedModule)
+getRefactParsedMod = do
+  mtm <- gets rsModule
+  let tm = gfromJust "getRefactParsed" mtm
+  let t  = rsTypecheckedMod tm
+  return $ tmParsedModule t
+
 putParsedModule :: [Comment] -> TypecheckedModule -> RefactGhc ()
 putParsedModule cppComments tm = do
   st <- get
@@ -234,6 +250,30 @@ clearParsedModule :: RefactGhc ()
 clearParsedModule = do
   st <- get
   put $ st { rsModule = Nothing }
+
+
+--Manually runs the typechecker on the target module parsed source,
+--Updates the rsModule accordingly 
+typeCheckModule :: RefactGhc ()
+typeCheckModule = do
+  st <- get
+  mtm <- gets rsModule
+  let tm = gfromJust "typecheckModule mtm" mtm
+      t = rsTypecheckedMod tm
+      pm = tmParsedModule t
+  tm' <- GHC.typecheckModule pm
+  let
+    rmSource = gfromJust "typecheckModule rmSource" (GHC.tm_renamed_source tm')
+    (gblEnv, md) = GHC.tm_internals_ tm'
+    tm'' = TypecheckedModule {
+        tmParsedModule = GHC.tm_parsed_module tm',
+        tmRenamedSource = rmSource,
+        tmTypecheckedSource = GHC.tm_typechecked_source tm',
+        tmMinfExports = GHC.md_exports md,
+        tmMinfRdrEnv = Just (GHC.tcg_rdr_env gblEnv)        
+          }
+  let rm = tm {rsTypecheckedMod = tm''}
+  put $ st {rsModule = Just rm}
 
 -- ---------------------------------------------------------------------
 
@@ -408,6 +448,11 @@ getStateStorage :: RefactGhc StateStorage
 getStateStorage = do
   storage <- gets rsStorage
   return storage
+
+-- ---------------------------------------------------------------------
+
+logData :: (SYB.Data a) => String -> a -> RefactGhc ()
+logData str ast = logm $ str ++ (SYB.showData SYB.Parser 3 ast)
 
 -- ---------------------------------------------------------------------
 
@@ -656,3 +701,5 @@ parseDeclWithAnns src = do
 
 -- EOF
 
+showOutputable :: (Outputable o) => o -> String
+showOutputable = SYB.showSDoc_ . ppr

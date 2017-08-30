@@ -1,0 +1,6 @@
+module FHList1 where
+import qualified Data.DList as DList
+import Data.DList (DList)
+
+interleave :: a -> [a] -> DList a
+interleave e lst = (head lst) `DList.cons` e `DList.cons` interleave e (tail lst)

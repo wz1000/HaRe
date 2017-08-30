@@ -1,0 +1,6 @@
+module HList4 where
+import qualified Data.DList as DList
+import Data.DList (DList)
+
+exponents :: Int -> DList Int
+exponents base = base `DList.cons` (exponents (2*base))

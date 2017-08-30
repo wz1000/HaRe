@@ -1,0 +1,21 @@
+module M1 where
+import Data.Char
+
+data Expr = Var Char
+          | N Int
+          | Add Expr Expr
+          | Sub Expr Expr
+          | Assign Char Expr
+          deriving Show
+
+type Env = [(Char,Int)]
+
+eval :: Monad m => Expr -> Env -> m (Int,Env)
+
+eval (Var v) env = return (head [val | (x,val) <- env, x==v], env)
+
+eval (N n) env = return (n,env)
+
+eval (Add e1 e2) env = eval e1 env >>= (\(v1,env1) -> eval e2 env1 >>= (\(v2,env2) -> return (v1+v2,env2)))
+eval (Sub e1 e2) env = eval e1 env >>= (\(v1,env1) -> eval e2 env1 >>= (\(v2,env2) -> return (v1-v2,env2)))
+eval (Assign x e) env = eval e env >>= (\(v,env1) -> return (v, (x,v):env1))

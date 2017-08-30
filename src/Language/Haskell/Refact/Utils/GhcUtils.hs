@@ -21,7 +21,6 @@ module Language.Haskell.Refact.Utils.GhcUtils (
     , everywhereStaged'
     , listifyStaged
     , everywhereButM
-      
     -- ** SYB Utility
     -- , checkItemRenamer
 
@@ -44,7 +43,8 @@ import qualified GHC.SYB.Utils as SYB
 import Control.Monad
 import Data.Data
 import Data.Maybe
-
+import Language.Haskell.Refact.Utils.Monad
+import Language.Haskell.Refact.Utils.MonadFunctions
 
 import qualified Data.Generics.Zipper as Z
 
@@ -83,9 +83,10 @@ everywhereM' f x
 -- ---------------------------------------------------------------------
 
 -- Monadic everywhereBut
+-- Top-down order
 -- Traversal ceases if q holds for x
 
-everywhereButM :: Monad m => SYB.GenericQ Bool -> SYB.Generic m -> SYB.GenericM m
+everywhereButM :: Monad m => SYB.GenericQ Bool -> SYB.GenericM m -> SYB.GenericM m
 everywhereButM q f x
   | q x = return x
   | otherwise = do
@@ -99,6 +100,7 @@ everywhereStaged stage f x
   | checkItemStage stage x = x
 #endif
   | otherwise = (f . gmapT (everywhereStaged stage f)) x
+
 
 -- | Top-down version of everywhereStaged
 everywhereStaged' ::  SYB.Stage -> (forall a. Data a => a -> a) -> forall a. Data a => a -> a

@@ -24,7 +24,10 @@ module Language.Haskell.Refact.HaRe
  , roundTrip
 -- , introduceTypeSyn
 -- , unwrapTypeSyn
+ , hughesList, compHughesList
  , genApplicative, compGenApplicative
+ , monadification, compMonadification
+ , sugar, compSugar
  )
 where
 
@@ -38,6 +41,9 @@ import Language.Haskell.Refact.Refactoring.DeleteDef
 --import Language.Haskell.Refact.Refactoring.UnwrapTypeSyn
 import Language.Haskell.Refact.Refactoring.GenApplicative
 -- import Language.Haskell.Refact.Refactoring.SwapArgs
+import Language.Haskell.Refact.Refactoring.HughesList
+import Language.Haskell.Refact.Refactoring.Monadification
+import Language.Haskell.Refact.Refactoring.Sugar
 import Language.Haskell.Refact.Refactoring.RoundTrip
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.Types

@@ -75,6 +75,8 @@ data-files:                     elisp/*.el
                                 test/testdata/LiftToToplevel/*.expected.hs
                                 test/testdata/LiftToToplevel/*.hs
                                 test/testdata/LiftToToplevel/*.hs.expected
+                                test/testdata/Monadification/*.hs
+                                test/testdata/Monadification/*.hs.expected
                                 test/testdata/MoveDef/*.hs
                                 test/testdata/MoveDef/*.hs.expected
                                 test/testdata/Renaming/*.expected.hs
@@ -164,7 +166,11 @@ Library
            , Language.Haskell.Refact.Refactoring.MaybeToMonadPlus
 --           , Language.Haskell.Refact.Refactoring.IntroduceTypeSyn
 --           , Language.Haskell.Refact.Refactoring.UnwrapTypeSyn
+           , Language.Haskell.Refact.Refactoring.Monadification
+           , Language.Haskell.Refact.Refactoring.Sugar
            , Language.Haskell.Refact.Refactoring.GenApplicative
+           , Language.Haskell.Refact.Refactoring.HughesList
+           , Language.Haskell.Refact.Utils.Isomorphic             
            , Language.Haskell.Refact.Utils.ExactPrint
            , Language.Haskell.Refact.Utils.GhcBugWorkArounds
            , Language.Haskell.Refact.Utils.GhcModuleGraph
@@ -241,6 +247,9 @@ test-suite spec
     , TypeUtilsSpec
     , UtilsSpec
     , DeleteDefSpec
+    , HughesListSpec
+    , MonadificationSpec
+                        
 --    , IntroduceTypeSynSpec
 --    , UnwrapTypeSynSpec
 
@@ -286,7 +295,8 @@ test-suite spec
     , conversion
     , conversion-text
     , parsec
-    , case-insensitive
+    , dlist              
+    , case-insensitive          
     , HaRe
   Extensions:      CPP
   if impl (ghc < 7.10.2)

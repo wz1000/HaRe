@@ -1,0 +1,14 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+module FHList2 where
+import qualified Data.DList as DList
+import Data.DList (DList)
+
+--Super contrived example
+explode :: Int -> [a] -> DList a
+explode n lst = DList.fromList (concat (map (\x -> replicate n x) lst))
+
+f :: IO ()
+f = do
+  (lst :: [Int]) <- read <$> getLine
+  let newLst = DList.toList (explode 3 lst)
+  print newLst
