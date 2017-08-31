@@ -66,7 +66,7 @@ locWithAnnVal a = do
 --Takes in a lhs pattern and a rhs. Wraps those in a lambda and adds the annotations associated with the lambda. Returns the new located lambda expression
 wrapInLambda :: GHC.LPat GHC.RdrName -> ParsedGRHSs -> RefactGhc (GHC.LHsExpr GHC.RdrName)
 wrapInLambda varPat rhs = do
-  match <- mkLamMatch varPat rhs  
+  match@(GHC.L l match')  <- mkLamMatch varPat rhs  
   --logm $ "Match: " ++ (SYB.showData SYB.Parser 3 match)
 #if __GLASGOW_HASKELL__ <= 710
   let mg = GHC.MG [match] [] GHC.PlaceHolder GHC.Generated

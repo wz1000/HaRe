@@ -2,7 +2,7 @@
 module Language.Haskell.Refact.Refactoring.MaybeToMonadPlus where
 
 import Language.Haskell.Refact.API
-import qualified Language.Haskell.GhcMod as GM
+import qualified GhcMod as GM (Options(..))
 import System.Directory
 import qualified GHC as GHC
 import Data.Generics as SYB
@@ -134,7 +134,7 @@ doRewriteAsBind fileName pos funNm = do
     (newPat, _) <- liftT $ cloneT varPat
     (newRhs, _) <- liftT $ cloneT rhs
     let rhs = justToReturn newRhs
-    lam <- wrapInLambda funNm newPat rhs
+    lam <- wrapInLambda newPat rhs
 --    logm $ "New pat: " ++ (SYB.showData SYB.Parser 3 newPat)
     let (GHC.L _ (GHC.VarPat nm)) = newPat
         newNm = mkNewNm nm
@@ -150,7 +150,7 @@ doRewriteAsBind fileName pos funNm = do
               GHC.Unqual $ GHC.mkVarOcc ("m_" ++ str)
 
 addMonadImport :: RefactGhc ()
-addMonadImport = addSimpleImportDecl "Control.Monad"
+addMonadImport = addSimpleImportDecl "Control.Monad" Nothing
 
 --This function finds the function binding and replaces the pattern match.
 --The LHS is replaced with the provided name (3rd argument)
