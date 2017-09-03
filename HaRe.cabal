@@ -199,7 +199,7 @@ Executable ghc-hare
                                 , ghc-mod-core == 5.9.0.*
                                 , gitrev >= 1.1
                                 , mtl
-                                , optparse-applicative == 0.13.2.*
+                                , optparse-applicative >= 0.13.2 && < 0.15
                                 , optparse-simple
                                 , Cabal
                                 -- , Paths_HaRe

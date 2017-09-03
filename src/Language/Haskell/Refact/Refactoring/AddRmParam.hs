@@ -587,7 +587,7 @@ doRmParam pn nTh = do
 #elif __GLASGOW_HASKELL__ <= 800
              inMatch match@(GHC.L _ (GHC.Match (GHC.FunBindMatch _fun _) _pats _mtyp (GHC.GRHSs _rhs _ds)))
 #else
-             inMatch match@(GHC.L _ (GHC.Match (GHC.FunRhs _fun _) _pats _mtyp (GHC.GRHSs _rhs _ds)))
+             inMatch match@(GHC.L _ (GHC.Match (GHC.FunRhs _fun _ _) _pats _mtyp (GHC.GRHSs _rhs _ds)))
 #endif
                = doRemoving' match
              inMatch _ = mzero
@@ -678,7 +678,7 @@ doRmParam pn nTh = do
 #elif __GLASGOW_HASKELL__ <= 800
                  rmInMatch nm (match@(GHC.L l (GHC.Match (GHC.FunBindMatch fun b) pats typ (GHC.GRHSs rhs decls)))::GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName))
 #else
-                 rmInMatch nm (match@(GHC.L l (GHC.Match (GHC.FunRhs fun b) pats typ (GHC.GRHSs rhs decls)))::GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+                 rmInMatch nm (match@(GHC.L l (GHC.Match (GHC.FunRhs fun b s) pats typ (GHC.GRHSs rhs decls)))::GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName))
 #endif
                    | rdrName2NamePure nm fun == pn' =
                        let  pat = pats!!nTh'     --get the nth formal parameter
@@ -700,7 +700,7 @@ doRmParam pn nTh = do
 #elif __GLASGOW_HASKELL__ <= 800
                               return (GHC.L l (GHC.Match (GHC.FunBindMatch fun b) pats' typ (GHC.GRHSs rhs decls)))
 #else
-                              return (GHC.L l (GHC.Match (GHC.FunRhs fun b) pats' typ (GHC.GRHSs rhs decls)))
+                              return (GHC.L l (GHC.Match (GHC.FunRhs fun b s) pats' typ (GHC.GRHSs rhs decls)))
 #endif
                  rmInMatch _ _ = mzero
 
@@ -836,7 +836,7 @@ getParam pos = do
 #elif __GLASGOW_HASKELL__ <= 800
        inMatch ((GHC.Match (GHC.FunBindMatch fun _) pats _mtyp _grhs)::GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName))
 #else
-       inMatch ((GHC.Match (GHC.FunRhs fun _) pats _mtyp _grhs)::GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+       inMatch ((GHC.Match (GHC.FunRhs fun _ _) pats _mtyp _grhs)::GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName))
 #endif
          = case locToRdrName pos pats of
              Nothing  -> Nothing

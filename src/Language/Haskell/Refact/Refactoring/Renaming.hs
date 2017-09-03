@@ -244,7 +244,7 @@ condChecking2 nm oldPN newName t = do
     inMatch (GHC.Match f@(GHC.FunBindMatch ln isInfix) pats  mtype (GHC.GRHSs rhs ds)
              ::GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName)) = do
 #else
-    inMatch (GHC.Match f@(GHC.FunRhs ln isInfix) pats  mtype (GHC.GRHSs rhs ds)
+    inMatch (GHC.Match f@(GHC.FunRhs ln isInfix s) pats  mtype (GHC.GRHSs rhs ds)
              ::GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName)) = do
 #endif
       isDeclaredPats <- isDeclaredBy pats

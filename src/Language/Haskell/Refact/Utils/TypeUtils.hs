@@ -2468,12 +2468,12 @@ renamePN oldPN newName useQual t = do
            else return mln
        GHC.NonFunBindMatch -> return mln
 #else
-       GHC.FunRhs old f -> do
+       GHC.FunRhs old f s -> do
          nm <- getRefactNameMap
          if cond nm old
            then do
              new <- makeNewName old newNameUnqual
-             return (GHC.FunRhs new f)
+             return (GHC.FunRhs new f s)
            else return mln
        _ -> return mln
 #endif

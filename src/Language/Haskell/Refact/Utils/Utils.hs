@@ -88,7 +88,7 @@ getTargetGhc (GM.ModulePath _mn fp) = parseSourceFileGhc fp
 -- | Parse a single source file into a GHC session
 parseSourceFileGhc :: FilePath -> RefactGhc ()
 parseSourceFileGhc targetFile = do
-  (_, mtm) <- RefactGhc $ GM.getTypecheckedModuleGhc id targetFile
+  (_, mtm) <- RefactGhc $ GM.getTypecheckedModuleGhc' id targetFile
   case mtm of
     Nothing -> error $ "Couldn't get typechecked module for " ++ targetFile
     Just tm -> loadTypecheckedModule tm
