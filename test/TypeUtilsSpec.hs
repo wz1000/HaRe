@@ -281,7 +281,11 @@ spec = do
 
       (showGhcQual nn) `shouldBe` "Field1.pointx"
 
+#if __GLASGOW_HASKELL__ >= 802
+      (showGhcQual resg) `shouldBe` "[data Point\n   = Pt {pointx, pointy :: Float}\n   deriving Show]"
+#else
       (showGhcQual resg) `shouldBe` "[data Point\n   = Pt {pointx, pointy :: Float}\n   deriving (Show)]"
+#endif
 
   -- ---------------------------------------
   -- -------------------------------------------------------------------
@@ -3072,6 +3076,7 @@ spec = do
       let Just n = locToNameRdrPure nm (7, 1) parsed
       let
         comp = do
+         -- logParsedSource "orig"
          qualifyToplevelName n
 
          return ()
@@ -3079,6 +3084,8 @@ spec = do
 
       (_,s) <- ct $ runRefactGhc comp (initialState { rsModule = initRefactModule [] t }) testOptions
       -- (_,s) <- ct $ runRefactGhc comp (initialLogOnState { rsModule = initRefactModule [] t }) testOptions
+
+      -- putStrLn $ showAnnDataFromState s
 
       (showGhcQual n) `shouldBe` "Renaming.C7.myFringe"
       (sourceFromState s) `shouldBe` "module Renaming.C7(Renaming.C7.myFringe)  where\n\nimport Renaming.D7\n\nmyFringe:: Tree a -> [a]\nmyFringe (Leaf x ) = [x]\nmyFringe (Branch left right) = Renaming.C7.myFringe left ++ fringe right\n\n\n\n\n"

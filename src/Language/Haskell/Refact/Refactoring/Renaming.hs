@@ -11,7 +11,7 @@ import qualified Data.Generics         as SYB
 import qualified GHC
 import qualified Name                  as GHC
 -- import qualified OccName               as GHC
-import qualified Outputable            as GHC
+-- import qualified Outputable            as GHC
 import qualified RdrName               as GHC
 
 import Control.Monad

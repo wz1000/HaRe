@@ -133,12 +133,12 @@ import Language.Haskell.GHC.ExactPrint.Utils
 
 
 -- Modules from GHC
-import qualified Avail         as GHC
+-- import qualified Avail         as GHC
 import qualified FastString    as GHC
 import qualified GHC           as GHC
 import qualified Module        as GHC
 import qualified Name          as GHC
-import qualified NameSet       as GHC
+-- import qualified NameSet       as GHC
 import qualified Outputable    as GHC
 import qualified RdrName       as GHC
 import qualified TyCon         as GHC
@@ -874,7 +874,9 @@ addImportDecl (GHC.L l p) modName pkgQual source safe qualify alias hide idNames
 #else
                     Just stringName ->  do
                       newSpan <- liftT uniqueSrcSpanT
-                      return $ Just $ GHC.L newSpan (GHC.mkModuleName stringName)
+                      let lalias = GHC.L newSpan (GHC.mkModuleName stringName)
+                      liftT $ addSimpleAnnT lalias (DP (0,1)) [((G GHC.AnnVal),DP (0,0))]
+                      return $ Just lalias
 #endif
                     _               -> return Nothing
        newSpan1 <- liftT uniqueSrcSpanT
@@ -2230,8 +2232,13 @@ renamePN oldPN newName useQual t = do
     makeNewNameIe useQual' old = do
       let old' = (GHC.ieLWrappedName old)
       let newRdr = newNameCalc useQual' $ GHC.unLoc old'
-      new <- makeNewName old' (newNameCalc useQual' $ GHC.unLoc old')
-      return (GHC.replaceLWrappedName old (GHC.unLoc new))
+      new@(GHC.L nss _) <- makeNewName old' newRdr
+      let
+        newIe = case old of
+          GHC.L _ (GHC.IEName    _) -> GHC.L nss (GHC.IEName    new)
+          GHC.L _ (GHC.IEPattern _) -> GHC.L nss (GHC.IEPattern new)
+          GHC.L _ (GHC.IEType    _) -> GHC.L nss (GHC.IEType    new)
+      return newIe
 #endif
 
     -- ---------------------------------

@@ -5,7 +5,7 @@ module Language.Haskell.Refact.Utils.Types
         ApplyRefacResult
        , RefacResult(..)
        , TypecheckedModule(..)
-       , ModuleInfo(..)
+       , ModuleInfo
        , tmRenamedSource
        , HookIORefData
        -- *
@@ -18,10 +18,10 @@ module Language.Haskell.Refact.Utils.Types
 
        ) where
 
-import qualified Avail      as GHC
+-- import qualified Avail      as GHC
 import qualified GHC        as GHC
-import           GHC (TypecheckedModule(..), ModuleInfo(..))
-import qualified RdrName    as GHC
+import           GHC (TypecheckedModule(..), ModuleInfo)
+-- import qualified RdrName    as GHC
 
 import Language.Haskell.GHC.ExactPrint
 -- import Language.Haskell.GHC.ExactPrint.Utils
@@ -39,6 +39,7 @@ data RefacResult = RefacModified | RefacUnmodifed
 
 -- ---------------------------------------------------------------------
 
+tmRenamedSource :: TypecheckedModule -> GHC.RenamedSource
 tmRenamedSource = maybe (error "failed to get renamedSource") id . GHC.tm_renamed_source
 
 -- data TypecheckedModule = TypecheckedModule
