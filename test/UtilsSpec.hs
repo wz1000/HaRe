@@ -234,7 +234,7 @@ spec = do
       setCurrentDirectory "./test/testdata/cabal/cabal4"
 
       let settings = defaultSettings { rsetEnabledTargets = (True,True,True,True)
-                                     , rsetVerboseLevel = Debug
+                                     -- , rsetVerboseLevel = Debug
                                      }
 
       let handler = [Handler handler1]
@@ -368,6 +368,27 @@ spec = do
 -}
   -- -------------------------------------------------------------------
 
+  describe "generates a nameMap for a file" $ do
+    it "nameMap for B.hs" $ do
+      t <- ct $ parsedFileGhc "./B.hs"
+      let nm = initRdrNameMap t
+      (showGhc nm) `shouldBe` "[(B.hs:4:1-3, bob), (B.hs:4:8-10, Int), (B.hs:4:15-17, Int),\n (B.hs:4:22-24, Int), (B.hs:5:1-3, bob), (B.hs:5:5, x),\n (B.hs:5:7, y), (B.hs:5:11, x), (B.hs:5:13, +), (B.hs:5:15, y)]"
+
+    -- ---------------------------------
+
+    it "nameMap for Renaming/RenameInExportedType2.hs" $ do
+      t <- ct $ parsedFileGhc "./Renaming/RenameInExportedType2.hs"
+      let nm = initRdrNameMap t
+      -- putStrLn $ showAnnData mempty 0 (gfromJust "foo" $ GHC.tm_renamed_source t)
+      (showGhc nm) `shouldBe`
+        (  "[(Renaming/RenameInExportedType2.hs:3:3-8, MyType),\n"
+         ++" (Renaming/RenameInExportedType2.hs:3:11-12, NT),\n"
+         ++" (Renaming/RenameInExportedType2.hs:6:6-11, MyType),\n"
+         ++" (Renaming/RenameInExportedType2.hs:6:15-16, MT),\n"
+         ++" (Renaming/RenameInExportedType2.hs:6:18-20, Int),\n"
+         ++" (Renaming/RenameInExportedType2.hs:6:24-25, NT)]")
+
+  -- -------------------------------------------------------------------
   describe "sameOccurrence" $ do
     it "checks that a given syntax element is the same occurrence as another" $ do
       pending -- "write this test"

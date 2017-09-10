@@ -526,7 +526,36 @@ initRdrNameMap tm = r
     hsRecFieldT _ = []
 #endif
 
-    nameMap = Map.fromList $ map (\(GHC.L l n) -> (l,n)) names
+#if (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,2,1,0)))
+    -- This is a workaround for https://ghc.haskell.org/trac/ghc/ticket/14189 
+    namesIeParsedL = SYB.everything (++) ([] `SYB.mkQ` ieThingWith) (GHC.hsmodExports $ GHC.unLoc parsed)
+    namesIeParsed = Map.fromList $ SYB.everything (++) ([] `SYB.mkQ` ieThingWith) (GHC.hsmodExports $ GHC.unLoc parsed)
+
+
+    ieThingWith :: GHC.IE GHC.RdrName -> [(GHC.SrcSpan, [GHC.SrcSpan])]
+    ieThingWith (GHC.IEThingWith l _ sub_rdrs _) = [(GHC.getLoc l,map GHC.getLoc sub_rdrs)]
+    ieThingWith _ = []
+
+    renamedExports = case renamed of
+                       Nothing -> Nothing
+                       Just (_,_,es,_) -> es
+    namesIeRenamed = SYB.everything (++) ([] `SYB.mkQ` ieThingWithNames) renamedExports
+
+    ieThingWithNames :: GHC.IE GHC.Name -> [GHC.Located GHC.Name]
+    ieThingWithNames (GHC.IEThingWith l _ sub_rdrs _) = (GHC.ieLWrappedName l:nameSubs)
+      where
+        rdrSubLocs = gfromJust "ieThingWithNames" $ Map.lookup (GHC.getLoc l) namesIeParsed
+        nameSubs = map (\(loc,GHC.L _ lwn) -> GHC.L loc (GHC.ieWrappedName lwn)) $ zip rdrSubLocs sub_rdrs
+    ieThingWithNames _ = []
+
+    namesIe = case SYB.everything mappend (nameSybQuery checkName) namesIeRenamed of
+       Nothing -> names
+       Just ns -> names ++ ns
+#else
+    namesIe = names
+#endif
+
+    nameMap = Map.fromList $ map (\(GHC.L l n) -> (l,n)) namesIe
 
     -- If the name does not exist (e.g. a TH Splice that has been expanded, make a new one)
     -- No attempt is made to make sure that equivalent ones have equivalent names.

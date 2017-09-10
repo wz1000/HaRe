@@ -2233,6 +2233,7 @@ renamePN oldPN newName useQual t = do
       let old' = (GHC.ieLWrappedName old)
       let newRdr = newNameCalc useQual' $ GHC.unLoc old'
       new@(GHC.L nss _) <- makeNewName old' newRdr
+      logm $ "renamePN.makeNewNameIe:(old',newRdr)" ++ (showGhc (old',newRdr))
       let
         newIe = case old of
           GHC.L _ (GHC.IEName    _) -> GHC.L nss (GHC.IEName    new)
@@ -2272,11 +2273,19 @@ renamePN oldPN newName useQual t = do
     renameLRdr useQual' old@(GHC.L _ n) = do
      nm <- getRefactNameMap
      if cond nm old
-       then do
-          let nn = newNameCalc useQual' n
-          new <- makeNewName old nn
-          return new
+       then makeNewName old (newNameCalc useQual' n)
        else return old
+
+    -- ---------------------------------
+
+#if __GLASGOW_HASKELL__ >= 802
+    renameLIEWrappedName :: HowToQual -> GHC.LIEWrappedName GHC.RdrName -> RefactGhc (GHC.LIEWrappedName GHC.RdrName)
+    renameLIEWrappedName useQual' old = do
+     nm <- getRefactNameMap
+     if cond nm (GHC.ieLWrappedName old)
+       then makeNewNameIe useQual' old
+       else return old
+#endif
 
     -- ---------------------------------
 
@@ -2391,21 +2400,18 @@ renamePN oldPN newName useQual t = do
          nm <- getRefactNameMap
 #if __GLASGOW_HASKELL__ <= 800
          old' <- if (cond nm (GHC.L ln n))
-           then do
-             new <- makeNewName old (newNameCalc useQual' n)
-             return new
+           then makeNewName old (newNameCalc useQual' n)
            else return old
 #else
          old' <- if (cond nm (GHC.ieLWrappedName old))
-           then do
-             new <- makeNewNameIe useQual' old
-             return new
+           then makeNewNameIe useQual' old
            else return old
 #endif
 
 #if __GLASGOW_HASKELL__ <= 800
          ns' <- if (any (\(GHC.L lnn nn) -> cond nm (GHC.L lnn nn)) ns)
 #else
+         logm $ "renamePN:renameLIE IEThingWith :cond?nn:" ++ (show (any (\nn -> cond nm (GHC.ieLWrappedName nn)) ns))
          ns' <- if (any (\nn -> cond nm (GHC.ieLWrappedName nn)) ns)
 #endif
            then renameTransform useQual' ns
@@ -2546,6 +2552,9 @@ renamePN oldPN newName useQual t = do
                   `SYB.extM` (renameTyVar       useQual')
                   `SYB.extM` (renameHsTyVarBndr useQual')
                   `SYB.extM` (renameLIE         useQual')
+#if __GLASGOW_HASKELL__ >= 802
+                  `SYB.extM` (renameLIEWrappedName useQual')
+#endif
                   `SYB.extM` (renameLPat        useQual')
                   `SYB.extM` (renameTypeSig     useQual')
                   `SYB.extM` (renameImportDecl  useQual')

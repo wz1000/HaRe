@@ -2819,7 +2819,11 @@ spec = do
 
       (showGhcQual n) `shouldBe` "ioFun"
       (sourceFromState s) `shouldBe` "module LayoutIn4 where\n\n--Layout rule applies after 'where','let','do' and 'of'\n\n--In this Example: rename 'ioFun' to  'io'\n\nmain = ioFunLong \"hello\" where ioFunLong s= do  let  k = reverse s\n         --There is a comment\n                                                s <- getLine\n                                                let  q = (k ++ s)\n                                                putStr q\n                                                putStr \"foo\"\n\n"
+#if __GLASGOW_HASKELL__ >= 802
+      (unspace $ showGhcQual nb) `shouldBe` "module LayoutIn4 where\nmain\n = ioFunLong \"hello\"\n where\n ioFunLong s\n = do let k = reverse s\n s <- getLine\n let q = (k ++ s)\n putStr q\n putStr \"foo\""
+#else
       (unspace $ showGhcQual nb) `shouldBe` "module LayoutIn4 where\nmain\n = ioFunLong \"hello\"\n where\n ioFunLong s\n = do { let k = reverse s;\n s <- getLine;\n let q = (k ++ s);\n putStr q;\n putStr \"foo\" }"
+#endif
 
     ------------------------------------
 
@@ -2970,10 +2974,14 @@ spec = do
       let
         comp = do
          logm $ "parsed:" ++ (SYB.showData SYB.Parser 0 parsed)
+         renamed <- getRefactRenamed
+         logDataWithAnns "renamed:\n" renamed
 
          newName <- mkNewGhcName Nothing "NewType"
+         logm $ "newName unique:" ++ (showGhc $ GHC.nameUnique newName)
          new <- renamePN n newName PreserveQualify parsed
 
+         logm $ "nm:" ++ (showGhc nm)
          putRefactParsed new emptyAnns
          logm $ "parsed:after" ++ (SYB.showData SYB.Parser 0 new)
 
@@ -2981,6 +2989,8 @@ spec = do
 
       ((_nb,nn),s) <- ct $ runRefactGhc comp (initialState { rsModule = initRefactModule [] t }) testOptions
       -- ((_nb,nn),s) <- ct $ runRefactGhc comp (initialLogOnState { rsModule = initRefactModule [] t }) testOptions
+
+      -- putStrLn $ showAnnDataFromState s
 
       (showGhcQual (n,nn)) `shouldBe` "(Renaming.RenameInExportedType.NT, NewType)"
       (sourceFromState s) `shouldBe` "module Renaming.RenameInExportedType\n  (\n  MyType (NewType)\n  ) where\n\ndata MyType = MT Int | NewType\n\n\n"
