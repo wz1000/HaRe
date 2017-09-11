@@ -1183,6 +1183,7 @@ addParamsToSigs newParams (GHC.L l (GHC.TypeSig lns (GHC.HsWC wcs (GHC.HsIB v lt
   let newStr = ":: " ++ (intercalate " -> " $ map printSigComponent ts) ++ " -> "
   logm $ "addParamsToSigs:newStr=[" ++ newStr ++ "]"
   typ' <- liftT $ foldlM addOneType ltyp (reverse ts)
+  logDataWithAnns "addParamsToSigs:typ'=" typ'
   sigOk <- isNewSignatureOk ts
   logm $ "addParamsToSigs:(sigOk,newStr)=" ++ show (sigOk,newStr)
   if sigOk
@@ -1199,7 +1200,7 @@ addParamsToSigs newParams (GHC.L l (GHC.TypeSig lns (GHC.HsWC wcs (GHC.HsIB v lt
     addOneType et t = do
       hst <- typeToLHsType t
       ss1 <- uniqueSrcSpanT
-#if __GLASGOW_HASKELL__ <= 710
+#if (__GLASGOW_HASKELL__ <= 710) || (__GLASGOW_HASKELL__ >= 802)
       hst1 <- case t of
         (GHC.FunTy _ _) -> do
           ss <- uniqueSrcSpanT
@@ -1296,7 +1297,7 @@ typeToLHsType (GHC.AppTy t1 t2) = do
 
 typeToLHsType t@(GHC.TyConApp _tc _ts) = tyConAppToHsType t
 
-#if __GLASGOW_HASKELL__ <= 710
+#if (__GLASGOW_HASKELL__ <= 710) || (__GLASGOW_HASKELL__ >= 802)
 typeToLHsType (GHC.FunTy t1 t2) = do
   t1' <- typeToLHsType t1
   t2' <- typeToLHsType t2
@@ -1344,6 +1345,7 @@ typeToLHsType (GHC.LitTy (GHC.StrTyLit s)) = do
   addSimpleAnnT typ (DP (0,0)) [((G GHC.AnnVal),DP (0,0))]
   return typ
 
+typeToLHsType x = error $ "typeToLHsType: not processing " ++ showAnnData mempty 0 x
 
 {-
 data Type
@@ -1396,7 +1398,7 @@ tyConAppToHsType (GHC.TyConApp tc _ts) = r (show $ GHC.tyConName tc)
 #if __GLASGOW_HASKELL__ <= 800
       let typ = GHC.L ss (GHC.HsTyLit (GHC.HsStrTy str $ GHC.mkFastString str)) :: GHC.LHsType GHC.RdrName
 #else
-      let typ = GHC.L ss (GHC.HsTyLit (GHC.HsStrTy GHC.NoSourceText $ GHC.mkFastString str)) :: GHC.LHsType GHC.RdrName
+      let typ = GHC.L ss (GHC.HsTyLit (GHC.HsStrTy (GHC.SourceText str) $ GHC.mkFastString str)) :: GHC.LHsType GHC.RdrName
 #endif
       addSimpleAnnT typ (DP (0,0)) [((G GHC.AnnVal),DP (0,1))]
       return typ

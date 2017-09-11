@@ -306,7 +306,7 @@ negative=[(["PatBindIn2.hs"],["17","7"]),
 
     -- ---------------------------------
 
-    it "liftToTopLevel Signature" $ do
+    it "liftToTopLevel Signature1" $ do
      r <- ct $ liftToTopLevel defaultTestSettings testOptions "./LiftToToplevel/Signature.hs" (9,5)
      -- r <- ct $ liftToTopLevel logTestSettings  testOptions "./LiftToToplevel/Signature.hs" (9,5)
      r' <- mapM makeRelativeToCurrentDirectory r

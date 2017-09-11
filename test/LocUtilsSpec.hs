@@ -32,7 +32,11 @@ spec = do
          let ss = getSrcSpan decls
          return (decls,ss)
       ((d,ss'),_s) <- ct $ runRefactGhc comp initialState testOptions
+#if __GLASGOW_HASKELL__ >= 802
+      (showGhcQual d) `shouldBe` "[toplevel :: Integer -> Integer, toplevel x = c * x,\n c, d :: Integer, c = 7, d = 9, tup :: (Int, Int), h :: Int,\n t :: Int,\n tup@(h, t)\n   = head $ zip [1 .. 10] [3 .. ff]\n   where\n       ff :: Int\n       ff = 15,\n data D = A | B String | C,\n ff y\n   = y + zz\n   where\n       zz = 1,\n l z = let ll = 34 in ll + z,\n dd q\n   = do let ss = 5\n        return (ss + q)]"
+#else
       (showGhcQual d) `shouldBe` "[toplevel :: Integer -> Integer, toplevel x = c * x,\n c, d :: Integer, c = 7, d = 9, tup :: (Int, Int), h :: Int,\n t :: Int,\n tup@(h, t)\n   = head $ zip [1 .. 10] [3 .. ff]\n   where\n       ff :: Int\n       ff = 15,\n data D = A | B String | C,\n ff y\n   = y + zz\n   where\n       zz = 1,\n l z = let ll = 34 in ll + z,\n dd q\n   = do { let ss = 5;\n          return (ss + q) }]"
+#endif
       (showGhcQual ss') `shouldBe` "Just DupDef/Dd1.hs:3:1-30"
 
     -- -------------------------------
