@@ -1,7 +1,27 @@
-resolver: nightly-2017-06-14
+resolver: nightly-2017-07-25
 packages:
 - .
 - location:
-    git: https://github.com/alanz/ghc-mod.git
-    commit: 86ca8bc766556df2a64ae062e4489714249bbd7c
+    # git: https://github.com/alanz/ghc-mod.git
+    git: https://gitlab.com/alanz/ghc-mod.git
+    commit: d7ac965c6c3f14deeeb5cf7485682d58f2874687
+    # ../ghc-mod
   extra-dep: true
+  subdirs:
+    - .
+    - core
+
+- location:
+    # ../cabal-helper
+    # git: https://github.com/alanz/cabal-helper.git
+    git: https://gitlab.com/dxld/cabal-helper.git
+    commit: c4e743c8408ada721e1039d786b69f6e122b28cd
+  extra-dep: true
+
+extra-deps:
+- syz-0.2.0.0
+# For the tests
+- conversion-1.2.1
+- conversion-bytestring-1.0.1
+- conversion-case-insensitive-1.0.0.0
+- conversion-text-1.0.1
