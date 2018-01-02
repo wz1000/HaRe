@@ -4,8 +4,8 @@ module Language.Haskell.Refact.Utils.Types
        (
         ApplyRefacResult
        , RefacResult(..)
-       , TypecheckedModule(..)
-       , ModuleInfo
+       -- , TypecheckedModule(..)
+       -- , ModuleInfo
        , tmRenamedSource
        , HookIORefData
        -- *
@@ -18,13 +18,10 @@ module Language.Haskell.Refact.Utils.Types
 
        ) where
 
--- import qualified Avail      as GHC
 import qualified GHC        as GHC
-import           GHC (TypecheckedModule(..), ModuleInfo)
--- import qualified RdrName    as GHC
+-- import           GHC (TypecheckedModule(..), ModuleInfo)
 
 import Language.Haskell.GHC.ExactPrint
--- import Language.Haskell.GHC.ExactPrint.Utils
 
 import qualified Data.Map as Map
 
@@ -39,7 +36,7 @@ data RefacResult = RefacModified | RefacUnmodifed
 
 -- ---------------------------------------------------------------------
 
-tmRenamedSource :: TypecheckedModule -> GHC.RenamedSource
+tmRenamedSource :: GHC.TypecheckedModule -> GHC.RenamedSource
 tmRenamedSource = maybe (error "failed to get renamedSource") id . GHC.tm_renamed_source
 
 -- data TypecheckedModule = TypecheckedModule
@@ -57,10 +54,10 @@ tmRenamedSource = maybe (error "failed to get renamedSource") id . GHC.tm_rename
 -- |Contents of IORef used to communicate with the GHC frontend hook. This has
 -- to be kept in the RefactGhc state because so ghc-mod caches GHC sessions, so
 -- it is not possible to change the IORef.
-type HookIORefData = (FilePath,Maybe TypecheckedModule)
+type HookIORefData = (FilePath,Maybe GHC.TypecheckedModule)
 
 -- TODO: improve this, or remove it's need
-instance Show TypecheckedModule where
+instance Show GHC.TypecheckedModule where
   show _ = "TypeCheckedModule(..)"
 
 -- ---------------------------------------------------------------------

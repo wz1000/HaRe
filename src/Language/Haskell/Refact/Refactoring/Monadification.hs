@@ -1,9 +1,10 @@
+{-#LANGUAGE CPP #-}
 {-#LANGUAGE ScopedTypeVariables #-}
 module Language.Haskell.Refact.Refactoring.Monadification
   (monadification,compMonadification) where
 
 import Language.Haskell.Refact.API
-import qualified GhcMod as GM (Options(..))
+import qualified GhcModCore as GM (Options(..))
 import System.Directory (canonicalizePath)
 import qualified GHC.SYB.Utils as SYB
 import Data.Generics as SYB
@@ -46,7 +47,11 @@ monadifyFunc :: [GHC.Name] -> SimpPos -> RefactGhc ()
 monadifyFunc nmsList pos = do
   parsed <- getRefactParsed
   let (Just rdr) = locToRdrName pos parsed
+#if __GLASGOW_HASKELL__ >= 800
+      (Just funBind) = getHsBind pos parsed
+#else
       (Just funBind) = getHsBind (GHC.unLoc rdr) parsed
+#endif
   monadifyFunBind pos nmsList funBind
   --logParsedSource "After monadification"
   addMonadToSig pos
@@ -60,7 +65,7 @@ monadifyFunBind pos nms bnd = do
   replaceFunBind pos newBnd
 
 replaceBndRHS :: (ParsedLMatch -> RefactGhc ParsedLMatch) -> ParsedBind -> RefactGhc ParsedBind
-replaceBndRHS fun fb@(GHC.FunBind _ _ _ _ _ _) = SYB.everywhereM (SYB.mkM fun) fb
+replaceBndRHS fun fb@(GHC.FunBind {}) = SYB.everywhereM (SYB.mkM fun) fb
 replaceBndRHS _ bnd = return bnd
 
 modMatchRHSExpr :: (ParsedLExpr -> RefactGhc ParsedLExpr) -> (ParsedLMatch -> RefactGhc ParsedLMatch)
@@ -70,7 +75,11 @@ modMatchRHSExpr fun = comp
         comp' (GHC.GRHS lst body) = (fun body) >>= (\newBody -> return (GHC.GRHS lst newBody))
 
 isFunCall :: [GHC.Name] -> GHC.HsExpr GHC.Name -> Bool
+#if __GLASGOW_HASKELL__ >= 800
+isFunCall nms (GHC.HsVar (GHC.L _ nm2)) = elem nm2 nms
+#else
 isFunCall nms (GHC.HsVar nm2) = elem nm2 nms
+#endif
 isFunCall nms (GHC.HsPar e) = isFunCall nms (GHC.unLoc e)
 isFunCall nms (GHC.HsApp lhs _) = isFunCall nms (GHC.unLoc lhs)
 isFunCall nms (GHC.HsLet _ e) = isFunCall nms (GHC.unLoc e)
@@ -173,7 +182,7 @@ monadifyExpr expr = do
             lift $ wrapWithReturn strippedExpr
   composeWithBinds newE
 
-lookupRenamedExpr :: ParsedLExpr -> RefactGhc (GHC.LHsExpr GHC.Name) 
+lookupRenamedExpr :: ParsedLExpr -> RefactGhc (GHC.LHsExpr GHC.Name)
 lookupRenamedExpr parsedElem = do
   (grp,_ ,_, _) <- getRefactRenamed
   logData "getRenamedElem of: " parsedElem
@@ -186,15 +195,30 @@ lookupRenamedExpr parsedElem = do
 --If the expression isn't a HsPar it will be parenthisized first
 wrapWithReturn :: ParsedLExpr -> RefactGhc ParsedLExpr
 wrapWithReturn e@(GHC.L _ (GHC.HsPar _)) = do
+#if __GLASGOW_HASKELL__ >= 800
+  returnRdrL <- locate returnRdr
+  retVar <- locate (GHC.HsVar returnRdrL)
+#else
   retVar <- locate (GHC.HsVar returnRdr)
+#endif
   addAnnVal retVar
   locate (GHC.HsApp retVar e)
 wrapWithReturn e@(GHC.L _ (GHC.HsVar _)) = do
+#if __GLASGOW_HASKELL__ >= 800
+  returnRdrL <- locate returnRdr
+  retVar <- locate (GHC.HsVar returnRdrL)
+#else
   retVar <- locate (GHC.HsVar returnRdr)
+#endif
   addAnnVal retVar
   locate (GHC.HsApp retVar e)
 wrapWithReturn e = do
+#if __GLASGOW_HASKELL__ >= 800
+  returnRdrL <- locate returnRdr
+  retVar <- locate (GHC.HsVar returnRdrL)
+#else
   retVar <- locate (GHC.HsVar returnRdr)
+#endif
   addAnnVal retVar
   zeroDP e
   isPared <- isWrappedInPars e
@@ -222,30 +246,44 @@ composeWithBinds e = do
     lamRHS <- lift $ mkGRHSs e
     lambda <- lift $ wrapInLambda pat lamRHS
     --locate + annVal bindRdr
+#if __GLASGOW_HASKELL__ >= 800
+    bindRdrL <- lift $ locate bindRdr
+    lBindOp <- lift (locate (GHC.HsVar bindRdrL))
+#else
     lBindOp <- lift (locate (GHC.HsVar bindRdr))
+#endif
     lift $ addAnnVal lBindOp
     --opApp lhsExpr locBnd lambda
     let opApp = (GHC.OpApp lhsExpr lBindOp GHC.PlaceHolder lambda)
     lOpApp <- lift $ locate opApp
     composeWithBinds lOpApp
-    
+
 mkGRHSs :: ParsedLExpr -> RefactGhc ParsedGRHSs
 mkGRHSs rhsExpr = do
   let grhs = (GHC.GRHS [] rhsExpr)
   lGrhs <- locate grhs
+#if __GLASGOW_HASKELL__ >= 800
+  return (GHC.GRHSs [lGrhs] (GHC.noLoc GHC.EmptyLocalBinds))
+#else
   return (GHC.GRHSs [lGrhs] GHC.EmptyLocalBinds)
+#endif
 
 mkVarPat :: GHC.RdrName -> RefactGhc (GHC.LPat GHC.RdrName)
 mkVarPat nm = do
+#if __GLASGOW_HASKELL__ >= 800
+  nmL <- locate nm
+  let pat = (GHC.VarPat nmL)
+#else
   let pat = (GHC.VarPat nm)
+#endif
   lPat <- locate pat
   addAnnVal lPat
   return lPat
-  
+
 
 bindRdr :: GHC.RdrName
 bindRdr = mkRdrName ">>="
-    
+
 --If this is called with a subtree that is a call to a monadified function
 --It stores the original expression in the queue and returns a HsVar with the new name
 stripMonArgs :: Bool -> ParsedLExpr -> MonadifyState ParsedLExpr
@@ -263,10 +301,15 @@ stripMonArgs wrap e = do
     --locate (HsVar newName)
     --push the new name and original expression onto the queue
     nm <- newName
+#if __GLASGOW_HASKELL__ >= 800
+    nmL <- lift $ locate nm
+    lE <- lift (locWithAnnVal (GHC.HsVar nmL))
+#else
     lE <- lift (locWithAnnVal (GHC.HsVar nm))
+#endif
     pat <- lift (mkVarPat nm)
     pushQueue (pat, e)
-    return lE  
+    return lE
           else
     --otherwise just return the stripped expression
             return stripped
@@ -297,7 +340,13 @@ applyAtArgSubTrees f (GHC.L l (GHC.HsLet locBnds expr)) = do
         then return newExpr
         else lift $ wrapWithReturn newExpr
   case mBnds of
+#if __GLASGOW_HASKELL__ >= 800
+    Just bnds -> do
+      bndsL <- lift $ locate bnds
+      return (GHC.L l (GHC.HsLet bndsL rE))
+#else
     Just bnds -> return (GHC.L l (GHC.HsLet bnds rE))
+#endif
     Nothing -> return rE
 applyAtArgSubTrees _ ast = return ast
 
@@ -324,23 +373,27 @@ getParsedByPos pos a = let res = SYB.something (Nothing `SYB.mkQ` comp) a in
         comp _ = Nothing
 
 filterBinds :: GHC.LHsExpr GHC.Name -> MonadifyState (Maybe (GHC.HsLocalBinds GHC.RdrName))
+#if __GLASGOW_HASKELL__ >= 800
+filterBinds (GHC.L l (GHC.HsLet (GHC.L _ locBnds) _)) = case locBnds of
+#else
 filterBinds (GHC.L l (GHC.HsLet locBnds _)) = case locBnds of
+#endif
   (GHC.HsValBinds (GHC.ValBindsOut lst _)) -> do
     newLst <- mMapMaybe handleBind (reverse lst)
     case newLst of
       [] -> return Nothing
-      lst -> return (Just (GHC.HsValBinds (GHC.ValBindsIn (GHC.listToBag (reverse lst)) [])))    
+      lst -> return (Just (GHC.HsValBinds (GHC.ValBindsIn (GHC.listToBag (reverse lst)) [])))
 filterBinds _ = error "filterBinds: Called with a non-let expression."
 
 {- This is what handles an expression on the rhs of a let
    any monadic calls inside of the expression are stripped and added to the queue before
-   the top level let expression 
+   the top level let expression
 
 Assuming mon and mon2 are monadic
 let f = mon (mon2 4) 5 in
 expr ===>
 (mon2 4) >>= (\hare1 -> mon hare1 5 >>= (f -> expr))
--}  
+-}
 
 handleBind :: (GHC.RecFlag, GHC.LHsBinds GHC.Name) -> MonadifyState (Maybe (GHC.LHsBindLR GHC.RdrName GHC.RdrName))
 handleBind (_, bg) = do
@@ -348,7 +401,11 @@ handleBind (_, bg) = do
   parsed <- lift getRefactParsed
   let pBnd = getParsedBindByPos l parsed
   case pBnd of
+#if __GLASGOW_HASKELL__ >= 800
+    (GHC.L l fb@(GHC.FunBind (GHC.L _ id) mg _ _ _)) -> do
+#else
     (GHC.L l fb@(GHC.FunBind (GHC.L _ id) _ mg _ _ _)) -> do
+#endif
       let expr = getExprFromMG mg
       isModCall <- isModFunCall expr
       newExpr <- stripMonArgs False expr
@@ -367,7 +424,7 @@ handleBind (_, bg) = do
         pushQueue (pat, newExpr)
         return Nothing
         else return (Just (GHC.L l (pb {GHC.pat_rhs = replaceGRHSsExpr newExpr grhss})))
-      
+
 
 replaceMGExpr :: ParsedLExpr -> ParsedMatchGroup -> ParsedMatchGroup
 replaceMGExpr e = SYB.everywhere (SYB.mkT (replaceGRHSExpr e))
@@ -383,14 +440,14 @@ getExprFromGRHSs :: ParsedGRHSs -> ParsedLExpr
 getExprFromGRHSs grhs = let res = SYB.something (Nothing `SYB.mkQ` comp) grhs in
   gfromJust "getExprFromMG" res
   where comp :: ParsedLExpr -> Maybe ParsedLExpr
-        comp e = Just e 
+        comp e = Just e
 
 getExprFromMG :: ParsedMatchGroup -> ParsedLExpr
 getExprFromMG mg = let res = SYB.something (Nothing `SYB.mkQ` comp) mg in
   gfromJust "getExprFromMG" res
   where comp :: ParsedLExpr -> Maybe ParsedLExpr
         comp e = Just e
-                       
+
 
 mMapMaybe :: Monad m => (a -> m (Maybe b)) -> [a] -> m [b]
 mMapMaybe _ [] = return []
@@ -400,12 +457,16 @@ mMapMaybe f (x:xs) = do
   case mElem of
     Nothing -> return rst
     (Just elem) -> return (elem:rst)
-  
+
 
 getTypeSigByName :: (Data t) => GHC.RdrName -> t -> Maybe (GHC.Sig GHC.RdrName)
 getTypeSigByName nm t = SYB.something (Nothing `SYB.mkQ` comp) t
   where comp :: GHC.Sig GHC.RdrName -> Maybe (GHC.Sig GHC.RdrName)
+#if __GLASGOW_HASKELL__ >= 800
+        comp s@(GHC.TypeSig [(GHC.L _ x)] _) = if nm == x
+#else
         comp s@(GHC.TypeSig [(GHC.L _ x)] _ _) = if nm == x
+#endif
                                        then Just s
                                        else Nothing
         comp _ = Nothing
@@ -425,10 +486,48 @@ addMonadToSig pos = do
       replaceTypeSig pos newSig
     Nothing -> return ()
     where modTySig :: GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
+#if __GLASGOW_HASKELL__ >= 800
+          modTySig (GHC.TypeSig nms (GHC.HsWC wcs (GHC.HsIB a ty b)))
+             = (modType ty) >>= (\nTy -> return (GHC.TypeSig nms (GHC.HsWC wcs (GHC.HsIB a nTy b))))
+#else
           modTySig (GHC.TypeSig nms ty pstRn) = (modType ty)  >>= (\nTy -> return (GHC.TypeSig nms nTy pstRn))
+#endif
           modTySig _ = error "addMonadToSig: modTySig called with an unknown constructor."
           modType :: GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
-          modType (GHC.L l (GHC.HsForAllTy flg mSpn bndrs (GHC.L l2 cntxt) ty)) = do            
+#if __GLASGOW_HASKELL__ >= 800
+          modType (GHC.L l (GHC.HsQualTy (GHC.L l2 cntxt) ty)) = do
+            lMonad <- locate (mkRdrName "Monad")
+            lMonTy <- locWithAnnVal (GHC.HsTyVar GHC.NotPromoted lMonad)
+            zeroDP lMonTy
+            lm <- locate (mkRdrName "m")
+            lVarTy <- locWithAnnVal (GHC.HsTyVar GHC.NotPromoted lm)
+            newTy <- wrapResTy (mkRdrName "m") ty
+            let appTy = (GHC.HsAppTy lMonTy lVarTy)
+            lAppTy <- locWithAnnVal appTy
+            zeroDP lAppTy
+            newCntxt <- if (null cntxt)
+                        then do
+              lCntxt <- locate [lAppTy]
+              (addNewKeyword (G GHC.AnnDarrow, DP (0,1)) lCntxt)
+              zeroDP lCntxt
+              return lCntxt
+                        else return (GHC.L l2 (lAppTy:cntxt))
+            setDP  (DP (0,1)) newTy
+            return (GHC.L l (GHC.HsQualTy newCntxt newTy))
+          modType (GHC.L l (GHC.HsForAllTy bndrs ty)) = do
+            lMonad <- locate (mkRdrName "Monad")
+            lMonTy <- locWithAnnVal (GHC.HsTyVar GHC.NotPromoted lMonad)
+            zeroDP lMonTy
+            lm <- locate (mkRdrName "m")
+            lVarTy <- locWithAnnVal (GHC.HsTyVar GHC.NotPromoted lm)
+            newTy <- wrapResTy (mkRdrName "m") ty
+            let appTy = (GHC.HsAppTy lMonTy lVarTy)
+            lAppTy <- locWithAnnVal appTy
+            zeroDP lAppTy
+            setDP  (DP (0,1)) newTy
+            return (GHC.L l (GHC.HsForAllTy bndrs newTy))
+#else
+          modType (GHC.L l (GHC.HsForAllTy flg mSpn bndrs (GHC.L l2 cntxt) ty)) = do
             lMonTy <- locWithAnnVal (GHC.HsTyVar (mkRdrName "Monad"))
             zeroDP lMonTy
             lVarTy <- locWithAnnVal (GHC.HsTyVar (mkRdrName "m"))
@@ -443,8 +542,16 @@ addMonadToSig pos = do
               zeroDP lCntxt
               return lCntxt
                         else return (GHC.L l2 (lAppTy:cntxt))
-            setDP  (DP (0,1)) newTy            
+            setDP  (DP (0,1)) newTy
             return (GHC.L l (GHC.HsForAllTy flg mSpn bndrs newCntxt newTy))
+#endif
           wrapResTy :: GHC.RdrName -> GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
           wrapResTy rdr (GHC.L l (GHC.HsFunTy lTy rTy)) = (wrapResTy rdr rTy) >>= (\nRTy -> return (GHC.L l (GHC.HsFunTy lTy nRTy)))
+#if __GLASGOW_HASKELL__ >= 800
+          wrapResTy rdr locTy = do
+            rdrL <- locate rdr
+            lTyVar <- locWithAnnVal (GHC.HsTyVar GHC.NotPromoted rdrL)
+            locate (GHC.HsAppTy lTyVar locTy)
+#else
           wrapResTy rdr locTy = locWithAnnVal (GHC.HsTyVar rdr) >>= (\ lTyVar -> locate (GHC.HsAppTy lTyVar locTy))
+#endif

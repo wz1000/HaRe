@@ -471,7 +471,7 @@ usedWithoutQualR name t = isJust $ SYB.something (inName) t
 getModule :: RefactGhc GHC.Module
 getModule = do
   typechecked <- getTypecheckedModule
-  return $ GHC.ms_mod $ GHC.pm_mod_summary $ tm_parsed_module typechecked
+  return $ GHC.ms_mod $ GHC.pm_mod_summary $ GHC.tm_parsed_module typechecked
 
 -- ---------------------------------------------------------------------
 
@@ -523,9 +523,9 @@ isTopLevelPN n = do
   let names = fromMaybe [] maybeNames
   return $ n `elem` names
 
-modInfoTopLevelScope :: TypecheckedModule -> Maybe [GHC.Name]
+modInfoTopLevelScope :: GHC.TypecheckedModule -> Maybe [GHC.Name]
 modInfoTopLevelScope tm
-  = fmap (map GHC.gre_name . GHC.globalRdrEnvElts) (Just $ GHC.tcg_rdr_env $ fst $ tm_internals_ tm)
+  = fmap (map GHC.gre_name . GHC.globalRdrEnvElts) (Just $ GHC.tcg_rdr_env $ fst $ GHC.tm_internals_ tm)
 
 
 -- |Return True if a PName is a local PName.
@@ -2622,7 +2622,7 @@ useLoc (GHC.L l _) = GHC.srcSpanStart l
 findIdForName :: GHC.Name -> RefactGhc (Maybe GHC.Id)
 findIdForName n = do
   tm <- getTypecheckedModule
-  let t = tm_typechecked_source tm
+  let t = GHC.tm_typechecked_source tm
   let r = SYB.somethingStaged SYB.Parser Nothing (Nothing `SYB.mkQ` worker) t
       worker (i::GHC.Id)
          | (GHC.nameUnique n) ==  (GHC.varUnique i) = Just i

@@ -45,7 +45,7 @@ import Language.Haskell.Refact.Utils.ExactPrint
 
 
 --Takes in a string corresponding to the module name to be imported
---Adds the import declaration at the end of that module's imports 
+--Adds the import declaration at the end of that module's imports
 addSimpleImportDecl :: String -> Maybe String -> RefactGhc ()
 addSimpleImportDecl modName mqual = do
   let modNm' = GHC.mkModuleName modName
@@ -66,7 +66,7 @@ locWithAnnVal a = do
 --Takes in a lhs pattern and a rhs. Wraps those in a lambda and adds the annotations associated with the lambda. Returns the new located lambda expression
 wrapInLambda :: GHC.LPat GHC.RdrName -> ParsedGRHSs -> RefactGhc (GHC.LHsExpr GHC.RdrName)
 wrapInLambda varPat rhs = do
-  match@(GHC.L l match')  <- mkLamMatch varPat rhs  
+  match@(GHC.L l match')  <- mkLamMatch varPat rhs
   --logm $ "Match: " ++ (SYB.showData SYB.Parser 3 match)
 #if __GLASGOW_HASKELL__ <= 710
   let mg = GHC.MG [match] [] GHC.PlaceHolder GHC.Generated
@@ -108,7 +108,7 @@ wrapInParsWithDPs openDP closeDP expr = do
   return newAst
 
 
---Wraps a given expression in parenthesis and add the appropriate annotations, returns the modified ast chunk. 
+--Wraps a given expression in parenthesis and add the appropriate annotations, returns the modified ast chunk.
 wrapInPars :: GHC.LHsExpr GHC.RdrName -> RefactGhc (GHC.LHsExpr GHC.RdrName)
 wrapInPars = wrapInParsWithDPs (DP (0,1)) (DP (0,0))
 
@@ -118,7 +118,7 @@ removePars (GHC.L _ (GHC.HsPar expr)) = do
   setDP (DP (0,1)) expr
   return expr
 removePars expr = return expr
-  
+
 --Takes a piece of AST and adds an n row offset
 addNewLines :: (Data a) => Int -> GHC.Located a -> RefactGhc ()
 addNewLines n ast = do
@@ -146,7 +146,7 @@ replaceTypeSig pos sig = do
 #if __GLASGOW_HASKELL__ <= 710
           comp nm oldTy@(GHC.TypeSig [(GHC.L _ oldNm)]  _ _)
 #else
-          comp nm oldTy@(GHC.TypeSig [(GHC.L _ oldNm)]  _)         
+          comp nm oldTy@(GHC.TypeSig [(GHC.L _ oldNm)]  _)
 #endif
             | oldNm == nm = return sig
             | otherwise = return oldTy
@@ -160,7 +160,7 @@ replaceFunBind pos bnd = do
   newParsed <- SYB.everywhereM (SYB.mkM (comp rdrNm)) parsed
   putRefactParsed newParsed emptyAnns
     where comp :: GHC.RdrName -> GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
-#if __GLASGOW_HASKELL__ <= 710          
+#if __GLASGOW_HASKELL__ <= 710
           comp nm b@(GHC.FunBind (GHC.L _ id) _ _ _ _ _)
 #else
           comp nm b@(GHC.FunBind (GHC.L _ id) _ _ _ _)
@@ -168,8 +168,8 @@ replaceFunBind pos bnd = do
             | id == nm = return bnd
             | otherwise = return b
           comp _ x = return x
-              
- 
+
+
 --Adds backquotes around a function call
 addBackquotes :: ParsedLExpr -> RefactGhc ()
 addBackquotes var@(GHC.L l _) = do
@@ -200,14 +200,19 @@ constructHsVar nm = do
 
 constructLHsTy :: GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
 constructLHsTy nm = do
-#if __GLASGOW_HASKELL__ <= 710
-  logm "New ty var ghc 7" 
-  newTy <- locate (GHC.HsTyVar nm)
-#else
+#if __GLASGOW_HASKELL__ <= 802
+  lNm <- locate nm
+  addAnnVal lNm
+  zeroDP lNm
+  newTy <- locate (GHC.HsTyVar GHC.NotPromoted lNm)
+#elif __GLASGOW_HASKELL__ <= 800
   lNm <- locate nm
   addAnnVal lNm
   zeroDP lNm
   newTy <- locate (GHC.HsTyVar lNm)
+#else
+  logm "New ty var ghc 7"
+  newTy <- locate (GHC.HsTyVar nm)
 #endif
   addAnnVal newTy
   zeroDP newTy
@@ -229,7 +234,7 @@ insertNewDecl declStr = do
     Left (_spn, str) -> error $ "insertNewDecl: decl parse failed with message:\n" ++ str
     Right (anns, decl@(GHC.L spn _)) -> do
       let oldDecs = GHC.hsmodDecls hsMod
-          newParsed = (GHC.L pSpn (hsMod {GHC.hsmodDecls = oldDecs ++ [decl]}))      
+          newParsed = (GHC.L pSpn (hsMod {GHC.hsmodDecls = oldDecs ++ [decl]}))
       putRefactParsed newParsed anns
       addNewLines 1 decl
       return decl
@@ -296,7 +301,26 @@ replaceFunRhs pos newRhs = do
 --Is applied to the signature "f :: Int -> (Int -> String) -> String"
 --g will be applied to "(Int -> String)"
 --You also need to handle spacing before the type signature element
-traverseTypeSig :: Int -> (GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)) -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
+traverseTypeSig :: Int -> (GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName))
+                -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
+#if __GLASGOW_HASKELL__ >= 800
+traverseTypeSig argNum f (GHC.TypeSig lst (GHC.HsWC wcs (GHC.HsIB v ty c))) = do
+  newTy <- comp argNum ty
+  return (GHC.TypeSig lst (GHC.HsWC wcs (GHC.HsIB v newTy c)))
+  where
+    comp argNum (GHC.L l (GHC.HsForAllTy bndrs ty)) =
+      case ty of
+        (GHC.L _ (GHC.HsFunTy _ _)) -> comp' argNum ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy bndrs res)))
+        _ -> f ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy bndrs res)))
+    comp' 1 (GHC.L l (GHC.HsFunTy lhs rhs)) = do
+      resLHS <- f lhs
+      let funTy = (GHC.L l (GHC.HsFunTy resLHS rhs))
+      zeroDP funTy
+      return funTy
+    comp' 1 lTy = f lTy
+    comp' n (GHC.L l (GHC.HsFunTy lhs rhs)) = comp' (n-1) rhs >>= (\res -> return (GHC.L l (GHC.HsFunTy lhs res)))
+    comp' _ lHsTy@(GHC.L _ ty) = return lHsTy
+#else
 traverseTypeSig argNum f (GHC.TypeSig lst ty rn) = do
   newTy <- comp argNum ty
   return (GHC.TypeSig lst newTy rn)
@@ -310,8 +334,9 @@ traverseTypeSig argNum f (GHC.TypeSig lst ty rn) = do
       let funTy = (GHC.L l (GHC.HsFunTy resLHS rhs))
       zeroDP funTy
       return funTy
-    comp' 1 lTy = f lTy 
+    comp' 1 lTy = f lTy
     comp' n (GHC.L l (GHC.HsFunTy lhs rhs)) = comp' (n-1) rhs >>= (\res -> return (GHC.L l (GHC.HsFunTy lhs res)))
     comp' _ lHsTy@(GHC.L _ ty) = return lHsTy
-        
+#endif
+
 traverseTypeSig _ _ sig = error $ "traverseTypeSig: Unsupported constructor: " ++ show (toConstr sig)

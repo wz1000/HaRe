@@ -99,7 +99,7 @@ logSettings = defaultSettings { rsetVerboseLevel = Debug }
 data RefactStashId = Stash !String deriving (Show,Eq,Ord)
 
 data RefactModule = RefMod
-        { rsTypecheckedMod  :: !TypecheckedModule
+        { rsTypecheckedMod  :: !GHC.TypecheckedModule
         , rsNameMap         :: NameMap
           -- ^ Mapping from the names in the ParsedSource to the renamed
           -- versions. Note: No strict mark, can be computed lazily.
@@ -171,7 +171,7 @@ type Targets = [Either FilePath GHC.ModuleName]
 
 -- |Result of parsing a Haskell source file. It is simply the
 -- TypeCheckedModule produced by GHC.
-type ParseResult = TypecheckedModule
+type ParseResult = GHC.TypecheckedModule
 
 -- |Provide some temporary storage while the refactoring is taking
 -- place

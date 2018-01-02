@@ -1,7 +1,7 @@
 module Language.Haskell.Refact.Refactoring.Sugar (sugar, compSugar) where
 
 import Language.Haskell.Refact.API
-import qualified GhcMod as GM (Options(..))
+import qualified GhcModCore as GM (Options(..))
 import System.Directory (canonicalizePath)
 import qualified GHC.SYB.Utils as SYB
 import qualified Data.Generics as SYB
@@ -23,5 +23,5 @@ compSugar fileName pos = do
 doSugaring :: SimpPos -> RefactGhc ()
 doSugaring pos = do
   parsed <- getRefactParsed
-  
+
   return ()

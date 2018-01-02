@@ -57,7 +57,9 @@ isoRefact _ mqual funNm newFTy iST bnd = do
 isoDone :: IsoRefact Bool
 isoDone = do
   st <- get
-  return $ (typeQueue st) == []
+  case (typeQueue st) of
+    [] -> return True
+    _  -> return False
 
 skipCurrent :: IsoRefact Bool
 skipCurrent = do
@@ -82,14 +84,19 @@ doIsoRefact expr = do
   where doIsoRefact' :: ParsedLExpr -> IsoRefact ParsedLExpr
         doIsoRefact' (GHC.L l (GHC.HsApp le re)) = do
           le' <- doIsoRefact le
-          wrapWithAbs <- shouldInsertAbs          
+          wrapWithAbs <- shouldInsertAbs
           re' <- doIsoRefact re
           lift $ logm "POST RHS REFACT IN APP CASE"
           let newApp = (GHC.L l (GHC.HsApp le' re'))
           if wrapWithAbs
             then do
             absRdr <- getAbsFun
+#if __GLASGOW_HASKELL__ >= 800
+            absRdrL <- lift $ locate absRdr
+            let var = GHC.HsVar absRdrL
+#else
             let var = GHC.HsVar absRdr
+#endif
             pApp <- lift $ wrapInPars newApp
             lVar <- lift $ locate var
             lift $ addAnnVal lVar
@@ -106,10 +113,14 @@ doIsoRefact expr = do
           lift $ logm "Found lambda"
           lift $ logm (SYB.showData SYB.Parser 3 lam)
           return lam
+#if __GLASGOW_HASKELL__ >= 800
+        doIsoRefact' var@(GHC.L l (GHC.HsVar (GHC.L lr rdr))) = do
+#else
         doIsoRefact' var@(GHC.L l (GHC.HsVar rdr)) = do
-          st <- get          
+#endif
+          st <- get
           let tq = typeQueue st
-              fs = funcs st              
+              fs = funcs st
           typed <- lift getRefactTyped
           mId <- lift (getIdFromVar var)
           let id = gfromJust ("Tried to get id for: " ++ SYB.showData SYB.Parser 3 rdr) mId
@@ -136,7 +147,11 @@ doIsoRefact expr = do
               if compType (getResultType ty) goalType
                 then do
                 let changedTypes = typeDifference ty currTy
+#if __GLASGOW_HASKELL__ >= 800
+                    newE = (GHC.L l (GHC.HsVar (GHC.L lr oNm)))
+#else
                     newE = (GHC.L l (GHC.HsVar oNm))
+#endif
                 lift $ logm $ "Swapping " ++  (SYB.showData SYB.Parser 3 keyOcc)
                 lift $ logm $ "CURRENT TYPE: \n" ++ showType 3 currTy
                 lift $ logm $ "NEW VAR TYPE: \n" ++ showType 3 ty
@@ -148,7 +163,7 @@ doIsoRefact expr = do
                     let dp = annEntryDelta v
                     lift $ addAnnValWithDP newE dp
                 popTQ
-                addToTQ changedTypes                
+                addToTQ changedTypes
                 return newE
                 else do
                 lift $ logm $ "The goal type of " ++ (showOutputable oNm) ++ "didn't match."
@@ -162,7 +177,12 @@ doIsoRefact expr = do
             st <- get
             let fs = funcs st
                 singletonRdr = mkQualifiedRdrName (GHC.mkModuleName "DList") "singleton"
+#if __GLASGOW_HASKELL__ >= 800
+            singletonRdrL <- lift $ locate singletonRdr
+            let singletonVar = (GHC.HsVar singletonRdrL)
+#else
                 singletonVar = (GHC.HsVar singletonRdr)
+#endif
             lVar <- lift $ locate singletonVar
             lift $ addAnnVal lVar
             lift $ zeroDP lVar
@@ -175,7 +195,12 @@ doIsoRefact expr = do
             st <- get
             let fs = funcs st
                 absRdr = absFun fs
+#if __GLASGOW_HASKELL__ >= 800
+            absRdrL <- lift $ locate absRdr
+            lVar <- lift $ locate (GHC.HsVar absRdrL)
+#else
             lVar <- lift $ locate (GHC.HsVar absRdr)
+#endif
             lApp <- lift $ locate (GHC.HsApp lVar eLst)
             lift $ wrapInPars lApp
             return lApp
@@ -218,7 +243,7 @@ if it does then we need to see if the result type of the dlist function is the g
 if it is then we can do the swap, we need to check which of the parameters of the new function changes type
 from left to right those types are added to the type queue
 -}
-            
+
 compType :: GHC.Type -> GHC.Type -> Bool
 compType (GHC.TyVarTy v1) (GHC.TyVarTy v2) = True --v1 == v2
 compType (GHC.TyVarTy _) _ = True
@@ -316,7 +341,7 @@ getResultType :: GHC.Type -> GHC.Type
 --explicitly polymorphic once we get past all of the polymorphic types we will either find
 --some other constructor and in that case we've found the result type
 --if we find a FunTy constructor we continue to descent the type down the RHS
---until we find a non-FunTy constructor 
+--until we find a non-FunTy constructor
 getResultType (GHC.ForAllTy _ ty) = getResultType ty
 getResultType (GHC.FunTy _ ty) = comp ty
   where comp :: GHC.Type -> GHC.Type
@@ -327,7 +352,7 @@ getResultType ty = ty
 modMGAltsRHS :: (ParsedLExpr -> RefactGhc ParsedLExpr) -> ParsedBind -> RefactGhc ParsedBind
 modMGAltsRHS f bnd = do
   applyTP (stop_tdTP (failTP `adhocTP` comp)) bnd
-  where 
+  where
     comp :: GHC.GRHS GHC.RdrName ParsedLExpr -> RefactGhc (GHC.GRHS GHC.RdrName ParsedLExpr)
     comp (GHC.GRHS lst expr) = do
       newExpr <- f expr
@@ -339,7 +364,11 @@ getTyCon (GHC.TyConApp tc _) = tc
 getTypeFromRdr :: (Data a) => GHC.RdrName -> a -> Maybe GHC.Type
 getTypeFromRdr nm a = SYB.something (Nothing `SYB.mkQ` comp) a
   where comp :: GHC.HsBind GHC.Id -> Maybe GHC.Type
+#if __GLASGOW_HASKELL__ >= 800
+        comp (GHC.FunBind (GHC.L _ id) _ _ _ _)
+#else
         comp (GHC.FunBind (GHC.L _ id) _ _ _ _ _)
+#endif
           | occNm == (GHC.occName (GHC.idName id)) = Just (GHC.idType id)
           | otherwise = Nothing
         comp _ = Nothing
@@ -373,7 +402,12 @@ mkFuncs iDecl projStr absStr fStrings mqual = do
     f (s1, s2) = do
       let o2 = GHC.mkVarOcc s2
           rdr = mkRdr o2
+#if __GLASGOW_HASKELL__ >= 800
+      rdrL <- locate rdr
+      lExpr <- locate (GHC.HsVar rdrL)
+#else
       lExpr <- locate (GHC.HsVar rdr)
+#endif
       ((wrns, errs), mty) <- tcExprInTargetMod iDecl lExpr
       case mty of
         Nothing -> error $ "TypeChecking failed: " ++ GHC.foldBag (++) (\e -> show e ++ "\n") "" errs
@@ -389,6 +423,10 @@ tcExprInTargetMod idecl ex = do
     lst = (GHC.IIDecl (GHC.unLoc idecl)):oldCntx --(GHC.IIModule nm):oldCntx
   GHC.setContext lst
   env <- GHC.getSession
+#if __GLASGOW_HASKELL__ >= 800
+  liftIO $ GHC.tcRnExpr env GHC.TM_Default ex
+#else
   liftIO $ GHC.tcRnExpr env ex
+#endif
     where addImps decs ms = let old = GHC.ms_textual_imps ms in
             ms {GHC.ms_textual_imps = old ++ [decs]}

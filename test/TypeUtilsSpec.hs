@@ -60,7 +60,7 @@ spec = do
   describe "locToName" $ do
     it "returns a GHC.Name for a given source location, if it falls anywhere in an identifier #1" $ do
       t <- ct $ parsedFileGhc "./TypeUtils/B.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just (res'@(GHC.L l _)) = locToRdrName (7,3) parsed
@@ -74,7 +74,7 @@ spec = do
 
     it "returns a GHC.Name for a given source location, if it falls anywhere in an identifier #2" $ do
       t <- ct $ parsedFileGhc "./TypeUtils/B.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just (res'@(GHC.L l _)) = locToRdrName (25,8) parsed
@@ -88,7 +88,7 @@ spec = do
 
     it "returns Nothing for a given source location, if it does not fall in an identifier" $ do
       t <- ct $ parsedFileGhc "TypeUtils/B.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let res = locToNameRdrPure nm (7,7) parsed
@@ -98,7 +98,7 @@ spec = do
 
     it "gets a short name too" $ do
       t <- ct $ parsedFileGhc "./Demote/WhereIn2.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just (res'@(GHC.L l _)) = locToRdrName (14,1) parsed
@@ -112,7 +112,7 @@ spec = do
 
     it "gets a type variable name" $ do
       t <- ct $ parsedFileGhc "./Renaming/ConstructorIn3.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just (res'@(GHC.L l _)) = locToRdrName (9,12) parsed
@@ -127,7 +127,7 @@ spec = do
 
     it "gets an instance class name" $ do
       t <- ct $ parsedFileGhc "./Renaming/ClassIn3.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just (res'@(GHC.L l _)) = locToRdrName (16,10) parsed
           n = rdrName2NamePure nm res'
@@ -141,7 +141,7 @@ spec = do
   describe "locToRdrName" $ do
     it "returns a GHC.RdrName for a given source location, if it falls anywhere in an identifier" $ do
       t <- ct $ parsedFileGhc "./Renaming/D5.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
       let Just (res@(GHC.L l n)) = locToRdrName (20,1) parsed
       (show $ ss2span l) `shouldBe` "((20,1),(20,11))"
@@ -150,7 +150,7 @@ spec = do
 
     it "returns a GHC.RdrName for a source location, in a MatchGroup" $ do
       t <- ct $ parsedFileGhc "./LocToName.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
       let Just (res@(GHC.L l n)) = locToRdrName (24,2) parsed
       showGhcQual n `shouldBe` "sumSquares"
@@ -185,7 +185,7 @@ spec = do
   describe "definingDeclsRdrNames" $ do
     it "returns [] if not found" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (16,6) parsed
       let decls = GHC.hsmodDecls $ GHC.unLoc parsed
@@ -196,7 +196,7 @@ spec = do
 
     it "finds declarations at the top level" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (3,3) parsed
@@ -208,7 +208,7 @@ spec = do
 
     it "finds declarations not at the top level 1" $ do
       t <- ct $ parsedFileGhc "./LiftToToplevel/WhereIn6.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (13,29) parsed
@@ -221,7 +221,7 @@ spec = do
 
     it "finds declarations not at the top level 2" $ do
       t <- ct $ parsedFileGhc "./LiftToToplevel/LetIn1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (11,22) parsed
@@ -234,7 +234,7 @@ spec = do
 
     it "finds in a patbind" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (14,1) parsed
@@ -294,7 +294,7 @@ spec = do
     it "returns [] if not found" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (16,6) parsed
@@ -304,7 +304,7 @@ spec = do
     it "finds declarations at the top level" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (3,3) parsed
@@ -315,7 +315,7 @@ spec = do
     it "finds in a patbind" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (14,1) parsed
@@ -344,7 +344,7 @@ spec = do
   describe "definingSigsRdrNames" $ do
     it "returns [] if not found" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (21,1) parsed
@@ -356,7 +356,7 @@ spec = do
 
     it "finds signatures at the top level" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (4,1) parsed
@@ -368,7 +368,7 @@ spec = do
 
     it "returns only the single signature where there are others too" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (7,1) parsed
@@ -380,7 +380,7 @@ spec = do
 
     it "finds signatures at lower levels" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (16,5) parsed
@@ -392,7 +392,7 @@ spec = do
 
     it "finds multiple signatures 1" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let nm = initRdrNameMap t
 
       let Just n1 = locToNameRdrPure nm (21,1) parsed
@@ -411,7 +411,7 @@ spec = do
 
     it "finds multiple signatures 2" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let nm = initRdrNameMap t
 
       let Just n1 = locToNameRdrPure nm (14,1) parsed
@@ -431,7 +431,7 @@ spec = do
   describe "definingTyClDeclsNames" $ do
     it "returns [] if not found" $ do
       t <- ct $ parsedFileGhc "./TypeUtils/TyClDecls.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (10,29) parsed
@@ -447,7 +447,7 @@ spec = do
 
     it "finds family declarations" $ do
       t <- ct $ parsedFileGhc "./TypeUtils/TyClDecls.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       -- putStrLn $ "parsed:" ++ SYB.showData SYB.Parser 0 parsed
 
@@ -459,7 +459,7 @@ spec = do
 
     it "finds data declarations" $ do
       t <- ct $ parsedFileGhc "./TypeUtils/TyClDecls.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (12,6) parsed
@@ -470,7 +470,7 @@ spec = do
 
     it "finds field names in data declarations" $ do
       t <- ct $ parsedFileGhc "./Renaming/Field4.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (5,23) parsed
@@ -481,7 +481,7 @@ spec = do
 
     it "finds type declarations" $ do
       t <- ct $ parsedFileGhc "./TypeUtils/TyClDecls.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (14,6) parsed
@@ -492,7 +492,7 @@ spec = do
 
     it "finds class declarations" $ do
       t <- ct $ parsedFileGhc "./TypeUtils/TyClDecls.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (16,7) parsed
@@ -503,7 +503,7 @@ spec = do
 
     it "finds multiple declarations" $ do
       t <- ct $ parsedFileGhc "./TypeUtils/TyClDecls.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n1 = locToNameRdrPure nm (14,6) parsed
@@ -518,7 +518,7 @@ spec = do
     it "Returns False if not a function definition" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let decls = getHsDecls parsed
@@ -528,9 +528,9 @@ spec = do
 
     it "Returns True if a function definition" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let (GHC.L _l (GHC.HsModule _name _exps _imps _ds _ _)) = GHC.pm_parsed_source $ tm_parsed_module t
+      let (GHC.L _l (GHC.HsModule _name _exps _imps _ds _ _)) = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just toplevel = getName "DupDef.Dd1.toplevel" renamed
@@ -543,7 +543,7 @@ spec = do
     it "return True if a PName is a function/pattern name defined in t" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
       let renamed  = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       -- putStrLn $ "parsed:\n" ++ SYB.showData SYB.Parser 0 parsed
@@ -557,7 +557,7 @@ spec = do
       t  <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
       t2 <- ct $ parsedFileGhc "./DupDef/Dd2.hs"
       let renamed  = tmRenamedSource t
-      let parsed2 = GHC.pm_parsed_source $ tm_parsed_module t2
+      let parsed2 = GHC.pm_parsed_source $ GHC.tm_parsed_module t2
           nm2 = initRdrNameMap t2
 
       let Just tup = getName "DupDef.Dd1.tup" renamed
@@ -977,7 +977,7 @@ spec = do
     it "returns [] if e does not occur in t" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just tl1  = locToExp (4,13) (4,40) parsed :: (Maybe (GHC.Located (GHC.HsExpr GHC.RdrName)))
@@ -997,7 +997,7 @@ spec = do
 {-
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just tl1  = locToExp (28,4) (28,12) parsed :: (Maybe (GHC.LHsExpr GHC.RdrName))
@@ -1023,7 +1023,7 @@ spec = do
       pendingWith "no longer relevant?"
  {-
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just tl1  = locToExp (28,4) (28,12) parsed :: (Maybe (GHC.LHsExpr GHC.RdrName))
@@ -1047,7 +1047,7 @@ spec = do
   {-
       t <- ct $ parsedFileGhc "./Visible/Simple.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
       let Just e  = locToExp (5,11) (5,19) parsed :: (Maybe (GHC.LHsExpr GHC.RdrName))
       (showGhcQual e) `shouldBe` "a + b"
@@ -1073,7 +1073,7 @@ spec = do
    {-
       t <- ct $ parsedFileGhc "./Visible/Simple.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       -- (SYB.showData SYB.Renamer 0 renamed) `shouldBe` ""
 
       let Just e   = locToExp (9,15) (9,17) parsed  :: (Maybe (GHC.LHsExpr GHC.RdrName))
@@ -1097,7 +1097,7 @@ spec = do
 
     it "finds visible vars inside a function" $ do
       t <- ct $ parsedFileGhc "./Renaming/IdIn5.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
       let Just rhs  = locToExp (17,6) (18,14) parsed  :: (Maybe (GHC.LHsExpr GHC.RdrName))
       (showGhcQual rhs) `shouldBe` "x + y + z"
@@ -1123,7 +1123,7 @@ spec = do
 
     it "finds visible vars inside a data declaration" $ do
       t <- ct $ parsedFileGhc "./Renaming/D1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
       let Just ln = locToRdrName (6, 6) parsed
       (showGhcQual ln) `shouldBe` "Tree"
@@ -1163,7 +1163,7 @@ spec = do
 
     it "finds visible vars inIdIn5" $ do
       t <- ct $ parsedFileGhc "./Renaming/IdIn5.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
       let Just ln = locToRdrName (13, 1) parsed
       (showGhcQual ln) `shouldBe` "x"
@@ -1191,7 +1191,7 @@ spec = do
     it "finds function arguments visible in RHS fd" $ do
       t <- ct $ parsedFileGhc "./Visible/Simple.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just e  = locToExp (5,11) (5,19) parsed :: (Maybe (GHC.Located (GHC.HsExpr GHC.RdrName)))
@@ -1215,7 +1215,7 @@ spec = do
     it "finds function arguments and free vars visible in RHS" $ do
       t <- ct $ parsedFileGhc "./Visible/Simple.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just e  = locToExp (9,15) (9,17) parsed :: Maybe (GHC.LHsExpr GHC.RdrName)
@@ -1248,7 +1248,7 @@ spec = do
     it "finds imported functions used in the rhs" $ do
       t <- ct $ parsedFileGhc "./FreeAndDeclared/Declare.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
       let Just n = getName "FreeAndDeclared.Declare.tup" renamed
 
@@ -1330,7 +1330,7 @@ spec = do
   describe "isLocalPN" $ do
     it "returns True if the name is local to the module" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (17, 5) parsed
       (showGhcQual n) `shouldBe` "ff"
@@ -1338,7 +1338,7 @@ spec = do
 
     it "returns False if the name is not local to the module" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (21, 1) parsed
       (showGhcQual n) `shouldBe` "DupDef.Dd1.ff"
@@ -1379,7 +1379,7 @@ spec = do
   describe "definedPNsRdr" $ do
     it "gets the PNs defined in a declaration" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just pn = locToNameRdrPure nm (3, 1) parsed
@@ -1395,7 +1395,7 @@ spec = do
 
     it "gets the PNs defined in an as-match" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just pn = locToNameRdrPure nm (14, 1) parsed
@@ -1538,7 +1538,7 @@ spec = do
   describe "duplicateDecl" $ do
     it "duplicates a bind only" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (3, 1) parsed
@@ -1560,7 +1560,7 @@ spec = do
 
     it "duplicates a bind with a signature, and an offset" $ do
       t <- ct $ parsedFileGhc "./DupDef/Dd1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just np = locToNameRdrPure nm (14, 1) parsed
@@ -1610,7 +1610,7 @@ spec = do
   describe "addParamsToDecl" $ do
     it "adds parameters to a declaration" $ do
       t <- ct $ parsedFileGhc "./MoveDef/Md1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (3, 1) parsed
@@ -1633,7 +1633,7 @@ spec = do
 
     it "adds parameters to a declaration with multiple matches" $ do
       t <- ct $ parsedFileGhc "./AddParams1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (3, 1) parsed
@@ -1655,7 +1655,7 @@ spec = do
 
     it "adds parameters to a declaration with no existing ones" $ do
       t <- ct $ parsedFileGhc "./AddParams1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (6, 1) parsed
@@ -1679,7 +1679,7 @@ spec = do
   describe "addActualParamsToRhs" $ do
     it "adds a parameter to the rhs of a declaration" $ do
       t <- ct $ parsedFileGhc "./LiftToToplevel/D1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (6, 21) parsed
@@ -1704,7 +1704,7 @@ spec = do
 
     it "adds parameters to a complex rhs of a declaration" $ do
       t <- ct $ parsedFileGhc "./LiftToToplevel/WhereIn7.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (10, 17) parsed
@@ -1730,7 +1730,7 @@ spec = do
 
     it "adds parameters to a declaration in a tuple" $ do
       t <- ct $ parsedFileGhc "./AddParams2.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (5, 36) parsed
@@ -1756,7 +1756,7 @@ spec = do
   describe "rmDecl" $ do
     it "removes a top level declaration, leaving type signature 1" $ do
       t <- ct $ parsedFileGhc "./MoveDef/Md1a.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (6, 1) parsed
       let
@@ -1775,7 +1775,7 @@ spec = do
 
     it "removes a top level declaration, leaving type signature 2b" $ do
       t <- ct $ parsedFileGhc "./MoveDef/Md1b.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (6, 1) parsed
       let
@@ -1793,7 +1793,7 @@ spec = do
 
     it "removes a top level declaration, leaving type signature 2" $ do
       t <- ct $ parsedFileGhc "./MoveDef/Md1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (22, 1) parsed
       let
@@ -1812,7 +1812,7 @@ spec = do
 
     it "removes a top level declaration, and type signature" $ do
       t <- ct $ parsedFileGhc "./MoveDef/Md1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (22, 1) parsed
@@ -1831,7 +1831,7 @@ spec = do
 
     it "removes the last local decl in a let/in clause" $ do
       t <- ct $ parsedFileGhc "./LiftToToplevel/LetIn1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (11, 22) parsed
@@ -1854,7 +1854,7 @@ spec = do
 
     it "removes the last local decl in a where clause" $ do
       t <- ct $ parsedFileGhc "./RmDecl3.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (6, 5) parsed
@@ -1875,7 +1875,7 @@ spec = do
 
     it "removes the first local decl in a where clause" $ do
       t <- ct $ parsedFileGhc "./RmDecl4.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       -- (SYB.showData SYB.Renamer 0 renamed) `shouldBe` ""
 
@@ -1897,7 +1897,7 @@ spec = do
 
     it "removes the non last local decl in a let/in clause 1" $ do
       t <- ct $ parsedFileGhc "./Demote/LetIn1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       -- (SYB.showData SYB.Renamer 0 renamed) `shouldBe` ""
 
@@ -1918,7 +1918,7 @@ spec = do
 
     it "removes the non last local decl in a let/in clause 2" $ do
       t <- ct $ parsedFileGhc "./Demote/LetIn2.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (10, 22) parsed
@@ -1938,7 +1938,7 @@ spec = do
 
     it "removes a decl with a trailing comment" $ do
       t <- ct $ parsedFileGhc "./Demote/WhereIn3.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (14, 1) parsed
       let
@@ -1957,7 +1957,7 @@ spec = do
 
     it "removes a sub decl liftOneLevel D1" $ do
       t <- ct $ parsedFileGhc "./LiftOneLevel/D1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (8, 6) parsed
       let
@@ -1977,7 +1977,7 @@ spec = do
   describe "rmTypeSig" $ do
     it "removes a type signature from the top level 1" $ do
       t <- ct $ parsedFileGhc "./MoveDef/Md1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (22, 1) parsed
       let
@@ -1996,7 +1996,7 @@ spec = do
 
     it "removes a type signature from the top level, after decl removed" $ do
       t <- ct $ parsedFileGhc "./Demote/WhereIn3.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (14, 1) parsed
       let
@@ -2016,7 +2016,7 @@ spec = do
 
     it "removes a type signature from non-top level" $ do
       t <- ct $ parsedFileGhc "./MoveDef/Md1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (16, 5) parsed
       let
@@ -2035,7 +2035,7 @@ spec = do
 
     it "removes a type signature within multi signatures 1" $ do
       t <- ct $ parsedFileGhc "./TypeUtils/TypeSigs.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just b = locToNameRdrPure nm (12, 1) parsed
       let
@@ -2052,7 +2052,7 @@ spec = do
 
     it "removes a type signature within multi signatures 2" $ do
       t <- ct $ parsedFileGhc "./TypeUtils/TypeSigs.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (4, 1) parsed
       let
@@ -2072,7 +2072,7 @@ spec = do
 
     it "removes a type signature within multi signatures 3" $ do
       t <- ct $ parsedFileGhc "./Demote/WhereIn7.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (12, 1) parsed
       let
@@ -2495,7 +2495,7 @@ spec = do
     it "replaces a Name with another in limited scope 1" $ do
       t <- ct $ parsedFileGhc "./TokenTest.hs"
 
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (19, 1) parsed
       (showGhcQual n) `shouldBe` "TokenTest.foo"
@@ -2526,7 +2526,7 @@ spec = do
     it "replace a Name with another in limited scope 2" $ do
       t <- ct $ parsedFileGhc "./TokenTest.hs"
 
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (19, 1) parsed
       (showGhcQual n) `shouldBe` "TokenTest.foo"
@@ -2558,7 +2558,7 @@ spec = do
 
     it "replaces a name in a data declaration too" $ do
       t <- ct $ parsedFileGhc "./Renaming/Field1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (5, 19) parsed
@@ -2590,7 +2590,7 @@ spec = do
 
     it "replaces a name in a type signature too" $ do
       t <- ct $ parsedFileGhc "./Renaming/Field1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (5, 6) parsed
@@ -2621,7 +2621,7 @@ spec = do
 
     it "replace a name in a FunBind with multiple patterns" $ do
       t <- ct $ parsedFileGhc "./LocToName.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (20, 1) parsed
@@ -2644,7 +2644,7 @@ spec = do
 
     it "replaces a qualified name in a FunBind with multiple patterns" $ do
       t <- ct $ parsedFileGhc "./LocToName.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 #if __GLASGOW_HASKELL__ <= 710
       let modu = GHC.mkModule (GHC.stringToPackageKey "mypackage-1.0") (GHC.mkModuleName "LocToName")
@@ -2682,7 +2682,7 @@ spec = do
 
     it "replaces a parameter name in a FunBind" $ do
       t <- ct $ parsedFileGhc "./Renaming/LayoutIn2.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (8, 7) parsed
@@ -2713,7 +2713,7 @@ spec = do
 
     it "does not qualify a name in an import hiding clause" $ do
       t <- ct $ parsedFileGhc "./ScopeAndQual.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 #if __GLASGOW_HASKELL__ <= 710
       let modu = GHC.mkModule (GHC.stringToPackageKey "mypackage-1.0") (GHC.mkModuleName "LocToName")
@@ -2744,7 +2744,7 @@ spec = do
 
     it "does not qualify the subject of a type signature" $ do
       t <- ct $ parsedFileGhc "./Renaming/C7.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 #if __GLASGOW_HASKELL__ <= 710
       let modu = GHC.mkModule (GHC.stringToPackageKey "mypackage-1.0") (GHC.mkModuleName "LocToName")
@@ -2780,7 +2780,7 @@ spec = do
     it "realigns in a case for a shorter name" $ do
       t <- ct $ parsedFileGhc "./Renaming/LayoutIn2.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (8, 7) parsed
@@ -2813,7 +2813,7 @@ spec = do
     it "realigns in a case for a longer name" $ do
       t <- ct $ parsedFileGhc "./Renaming/LayoutIn2.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (8, 7) parsed
@@ -2844,7 +2844,7 @@ spec = do
     it "realigns in a do for a shorter name" $ do
       t <- ct $ parsedFileGhc "./Renaming/LayoutIn4.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (7, 8) parsed
@@ -2876,7 +2876,7 @@ spec = do
     it "realigns in a do for a longer name" $ do
       t <- ct $ parsedFileGhc "./Renaming/LayoutIn4.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (7, 8) parsed
@@ -2906,7 +2906,7 @@ spec = do
     it "realigns in a where for a shorter name" $ do
       t <- ct $ parsedFileGhc "./Renaming/LayoutIn1.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (7, 17) parsed
@@ -2933,7 +2933,7 @@ spec = do
     it "realigns in a where for a longer name" $ do
       t <- ct $ parsedFileGhc "./Renaming/LayoutIn1.hs"
       -- let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (7, 17) parsed
@@ -2961,7 +2961,7 @@ spec = do
     it "realigns in a let/in for a shorter name" $ do
       t <- ct $ parsedFileGhc "./TypeUtils/LayoutLet1.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (6, 6) parsed
@@ -2987,7 +2987,7 @@ spec = do
     it "realigns in a let/in for a longer name 1" $ do
       t <- ct $ parsedFileGhc "./TypeUtils/LayoutLet1.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (6, 6) parsed
@@ -3016,7 +3016,7 @@ spec = do
     it "realigns in a let/in for a longer name 2" $ do
       t <- ct $ parsedFileGhc "./TypeUtils/LayoutLet2.hs"
       let renamed = tmRenamedSource t
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (7, 6) parsed
@@ -3043,7 +3043,7 @@ spec = do
 
     it "renames an exported data type" $ do
       t <- ct $ parsedFileGhc "./Renaming/RenameInExportedType2.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (6, 24) parsed
@@ -3075,7 +3075,7 @@ spec = do
 
     it "renames a qualified usage of a name" $ do
       t <- ct $ parsedFileGhc "./Renaming/QualClient.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (10, 10) parsed
@@ -3101,7 +3101,7 @@ spec = do
 
     it "renames a class op signature" $ do
       t <- ct $ parsedFileGhc "./Renaming/D4.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (13, 5) parsed
@@ -3128,7 +3128,7 @@ spec = do
 
     it "renames a data decl parameter" $ do
       t <- ct $ parsedFileGhc "./Renaming/ConstructorIn3.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (9, 13) parsed
@@ -3156,7 +3156,7 @@ spec = do
   describe "qualifyToplevelName" $ do
     it "qualifies a name at the top level" $ do
       t <- ct $ parsedFileGhc "./Renaming/C7.hs"
-      let parsed  = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed  = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm      = initRdrNameMap t
 
       let Just n = locToNameRdrPure nm (7, 1) parsed
@@ -3322,7 +3322,7 @@ spec = do
   describe "modIsExported" $ do
     it "Returns True if the module is explicitly exported" $ do
       t <- ct $ parsedFileGhc "./FreeAndDeclared/Declare.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let renamed = tmRenamedSource t
       let (Just (modName,_)) = getModuleName parsed
 
@@ -3330,7 +3330,7 @@ spec = do
 
     it "Returns True if the module is exported by default" $ do
       t <- ct $ parsedFileGhc "./FreeAndDeclared/Declare1.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let renamed = tmRenamedSource t
       let (Just (modName,_)) = getModuleName parsed
 
@@ -3338,7 +3338,7 @@ spec = do
 
     it "Returns False if the module is explicitly not exported" $ do
       t <- ct $ parsedFileGhc "./FreeAndDeclared/Declare2.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let renamed = tmRenamedSource t
       let (Just (modName,_)) = getModuleName parsed
 
@@ -3380,8 +3380,8 @@ spec = do
          t2 <- parseSourceFileTest "./DupDef/Dd2.hs"
          let renamed2 = tmRenamedSource t2
 
-         let parsed1 = GHC.pm_parsed_source $ tm_parsed_module t1
-         let parsed2 = GHC.pm_parsed_source $ tm_parsed_module t2
+         let parsed1 = GHC.pm_parsed_source $ GHC.tm_parsed_module t1
+         let parsed2 = GHC.pm_parsed_source $ GHC.tm_parsed_module t2
 
          let Just (modName,_) = getModuleName parsed1
          let
@@ -3409,8 +3409,8 @@ spec = do
          t2 <- parseSourceFileTest "./DupDef/Dd3.hs"
          let renamed2 = tmRenamedSource t2
 
-         let parsed1 = GHC.pm_parsed_source $ tm_parsed_module t1
-         let parsed2 = GHC.pm_parsed_source $ tm_parsed_module t2
+         let parsed1 = GHC.pm_parsed_source $ GHC.tm_parsed_module t1
+         let parsed2 = GHC.pm_parsed_source $ GHC.tm_parsed_module t2
 
          -- let mn = locToName (4,1) renamed1
          -- let (Just (GHC.L _ _n)) = mn
@@ -3548,9 +3548,9 @@ spec = do
 
       t <- ct $ parsedFileGhc "./Renaming/ConflictExport.hs"
       let nm = initRdrNameMap t
-      let parsed  = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed  = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
-      let modu = GHC.ms_mod $ GHC.pm_mod_summary $ tm_parsed_module t
+      let modu = GHC.ms_mod $ GHC.pm_mod_summary $ GHC.tm_parsed_module t
 
       -- Is this the right module?
       let Just (modName,_) = getModuleName parsed
@@ -3574,9 +3574,9 @@ spec = do
     it "Returns False if there is no clash" $ do
       t <- ct $ parsedFileGhc "./Renaming/ConflictExport.hs"
       let nm = initRdrNameMap t
-      let parsed  = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed  = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
-      let modu = GHC.ms_mod $ GHC.pm_mod_summary $ tm_parsed_module t
+      let modu = GHC.ms_mod $ GHC.pm_mod_summary $ GHC.tm_parsed_module t
 
       -- Is this the right module?
       let Just (modName,_) = getModuleName parsed
@@ -3919,7 +3919,7 @@ spec = do
   describe "isFieldName" $ do
     it "returns True if a Name is a field name" $ do
       t <- ct $ parsedFileGhc "./Renaming/Field3.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let nm = initRdrNameMap t
 
       let Just nf = locToNameRdrPure nm (10,21) parsed
@@ -3933,7 +3933,7 @@ spec = do
   describe "name predicates" $ do
     it "classifies names" $ do
       t <- ct $ parsedFileGhc "./Cons.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       let nm = initRdrNameMap t
 
       let Just n1 = locToNameRdrPure nm (3,6)  parsed
@@ -3983,7 +3983,7 @@ spec = do
 
     it "finds a Name for a top-level RdrName" $ do
       t <- ct $ parsedFileGhc "./TokenTest.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
       let
         comp = do
@@ -4000,7 +4000,7 @@ spec = do
 
     it "finds a Name for a local RdrName" $ do
       t <- ct $ parsedFileGhc "./TokenTest.hs"
-      let parsed = GHC.pm_parsed_source $ tm_parsed_module t
+      let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
       let
         comp = do

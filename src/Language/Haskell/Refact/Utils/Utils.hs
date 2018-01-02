@@ -97,9 +97,9 @@ parseSourceFileGhc targetFile = do
 
 -- | In the existing GHC session, put the requested TypeCheckedModule
 -- into the RefactGhc monad
-loadTypecheckedModule :: TypecheckedModule -> RefactGhc ()
+loadTypecheckedModule :: GHC.TypecheckedModule -> RefactGhc ()
 loadTypecheckedModule t = do
-  let modSum =  GHC.pm_mod_summary $ tm_parsed_module t
+  let modSum =  GHC.pm_mod_summary $ GHC.tm_parsed_module t
   logm $ "loadFromModSummary:modSum=" ++ show modSum
   cppComments <- if True
                   then do
