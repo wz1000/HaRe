@@ -1,0 +1,14 @@
+module HList2 where
+import qualified HughesList.DList as DList
+import HughesList.DList (DList)
+
+data Tree a = Leaf
+            | Node (Tree a) a (Tree a)
+
+enumerate :: Tree a -> DList a
+enumerate Leaf = DList.empty
+enumerate (Node left x right) = (enumerate left) `DList.append` (DList.singleton x) `DList.append` (enumerate right)
+
+printEnumTree :: (Show a) => Tree a -> IO ()
+printEnumTree tree = let lst = DList.toList (enumerate tree) in
+  print lst

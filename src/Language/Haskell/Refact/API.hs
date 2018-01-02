@@ -17,7 +17,7 @@ module Language.Haskell.Refact.API
        , getRefacSettings
        , defaultSettings
        , logSettings
-
+       , logData
        , logm
        , logDataWithAnns
        , logExactprint
@@ -43,9 +43,8 @@ module Language.Haskell.Refact.API
        , clientModsAndFiles
        , serverModsAndFiles
        -- , lookupAnns
-
+         
        , stripCallStack
-
 
  -- * from `Language.Haskell.Refact.Utils.MonadFunctions`
 
@@ -56,11 +55,14 @@ module Language.Haskell.Refact.API
        , getRefactStreamModified
        , setRefactStreamModified
        , getRefactInscopes
+       , getRefactTyped
        , getRefactRenamed
        , putRefactRenamed
        , getRefactParsed
        , putRefactParsed
+       , getRefactParsedMod
        , putParsedModule
+       , typeCheckModule
        , clearParsedModule
        , getRefactFileName
        , getRefactTargetModule
@@ -84,7 +86,7 @@ module Language.Haskell.Refact.API
 
        -- * Parsing source
        , parseDeclWithAnns
-
+       , showOutputable
        -- , logm
 
 
@@ -163,6 +165,7 @@ module Language.Haskell.Refact.API
     ,locToNameRdr
     ,locToNameRdrPure
     ,locToRdrName
+    ,locToId
     ,getName
 
  -- * Program transformation
@@ -248,18 +251,27 @@ module Language.Haskell.Refact.API
   , addNewKeywords
 
   , addEmptyAnn
+  , addAnnValWithDP
   , addAnnVal
   , addAnn
+  , copyAnnDP
+  , getDeltaPos
 
    -- from Language.Haskell.Refact.Utils.Synonyms
  , UnlocParsedHsBind
  , ParsedGRHSs
+ , ParsedGRHS
  , ParsedMatchGroup
+ , ParsedMatch
  , ParsedLMatch
  , ParsedExpr
  , ParsedLStmt
  , ParsedLExpr
  , ParsedBind
+ , ParsedLBind
+ , ParsedLDecl
+ , ParsedLImportDecl
+ , ParsedBindBag
 
  -- from Language.Haskell.Refact.Utils.Transform
   , addSimpleImportDecl
@@ -269,12 +281,41 @@ module Language.Haskell.Refact.API
   , addNewLines
   , wrapInParsWithDPs
   , locate
+  , locWithAnnVal
+  , replaceTypeSig
+  , replaceFunBind
+  , addBackquotes
+  , constructLHsTy
+  , constructHsVar
+  , insertNewDecl
+  , rmFun
+  , replaceFunRhs
+  , traverseTypeSig
 -- from Language.Haskell.Refact.Utils.Query
   , getVarAndRHS
   , getHsBind
+  , getFunName
+  , getTypedHsBind
+  , getTypeSig
   , isHsVar
+  , astCompare
+  , lookupByLoc
+  , getIdFromVar
+  , isWrappedInPars
+-- from Language.Haskell.Refact.Refactoring.IsomorphicRefactoring
+  , isoRefact
+  , IsomorphicFuncs(..)
+  , IsoRefactState(..)
+  , IsoRefact
+  , runIsoRefact
+  , getTyCon
+  , getResultType
+  , mkFuncs
+  , IsoFuncStrings
+  , getInitState
  ) where
 
+import Language.Haskell.Refact.Utils.Isomorphic
 import Language.Haskell.Refact.Utils.ExactPrint
 import Language.Haskell.Refact.Utils.GhcUtils
 import Language.Haskell.Refact.Utils.GhcVersionSpecific

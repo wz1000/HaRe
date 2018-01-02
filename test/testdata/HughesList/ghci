@@ -1,0 +1,9 @@
+module HList1 where
+import Data.DList
+
+data Tree a = Leaf
+            | Node (Tree a) a (Tree a)
+
+toList :: Tree a -> DList a
+toList Leaf = empty
+toList Node left x right = (fromList [x]) `append` (toList left) `append` (toList right)

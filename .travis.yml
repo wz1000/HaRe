@@ -104,4 +104,3 @@ script:
 notifications:
   irc: "irc.freenode.org#haskell-refactorer"
 
-# EOF

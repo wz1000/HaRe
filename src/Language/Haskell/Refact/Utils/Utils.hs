@@ -36,7 +36,7 @@ module Language.Haskell.Refact.Utils.Utils
        , writeRefactoredFiles
 
        , stripCallStack
-
+       , showOutputable
        ) where
 
 -- import Control.Exception
@@ -508,3 +508,4 @@ stripCallStack str = str'
     str' = if last str == '\n'
               then s1 ++ "\n"
               else s1
+

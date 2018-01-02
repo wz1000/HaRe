@@ -51,6 +51,7 @@ module Language.Haskell.Refact.Utils.Variables
   , findLRdrName
   , locToNameRdr, locToNameRdrPure
   , locToRdrName
+  , locToId
   ) where
 
 import Control.Monad.State
@@ -1930,6 +1931,11 @@ locToRdrName::(SYB.Data t)
                     ->t                -- ^ The syntax phrase
                     -> Maybe (GHC.Located GHC.RdrName)  -- ^ The result
 locToRdrName (row,col) t = locToName' (row,col) t
+
+
+
+locToId :: (SYB.Data t) => SimpPos -> t -> Maybe (GHC.Located GHC.Id)
+locToId (row,col) t = locToName' (row,col) t
 
 
 -- |Worker for both locToName and locToRdrName.

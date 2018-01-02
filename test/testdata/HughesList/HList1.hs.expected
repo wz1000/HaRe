@@ -1,0 +1,10 @@
+module HughesList.HList1 where
+import qualified HughesList.DList as DList
+import HughesList.DList (DList)
+
+data Tree a = Leaf
+            | Node (Tree a) a (Tree a)
+
+enumerate :: Tree a -> DList a
+enumerate Leaf = DList.empty
+enumerate (Node left x right) = (enumerate left) `DList.append` (DList.singleton x) `DList.append` (enumerate right)

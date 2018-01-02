@@ -14,6 +14,7 @@ module Language.Haskell.Refact.Utils.ExactPrint
   , balanceAllComments
   , locate
   , addEmptyAnn
+  , addAnnValWithDP
   , addAnnVal
   , addAnn
   , zeroDP
@@ -23,6 +24,8 @@ module Language.Haskell.Refact.Utils.ExactPrint
   , synthesizeAnns
   , addNewKeyword
   , addNewKeywords
+  , copyAnnDP
+  , getDeltaPos
   ) where
 
 import qualified GHC           as GHC
@@ -184,10 +187,13 @@ locate ast = do
 addEmptyAnn :: (SYB.Data a) => GHC.Located a -> RefactGhc ()
 addEmptyAnn a = addAnn a annNone
 
+addAnnValWithDP :: (SYB.Data a) => GHC.Located a -> DeltaPos -> RefactGhc ()
+addAnnValWithDP a dp = addAnn a valAnn
+    where valAnn = annNone {annEntryDelta = dp, annsDP = [(G GHC.AnnVal, DP (0,0))]}
+
 --Adds an "AnnVal" annotation at the provided location
 addAnnVal :: (SYB.Data a) => GHC.Located a -> RefactGhc ()
-addAnnVal a = addAnn a valAnn
-  where valAnn = annNone {annEntryDelta = DP (0,1), annsDP = [(G GHC.AnnVal, DP (0,0))]}
+addAnnVal a = addAnnValWithDP a (DP (0,1))
 
 --Adds the given annotation at the provided location
 addAnn :: (SYB.Data a) => GHC.Located a -> Annotation -> RefactGhc ()
@@ -195,6 +201,7 @@ addAnn a ann = do
   currAnns <- fetchAnnsFinal
   let k = mkAnnKey a
   setRefactAnns $ Map.insert k ann currAnns
+
 
 --Sets the entry delta position of an ast chunk
 setDP :: (SYB.Data a) => DeltaPos -> GHC.Located a -> RefactGhc ()
@@ -277,3 +284,16 @@ addNewKeyword entry a = do
 
 addNewKeywords :: (SYB.Data a) => [(KeywordId, DeltaPos)] -> GHC.Located a -> RefactGhc ()
 addNewKeywords entries a = mapM_ ((flip addNewKeyword) a) entries
+
+getDeltaPos :: (SYB.Data a) => GHC.Located a -> Anns -> Maybe DeltaPos
+getDeltaPos a ans = Map.lookup (mkAnnKey a) ans >>= (\v -> return (annEntryDelta v))
+
+copyAnnDP :: (SYB.Data old,SYB.Data new)
+  => GHC.Located old -> GHC.Located new -> Anns -> Anns
+copyAnnDP old new ans =
+  case Map.lookup (mkAnnKey old) ans of
+    Nothing -> ans
+    Just v  -> Map.insert (mkAnnKey new) newAnn ans
+      where
+        dp = annEntryDelta v
+        newAnn = annNone {annEntryDelta = dp}
