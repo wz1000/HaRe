@@ -63,7 +63,9 @@ locWithAnnVal a = do
   return lA
 
 
---Takes in a lhs pattern and a rhs. Wraps those in a lambda and adds the annotations associated with the lambda. Returns the new located lambda expression
+-- |Takes in a lhs pattern and a rhs. Wraps those in a lambda and adds the
+--annotations associated with the lambda. Returns the new located lambda
+--expression
 wrapInLambda :: GHC.LPat GHC.RdrName -> ParsedGRHSs -> RefactGhc (GHC.LHsExpr GHC.RdrName)
 wrapInLambda varPat rhs = do
   match@(GHC.L l match')  <- mkLamMatch varPat rhs
@@ -77,10 +79,10 @@ wrapInLambda varPat rhs = do
 #endif
   currAnns <- fetchAnnsFinal
   --logm $ "Anns :" ++ (show $ getAllAnns currAnns match)
-  let l_lam = (GHC.L l (GHC.HsLam mg))
+  let l_lam = GHC.L l (GHC.HsLam mg)
   par_lam <- wrapInPars l_lam
-  logDataWithAnns "newLambda" par_lam
-  logExactprint "lam2" l_lam
+  -- logDataWithAnns "newLambda" par_lam
+  -- logExactprint "lam2" l_lam
   return par_lam
 
   --This function makes a match suitable for use inside of a lambda expression.

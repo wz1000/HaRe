@@ -1,8 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUGE QuasiQuotes #-}
 
 {- Main.hs -}
-module TH.Main where
+module Main where
 
 -- Import our template "pr"
 import TH.Printf

@@ -268,7 +268,7 @@ Executable hlist1
   default-language:    Haskell2010
 
 -- ---------------------------------------------------------------------
-  
+
 Executable hlist2
   Main-Is: HughesList/HList2.hs
   Build-Depends:          base >= 4.0 && < 5
@@ -276,7 +276,7 @@ Executable hlist2
   default-language:    Haskell2010
 
 -- ---------------------------------------------------------------------
-  
+
 Executable hlist3
   Main-Is: HughesList/HList3.hs
   Build-Depends:          base >= 4.0 && < 5
@@ -284,7 +284,7 @@ Executable hlist3
   default-language:    Haskell2010
 
 -- ---------------------------------------------------------------------
-  
+
 Executable hlist4
   Main-Is: HughesList/HList4.hs
   Build-Depends:          base >= 4.0 && < 5
@@ -292,14 +292,14 @@ Executable hlist4
   default-language:    Haskell2010
 
   -- ---------------------------------------------------------------------
-  
+
 Executable fhlist1
   Main-Is: HughesList/FHList1.hs
   Build-Depends:          base >= 4.0 && < 5
                         , deepseq
   default-language:    Haskell2010
 -- ---------------------------------------------------------------------
-  
+
 Executable fhlist2
   Main-Is: HughesList/FHList2.hs
   Build-Depends:          base >= 4.0 && < 5

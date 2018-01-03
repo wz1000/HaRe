@@ -1323,7 +1323,7 @@ spec = do
 
       (show fds) `shouldBe`
             "(FN [System.IO.putStrLn, pr],"++
-             "DN [TH.Main.main, TH.Main.baz, TH.Main.sillyString])"
+             "DN [Main.main, Main.baz, Main.sillyString])"
 
   -- ---------------------------------------------
 

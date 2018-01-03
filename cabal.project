@@ -1,3 +1,5 @@
 packages: .
-         ../ghc-mod-core
+          ../../DanielG/cabal-helper
+          ../../alanz/ghc-mod/core
+
 

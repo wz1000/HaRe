@@ -453,7 +453,7 @@ renameTopLevelVarName oldPN newName newNameGhc exportChecking = do
 
 renameLocalVarName :: (SYB.Data t) => GHC.Name -> String -> GHC.Name -> t -> RefactGhc t
 renameLocalVarName oldPN newName newNameGhc t = do
-  nm <- getRefactNameMap
+  -- nm <- getRefactNameMap
   let qual = PreserveQualify
   (f,d) <- hsFDNamesFromInsideRdr t
   if elem newName (d \\ [showGhc oldPN])  --only check the declared names here.

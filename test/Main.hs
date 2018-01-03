@@ -44,7 +44,9 @@ stackFiles =
 -- not be able to load the files
 resolver :: String
 resolver =
-#if __GLASGOW_HASKELL__ >= 802
+#if (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,2,2,0)))
+  "resolver: lts-10.2"
+#elif __GLASGOW_HASKELL__ >= 802
   "resolver: nightly-2017-09-02"
 #elif __GLASGOW_HASKELL__ > 710
   "resolver: nightly-2017-05-23"
@@ -65,6 +67,7 @@ stackFileContents = unlines
   , "- conversion-bytestring-1.0.1"
   , "- conversion-case-insensitive-1.0.0.0"
   , "- conversion-text-1.0.1"
+  , "- syb-0.7"
   ]
 {-
 stackFileContents :: String
