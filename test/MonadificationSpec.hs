@@ -30,9 +30,10 @@ spec = do
       diff `shouldBe` []
 
     it "Monadify function with partial evaluation and case expressions" $ do
-      res <- ct $ monadification logTestSettings testOptions "./Monadification/test.hs" [(4,1),(7,1),(10,1)]
-      res' <- ct $ mapM makeRelativeToCurrentDirectory res
-      res' `shouldBe` ["Monadification/test.hs"]
-      diff <- ct $ compareFiles "./Monadification/test.refactored.hs"
-                                "./Monadification/test.hs.expected"
-      diff `shouldBe` []
+      pendingWith "waiting for test file"
+      -- res <- ct $ monadification logTestSettings testOptions "./Monadification/test.hs" [(4,1),(7,1),(10,1)]
+      -- res' <- ct $ mapM makeRelativeToCurrentDirectory res
+      -- res' `shouldBe` ["Monadification/test.hs"]
+      -- diff <- ct $ compareFiles "./Monadification/test.refactored.hs"
+      --                           "./Monadification/test.hs.expected"
+      -- diff `shouldBe` []
