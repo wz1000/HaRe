@@ -93,8 +93,8 @@ import qualified GhcMod.Utils  as GM
 import qualified Module        as GHC
 import qualified Name          as GHC
 import qualified Unique        as GHC
-import qualified HscTypes      as GHC (md_exports)
-import qualified TcRnTypes     as GHC (tcg_rdr_env)
+-- import qualified HscTypes      as GHC (md_exports)
+-- import qualified TcRnTypes     as GHC (tcg_rdr_env)
 #if __GLASGOW_HASKELL__ > 710
 import qualified Var
 #endif
@@ -577,7 +577,7 @@ initRdrNameMap tm = r
 
 #if (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,2,1,0)))
     -- This is a workaround for https://ghc.haskell.org/trac/ghc/ticket/14189
-    namesIeParsedL = SYB.everything (++) ([] `SYB.mkQ` ieThingWith) (GHC.hsmodExports $ GHC.unLoc parsed)
+    -- namesIeParsedL = SYB.everything (++) ([] `SYB.mkQ` ieThingWith) (GHC.hsmodExports $ GHC.unLoc parsed)
     namesIeParsed = Map.fromList $ SYB.everything (++) ([] `SYB.mkQ` ieThingWith) (GHC.hsmodExports $ GHC.unLoc parsed)
 
 

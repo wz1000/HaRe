@@ -227,12 +227,12 @@ threadState opt currState (rGhc : rst) = do
 
 -- ---------------------------------------------------------------------
 
-cdAndDo :: FilePath -> IO a -> IO a
-cdAndDo path fn = do
-  old <- getCurrentDirectory
-  r <- GHC.gbracket (setCurrentDirectory path) (\_ -> setCurrentDirectory old)
-          $ const fn
-  return r
+-- cdAndDo :: FilePath -> IO a -> IO a
+-- cdAndDo path fn = do
+--   old <- getCurrentDirectory
+--   r <- GHC.gbracket (setCurrentDirectory path) (\_ -> setCurrentDirectory old)
+--           $ const fn
+--   return r
 
 -- ---------------------------------------------------------------------
 

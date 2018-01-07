@@ -163,18 +163,18 @@ replaceFunBind pos bnd = do
   putRefactParsed newParsed emptyAnns
     where comp :: GHC.RdrName -> GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
 #if __GLASGOW_HASKELL__ <= 710
-          comp nm b@(GHC.FunBind (GHC.L _ id) _ _ _ _ _)
+          comp nm b@(GHC.FunBind (GHC.L _ n) _ _ _ _ _)
 #else
-          comp nm b@(GHC.FunBind (GHC.L _ id) _ _ _ _)
+          comp nm b@(GHC.FunBind (GHC.L _ n) _ _ _ _)
 #endif
-            | id == nm = return bnd
+            | n == nm = return bnd
             | otherwise = return b
           comp _ x = return x
 
 
 --Adds backquotes around a function call
 addBackquotes :: ParsedLExpr -> RefactGhc ()
-addBackquotes var@(GHC.L l _) = do
+addBackquotes var = do
   anns <- liftT getAnnsT
   let (Just oldAnn) = Map.lookup (mkAnnKey var) anns
       annsLst = annsDP oldAnn
@@ -226,7 +226,7 @@ constructLHsTy nm = do
 insertNewDecl :: String -> RefactGhc ParsedLDecl
 insertNewDecl declStr = do
   (GHC.L pSpn hsMod) <- getRefactParsed
-  trgtMod <- getRefactTargetModule
+  -- trgtMod <- getRefactTargetModule
   -- Use a fake filepath the ensure that the location remains unique
   let fp = "HaRe"--GM.mpPath trgtMod
   logm $ "Inserting decl into " ++ fp
@@ -234,7 +234,7 @@ insertNewDecl declStr = do
   let pRes = parseDecl df fp declStr
   case pRes of
     Left (_spn, str) -> error $ "insertNewDecl: decl parse failed with message:\n" ++ str
-    Right (anns, decl@(GHC.L spn _)) -> do
+    Right (anns, decl) -> do
       let oldDecs = GHC.hsmodDecls hsMod
           newParsed = (GHC.L pSpn (hsMod {GHC.hsmodDecls = oldDecs ++ [decl]}))
       putRefactParsed newParsed anns

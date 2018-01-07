@@ -2362,10 +2362,10 @@ renamePN oldPN newName useQual t = do
 #endif
        else return x
 
-    renameLIE useQual' x@(GHC.L l (GHC.IEThingAbs old@(GHC.L _ln n))) = do
+    renameLIE useQual' x@(GHC.L l (GHC.IEThingAbs old)) = do
      nm <- getRefactNameMap
 #if __GLASGOW_HASKELL__ <= 800
-     if cond nm (GHC.L l n)
+     if cond nm old
        then do
           new <- makeNewName old (newNameCalc useQual' n)
           return (GHC.L l (GHC.IEThingAbs new))

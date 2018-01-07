@@ -43,8 +43,8 @@ import qualified GHC.SYB.Utils as SYB
 import Control.Monad
 import Data.Data
 import Data.Maybe
-import Language.Haskell.Refact.Utils.Monad
-import Language.Haskell.Refact.Utils.MonadFunctions
+-- import Language.Haskell.Refact.Utils.Monad
+-- import Language.Haskell.Refact.Utils.MonadFunctions
 
 import qualified Data.Generics.Zipper as Z
 
