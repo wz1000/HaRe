@@ -47,10 +47,10 @@ import Data.Generics.Strafunski.StrategyLib.StrategyLib
 isoRefact :: Int -> Maybe String -> GHC.RdrName -> GHC.Type -> IsoRefactState -> ParsedBind -> RefactGhc ParsedBind
 isoRefact _ mqual funNm newFTy iST bnd = do
   typedS <- getRefactTyped
-  let m_fTy = getTypeFromRdr funNm typedS
-      fTy = gfromJust "isoRefact: getting function type" m_fTy
-      newResTy = getResultType newFTy
-      paramTys = breakType newFTy
+  -- let m_fTy = getTypeFromRdr funNm typedS
+  --     fTy = gfromJust "isoRefact: getting function type" m_fTy
+  --     newResTy = getResultType newFTy
+  --     paramTys = breakType newFTy
   newBnd <- modMGAltsRHS (\e -> runIsoRefact (doIsoRefact e) iST) bnd
   return newBnd
 
@@ -231,8 +231,13 @@ addToTQ lst = do
 -- Breaks up a function type into a list of the types of the parameters
 breakType :: GHC.Type -> [GHC.Type]
 breakType ty = breakType' (consumeOuterForAlls ty)
-  where breakType' (GHC.FunTy lTy rTy) = breakType' lTy ++ breakType' rTy
-        breakType' ty = [ty]
+  where
+#if __GLASGOW_HASKELL__ >= 800
+    breakType' (GHC.ForAllTy _lTy rTy) = breakType' rTy
+#else
+    breakType' (GHC.FunTy lTy rTy) = breakType' lTy ++ breakType' rTy
+#endif
+    breakType' ty = [ty]
 
 {-
 NOTE: When do we catch if the goal type is nothing??? Does this happen when we find a var or when
@@ -250,7 +255,10 @@ compType (GHC.TyVarTy _) _ = True
 compType _ (GHC.TyVarTy _) = True --v1 == v2
 compType (GHC.AppTy l1 l2) (GHC.AppTy r1 r2) = compType l1 r1 && compType l2 r2
 compType (GHC.TyConApp tc1 lst1) (GHC.TyConApp tc2 lst2) = tc1 == tc2 && (and (zipWith compType lst1 lst2))
+#if __GLASGOW_HASKELL__ >= 800
+#else
 compType (GHC.FunTy l1 l2) (GHC.FunTy r1 r2) = compType l1 r1 && compType l2 r2
+#endif
 compType (GHC.ForAllTy v1 lTy) (GHC.ForAllTy v2 rTy) = compType lTy rTy
 compType (GHC.LitTy l) (GHC.LitTy r) = l == r
 compType _ _ = False
@@ -317,7 +325,10 @@ showType n (GHC.TyVarTy v) = indent n ++ "(TyVarTy " ++ SYB.showData SYB.TypeChe
 showType n (GHC.AppTy t1 t2) = indent n ++ "(AppTy\n" ++ (showType (n+1) t1) ++ "\n" ++ (showType (n+1) t2) ++ "\n)"
 showType n (GHC.TyConApp tc lst) = indent n ++ "(TyConApp: " ++ (printCon tc) ++
                                 (foldl (\rst ty -> rst ++ "\n" ++ (showType (n+1) ty)) "" lst) ++ ")"
+#if __GLASGOW_HASKELL__ >= 800
+#else
 showType n (GHC.FunTy t1 t2) = indent n ++ "(FunTy " ++ (showType (n+1) t1) ++ indent n ++ "->" ++ (showType (n+1) t2) ++ ")"
+#endif
 showType n (GHC.ForAllTy v ty) = indent n ++ "(ForAllTy: " ++ (SYB.showData SYB.TypeChecker (n+1) v) ++ "\n" ++ (showType (n+1) ty) ++ "\n)"
 showType n (GHC.LitTy tl) = indent n ++ "(LitTy: " ++ showTyLit tl ++ ")"
 
@@ -343,10 +354,13 @@ getResultType :: GHC.Type -> GHC.Type
 --if we find a FunTy constructor we continue to descent the type down the RHS
 --until we find a non-FunTy constructor
 getResultType (GHC.ForAllTy _ ty) = getResultType ty
+#if __GLASGOW_HASKELL__ >= 800
+#else
 getResultType (GHC.FunTy _ ty) = comp ty
   where comp :: GHC.Type -> GHC.Type
         comp (GHC.FunTy _ ty) = comp ty
         comp ty = ty
+#endif
 getResultType ty = ty
 
 modMGAltsRHS :: (ParsedLExpr -> RefactGhc ParsedLExpr) -> ParsedBind -> RefactGhc ParsedBind
@@ -423,7 +437,7 @@ tcExprInTargetMod idecl ex = do
     lst = (GHC.IIDecl (GHC.unLoc idecl)):oldCntx --(GHC.IIModule nm):oldCntx
   GHC.setContext lst
   env <- GHC.getSession
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
   liftIO $ GHC.tcRnExpr env GHC.TM_Default ex
 #else
   liftIO $ GHC.tcRnExpr env ex

@@ -51,7 +51,7 @@ monadifyFunc nmsList pos = do
 #if __GLASGOW_HASKELL__ >= 800
       (Just funBind) = getHsBind pos parsed
 #else
-      (Just funBind) = getHsBind (GHC.unLoc rdr) parsed
+      (Just funBind) = getHsBind pos parsed
 #endif
   monadifyFunBind pos nmsList funBind
   --logParsedSource "After monadification"
@@ -496,16 +496,19 @@ addMonadToSig pos = do
       logm $ "addMonadToSig: sig not found"
       return ()
     where modTySig :: GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
           modTySig (GHC.TypeSig nms (GHC.HsWC wcs (GHC.HsIB a ty b)))
              = (modType ty) >>= (\nTy -> return (GHC.TypeSig nms (GHC.HsWC wcs (GHC.HsIB a nTy b))))
+#elif __GLASGOW_HASKELL__ >= 800
+          modTySig (GHC.TypeSig names (GHC.HsIB pvs (GHC.HsWC pns wcs ty)))
+             = (modType ty) >>= (\nTy -> return (GHC.TypeSig names (GHC.HsIB pvs (GHC.HsWC pns wcs nTy))))
 #else
           modTySig (GHC.TypeSig nms ty pstRn) = (modType ty)  >>= (\nTy -> return (GHC.TypeSig nms nTy pstRn))
 #endif
           modTySig _ = error "addMonadToSig: modTySig called with an unknown constructor."
 
           modType :: GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
           modType (GHC.L l (GHC.HsQualTy (GHC.L l2 cntxt) ty)) = do
             lMonad <- locate (mkRdrName "Monad")
             lMonTy <- locWithAnnVal (GHC.HsTyVar GHC.NotPromoted lMonad)
@@ -557,6 +560,58 @@ addMonadToSig pos = do
             setDP  (DP (0,1)) newTy
             retTy <- locate (GHC.HsQualTy newCntxt newTy)
             return retTy
+#elif __GLASGOW_HASKELL__ >= 800
+          modType (GHC.L l (GHC.HsQualTy (GHC.L l2 cntxt) ty)) = do
+            lMonad <- locate (mkRdrName "Monad")
+            lMonTy <- locWithAnnVal (GHC.HsTyVar lMonad)
+            zeroDP lMonTy
+            lm <- locate (mkRdrName "m")
+            lVarTy <- locWithAnnVal (GHC.HsTyVar lm)
+            newTy <- wrapResTy (mkRdrName "m") ty
+            let appTy = (GHC.HsAppTy lMonTy lVarTy)
+            lAppTy <- locWithAnnVal appTy
+            zeroDP lAppTy
+            newCntxt <- if (null cntxt)
+                        then do
+              lCntxt <- locate [lAppTy]
+              (addNewKeyword (G GHC.AnnDarrow, DP (0,1)) lCntxt)
+              zeroDP lCntxt
+              return lCntxt
+                        else return (GHC.L l2 (lAppTy:cntxt))
+            setDP  (DP (0,1)) newTy
+            return (GHC.L l (GHC.HsQualTy newCntxt newTy))
+          modType (GHC.L l (GHC.HsForAllTy bndrs ty)) = do
+            lMonad <- locate (mkRdrName "Monad")
+            lMonTy <- locWithAnnVal (GHC.HsTyVar lMonad)
+            zeroDP lMonTy
+            lm <- locate (mkRdrName "m")
+            lVarTy <- locWithAnnVal (GHC.HsTyVar lm)
+            newTy <- wrapResTy (mkRdrName "m") ty
+            let appTy = (GHC.HsAppTy lMonTy lVarTy)
+            lAppTy <- locWithAnnVal appTy
+            zeroDP lAppTy
+            setDP  (DP (0,1)) newTy
+            return (GHC.L l (GHC.HsForAllTy bndrs newTy))
+          modType ty = do
+            lMonad <- locate (mkRdrName "Monad")
+            addAnnVal lMonad
+            lMonTy <- locate (GHC.HsTyVar lMonad)
+            -- zeroDP lMonTy
+            lm <- locate (mkRdrName "m")
+            addAnnVal lm
+            lVarTy <- locate (GHC.HsTyVar lm)
+            newTy <- wrapResTy (mkRdrName "m") ty
+            let appTy = (GHC.HsAppTy lMonTy lVarTy)
+            lAppTy <- locWithAnnVal appTy
+            zeroDP lAppTy
+            newCntxt <- do
+              lCntxt <- locate [lAppTy]
+              (addNewKeyword (G GHC.AnnDarrow, DP (0,1)) lCntxt)
+              zeroDP lCntxt
+              return lCntxt
+            setDP  (DP (0,1)) newTy
+            retTy <- locate (GHC.HsQualTy newCntxt newTy)
+            return retTy
 #else
           modType (GHC.L l (GHC.HsForAllTy flg mSpn bndrs (GHC.L l2 cntxt) ty)) = do
             lMonTy <- locWithAnnVal (GHC.HsTyVar (mkRdrName "Monad"))
@@ -580,11 +635,17 @@ addMonadToSig pos = do
           wrapResTy rdr (GHC.L l (GHC.HsFunTy lTy rTy)) = do
             nRTy <- wrapResTy rdr rTy
             return (GHC.L l (GHC.HsFunTy lTy nRTy))
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
           wrapResTy rdr locTy = do
             rdrL <- locate rdr
             addAnnVal rdrL
             lTyVar <- locate (GHC.HsTyVar GHC.NotPromoted rdrL)
+            locate (GHC.HsAppTy lTyVar locTy)
+#elif __GLASGOW_HASKELL__ >= 800
+          wrapResTy rdr locTy = do
+            rdrL <- locate rdr
+            addAnnVal rdrL
+            lTyVar <- locate (GHC.HsTyVar rdrL)
             locate (GHC.HsAppTy lTyVar locTy)
 #else
           wrapResTy rdr locTy = locWithAnnVal (GHC.HsTyVar rdr) >>= (\ lTyVar -> locate (GHC.HsAppTy lTyVar locTy))

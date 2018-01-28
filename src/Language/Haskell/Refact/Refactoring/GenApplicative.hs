@@ -44,7 +44,7 @@ doGenApplicative fileName pos = do
 #if __GLASGOW_HASKELL__ >= 800
       funBind = case getHsBind pos parsed of
 #else
-      funBind = case getHsBind (GHC.unLoc lrdr) parsed of
+      funBind = case getHsBind pos parsed of
 #endif
                   (Just fb) -> fb
                   Nothing -> error "That location is not the start of a function"

@@ -112,7 +112,7 @@ doHughesList fileName funNm pos argNum fStrs = do
 #if __GLASGOW_HASKELL__ >= 800
     (Just funBind) = getHsBind pos parsed
 #else
-    (Just funBind) = getHsBind rdr parsed
+    (Just funBind) = getHsBind pos parsed
 #endif
     (Just tySig) = getTypeSig pos funNm parsed
     newResTy = getResultType ty
@@ -287,11 +287,14 @@ resultTypeToDList tc = modResultType f
 modResultType :: (GHC.Type -> GHC.Type) -> GHC.Type -> GHC.Type
 modResultType f (GHC.ForAllTy v ty) = let newTy = modResultType f ty in
                                         (GHC.ForAllTy v newTy)
+#if __GLASGOW_HASKELL__ >= 800
+#else
 modResultType f (GHC.FunTy t1 t2) = let newT2 = comp t2 in
                                       (GHC.FunTy t1 newT2)
   where comp (GHC.FunTy t1 t2) = let newT2 = comp t2 in
                                    (GHC.FunTy t1 newT2)
         comp ty = f ty
+#endif
 modResultType f ty = f ty
 
 --This function inserts a definition and grabs the DList type constructor

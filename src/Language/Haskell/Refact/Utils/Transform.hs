@@ -202,12 +202,14 @@ constructHsVar nm = do
 
 constructLHsTy :: GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
 constructLHsTy nm = do
-#if __GLASGOW_HASKELL__ <= 802
+#if __GLASGOW_HASKELL__ >= 802
   lNm <- locate nm
+  newTy <- locate (GHC.HsTyVar GHC.NotPromoted lNm)
   addAnnVal lNm
   zeroDP lNm
-  newTy <- locate (GHC.HsTyVar GHC.NotPromoted lNm)
-#elif __GLASGOW_HASKELL__ <= 800
+#elif __GLASGOW_HASKELL__ >= 800
+  lNm <- locate nm
+  newTy <- locate (GHC.HsTyVar lNm)
   lNm <- locate nm
   addAnnVal lNm
   zeroDP lNm
@@ -305,7 +307,7 @@ replaceFunRhs pos newRhs = do
 --You also need to handle spacing before the type signature element
 traverseTypeSig :: Int -> (GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName))
                 -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
 traverseTypeSig argNum f (GHC.TypeSig lst (GHC.HsWC wcs (GHC.HsIB v ty c))) = do
   newTy <- comp argNum ty
   return (GHC.TypeSig lst (GHC.HsWC wcs (GHC.HsIB v newTy c)))
@@ -314,6 +316,26 @@ traverseTypeSig argNum f (GHC.TypeSig lst (GHC.HsWC wcs (GHC.HsIB v ty c))) = do
       case ty of
         (GHC.L _ (GHC.HsFunTy _ _)) -> comp' argNum ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy bndrs res)))
         _ -> f ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy bndrs res)))
+    comp' 1 (GHC.L l (GHC.HsFunTy lhs rhs)) = do
+      resLHS <- f lhs
+      let funTy = (GHC.L l (GHC.HsFunTy resLHS rhs))
+      zeroDP funTy
+      return funTy
+    comp' 1 lTy = f lTy
+    comp' n (GHC.L l (GHC.HsFunTy lhs rhs)) = comp' (n-1) rhs >>= (\res -> return (GHC.L l (GHC.HsFunTy lhs res)))
+    comp' _ lHsTy@(GHC.L _ ty) = return lHsTy
+#elif __GLASGOW_HASKELL__ >= 800
+traverseTypeSig argNum f (GHC.TypeSig lst (GHC.HsIB vs (GHC.HsWC ns mc ty) )) = do
+  newTy <- comp argNum ty
+  return (GHC.TypeSig lst (GHC.HsIB vs (GHC.HsWC ns mc newTy) ))
+  where
+    comp :: Int -> GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
+    comp argNum (GHC.L l (GHC.HsForAllTy bndrs ty)) =
+      case ty of
+        (GHC.L _ (GHC.HsFunTy _ _)) -> comp' argNum ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy bndrs res)))
+        _                           -> f ty            >>= (\res -> return (GHC.L l (GHC.HsForAllTy bndrs res)))
+
+    comp' :: Int -> GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
     comp' 1 (GHC.L l (GHC.HsFunTy lhs rhs)) = do
       resLHS <- f lhs
       let funTy = (GHC.L l (GHC.HsFunTy resLHS rhs))

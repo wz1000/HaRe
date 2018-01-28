@@ -14,16 +14,11 @@ import Language.Haskell.GHC.ExactPrint.Parsers
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Utils
 import Language.Haskell.GHC.ExactPrint.Types
--- import Language.Haskell.GHC.ExactPrint.Transform
--- import qualified Outputable as GHC
 import Control.Applicative
 import qualified Data.Map as Map
 import qualified OccName as GHC
 import qualified RdrName as GHC
--- import qualified BasicTypes as GHC
--- import qualified ApiAnnotation as GHC
 import qualified Type as GHC
--- import Data.Maybe
 import FastString
 
 maybeToMonadPlus :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> String -> Int -> IO [FilePath]
@@ -406,10 +401,15 @@ fixType' funNm argPos = do
   putRefactParsed newParsed anns
     where replaceMaybeWithVariable :: GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
           replaceMaybeWithVariable sig = SYB.everywhereM (SYB.mkM worker) sig
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
             where worker tyVar@(GHC.HsTyVar p (GHC.L lv rdrName))
                     | compNames "Maybe" rdrName = let newRdr = (GHC.mkVarUnqual . fsLit) "m" in
                         return (GHC.HsTyVar p (GHC.L lv newRdr))
+                    | otherwise = return tyVar
+#elif __GLASGOW_HASKELL__ >= 800
+            where worker tyVar@(GHC.HsTyVar (GHC.L lv rdrName))
+                    | compNames "Maybe" rdrName = let newRdr = (GHC.mkVarUnqual . fsLit) "m" in
+                        return (GHC.HsTyVar (GHC.L lv newRdr))
                     | otherwise = return tyVar
 #else
             where worker tyVar@(GHC.HsTyVar rdrName)
@@ -419,7 +419,7 @@ fixType' funNm argPos = do
 #endif
                   worker var = return var
           fixTypeClass :: GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
           fixTypeClass sig@(GHC.TypeSig names (GHC.HsWC wcs (GHC.HsIB a (GHC.L lt hsType) b))) =
             case hsType of
               (GHC.HsQualTy context ty) -> do
@@ -472,6 +472,62 @@ fixType' funNm argPos = do
                 let qualTy = GHC.HsQualTy newContext (GHC.L lt hsType)
                 qualTyL <- locate qualTy
                 return (GHC.TypeSig names (GHC.HsWC wcs (GHC.HsIB a qualTyL b)))
+#elif __GLASGOW_HASKELL__ >= 800
+          -- fixTypeClass sig@(GHC.TypeSig names (GHC.HsWC pns wcs (GHC.HsIB a (GHC.L lt hsType)))) =
+          fixTypeClass sig@(GHC.TypeSig names (GHC.HsIB pvs (GHC.HsWC pns wcs (GHC.L lt hsType)))) =
+            case hsType of
+              (GHC.HsQualTy context ty) -> do
+                newContext <- case context of
+                                (GHC.L _ []) -> do
+                                  tyCls <- genMonadPlusClass
+                                  parTy <- locate (GHC.HsParTy tyCls)
+                                  addNewKeyword ((G GHC.AnnCloseP),DP (0,0)) parTy
+                                  liftT $ setPrecedingLinesT parTy 0 (-1)
+                                  lList <- locate [parTy]
+                                  addNewKeywords [((G GHC.AnnOpenP), DP (0,0)),((G GHC.AnnCloseP), DP (0,-1)),((G GHC.AnnDarrow), DP (0,1))] lList
+                                  return lList
+                                (GHC.L _ [(GHC.L _ (GHC.HsParTy innerTy))]) -> do
+                                  tyCls <- genMonadPlusClass
+                                  lList <- locate [innerTy,tyCls]
+                                  return lList
+                                (GHC.L _ lst) -> do
+                                  tyCls <- genMonadPlusClass
+                                  lList <- locate (tyCls:lst)
+                                  return lList
+                newForAll <- locate (GHC.HsQualTy newContext ty)
+                liftT $ setPrecedingLinesT ty 0 1
+                liftT $ setPrecedingLinesT newForAll 0 1
+                -- return (GHC.TypeSig names (GHC.HsWC wcs (GHC.HsIB a newForAll)))
+                return (GHC.TypeSig names (GHC.HsIB pvs (GHC.HsWC pns wcs newForAll)))
+              (GHC.HsForAllTy bndrs ty) -> do
+                newContext <- do
+                                  tyCls <- genMonadPlusClass
+                                  parTy <- locate (GHC.HsParTy tyCls)
+                                  addNewKeyword ((G GHC.AnnCloseP),DP (0,0)) parTy
+                                  liftT $ setPrecedingLinesT parTy 0 (-1)
+                                  lList <- locate [parTy]
+                                  addNewKeywords [((G GHC.AnnOpenP), DP (0,0)),((G GHC.AnnCloseP), DP (0,-1)),((G GHC.AnnDarrow), DP (0,1))] lList
+                                  return lList
+                -- newForAll <- locate (GHC.HsForAllTy b ty)
+                newForAll <- locate (GHC.HsQualTy newContext ty)
+                liftT $ setPrecedingLinesT ty 0 1
+                liftT $ setPrecedingLinesT newForAll 0 1
+                -- return (GHC.TypeSig names (GHC.HsWC pns wcs (GHC.HsIB a newForAll b)))
+                return (GHC.TypeSig names (GHC.HsIB pvs (GHC.HsWC pns wcs newForAll)))
+              unexpected -> do
+                logDataWithAnns "fixTypeClass:unexpected" unexpected
+                newContext <- do
+                                  tyCls <- genMonadPlusClass
+                                  parTy <- locate (GHC.HsParTy tyCls)
+                                  -- addNewKeyword ((G GHC.AnnCloseP),DP (0,0)) parTy
+                                  liftT $ setPrecedingLinesT parTy 0 (-1)
+                                  lList <- locate [parTy]
+                                  addNewKeywords [((G GHC.AnnOpenP), DP (0,1)),((G GHC.AnnCloseP), DP (0,0)),((G GHC.AnnDarrow), DP (0,1))] lList
+                                  return lList
+                let qualTy = GHC.HsQualTy newContext (GHC.L lt hsType)
+                qualTyL <- locate qualTy
+                -- return (GHC.TypeSig names (GHC.HsWC wcs (GHC.HsIB a qualTyL b)))
+                return (GHC.TypeSig names (GHC.HsIB pvs (GHC.HsWC pns wcs qualTyL)))
 #else
           fixTypeClass sig@(GHC.TypeSig names (GHC.L _ hsType) p) =
             case hsType of
@@ -503,19 +559,27 @@ fixType' funNm argPos = do
           genMonadPlusClass = do
             let mPlusNm = GHC.mkVarUnqual (fsLit "MonadPlus")
                 mNm     = GHC.mkVarUnqual (fsLit "m")
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
             mPlusNmL <- locate mPlusNm
             addAnnValWithDP mPlusNmL (DP (0,0))
             lPlus <- locate (GHC.HsTyVar GHC.NotPromoted mPlusNmL)
+#elif __GLASGOW_HASKELL__ >= 800
+            mPlusNmL <- locate mPlusNm
+            addAnnValWithDP mPlusNmL (DP (0,0))
+            lPlus <- locate (GHC.HsTyVar mPlusNmL)
 #else
             lPlus <- locate (GHC.HsTyVar mPlusNm)
             addAnnVal lPlus
 #endif
             liftT $ setPrecedingLinesT lPlus 0 0
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
             mNmL <- locate mNm
             addAnnVal mNmL
             lM <- locate (GHC.HsTyVar GHC.NotPromoted mNmL)
+#elif __GLASGOW_HASKELL__ >= 800
+            mNmL <- locate mNm
+            addAnnVal mNmL
+            lM <- locate (GHC.HsTyVar mNmL)
 #else
             lM <- locate (GHC.HsTyVar mNm)
             addAnnVal lM
@@ -568,7 +632,7 @@ compNames s rdr = let sRdr = (GHC.occNameString . GHC.rdrNameOcc) rdr in
 
 getInnerType :: GHC.Sig GHC.RdrName -> Maybe (GHC.LHsType GHC.RdrName)
 getInnerType = SYB.everything (<|>) (Nothing `SYB.mkQ` getTy)
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
   where getTy :: GHC.HsType GHC.RdrName -> Maybe (GHC.LHsType GHC.RdrName)
         getTy (GHC.HsAppsTy [GHC.L _ (GHC.HsAppPrefix mCon), GHC.L _ (GHC.HsAppPrefix otherTy)])
           = if isMaybeTy mCon
@@ -578,6 +642,17 @@ getInnerType = SYB.everything (<|>) (Nothing `SYB.mkQ` getTy)
 
         isMaybeTy :: GHC.LHsType GHC.RdrName -> Bool
         isMaybeTy (GHC.L _ (GHC.HsTyVar _ (GHC.L _ (GHC.Unqual occNm)))) = (GHC.occNameString occNm) == "Maybe"
+        isMaybeTy _ = False
+#elif __GLASGOW_HASKELL__ >= 800
+  where getTy :: GHC.HsType GHC.RdrName -> Maybe (GHC.LHsType GHC.RdrName)
+        getTy (GHC.HsAppsTy [GHC.L _ (GHC.HsAppPrefix mCon), GHC.L _ (GHC.HsAppPrefix otherTy)])
+          = if isMaybeTy mCon
+                                             then Just otherTy
+                                             else Nothing
+        getTy _ = Nothing
+
+        isMaybeTy :: GHC.LHsType GHC.RdrName -> Bool
+        isMaybeTy (GHC.L _ (GHC.HsTyVar (GHC.L _ (GHC.Unqual occNm)))) = (GHC.occNameString occNm) == "Maybe"
         isMaybeTy _ = False
 #else
   where getTy :: GHC.HsType GHC.RdrName -> Maybe (GHC.LHsType GHC.RdrName)

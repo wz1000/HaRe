@@ -1275,7 +1275,8 @@ isNewSignatureOk types = do
 
 -- ---------------------------------------------------------------------
 
--- TODO: complete this
+-- TODO: complete this.
+--   NOTE: It can be modelled on the GHC source function with the same name
 typeToLHsType :: GHC.Type -> Transform (GHC.LHsType GHC.RdrName)
 typeToLHsType (GHC.TyVarTy v)   = do
   ss <- uniqueSrcSpanT
@@ -2367,7 +2368,7 @@ renamePN oldPN newName useQual t = do
 #if __GLASGOW_HASKELL__ <= 800
      if cond nm old
        then do
-          new <- makeNewName old (newNameCalc useQual' n)
+          new <- makeNewName old (newNameCalc useQual' (GHC.unLoc old))
           return (GHC.L l (GHC.IEThingAbs new))
 #else
      if cond nm (GHC.ieLWrappedName old)
