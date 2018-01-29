@@ -108,7 +108,7 @@ spec = do
       t <- ct $ parsedFileGhc "./BCpp.hs"
 
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
-      (showGhc parsed) `shouldBe` "module BCpp where\nbob :: Int -> Int -> Int\nbob x y = x + y"
+      (showGhc parsed) `shouldBe` "module Main where\nbob :: Int -> Int -> Int\nbob x y = x + y\nmain = putStrLn \"hello\""
 
      -- ---------------------------------
     it "loads a file having a top comment and LANGUAGE CPP pragma" $ do
@@ -150,7 +150,7 @@ spec = do
       let dir = "./test/testdata/cabal/cabal1"
 
       let settings = defaultSettings { rsetEnabledTargets = (True,True,False,False)
-                                     -- , rsetVerboseLevel = Debug
+                                     , rsetVerboseLevel = Debug
                                      }
 
       r <-  cdAndDo dir $ rename settings testOptions "./src/Foo/Bar.hs" "baz1" (3, 1)
@@ -459,6 +459,19 @@ spec = do
 
     ------------------------------------
 
+    it "gets modules which directly or indirectly import a module #3" $ do
+      let dir = "./test/testdata/cabal/cabal1"
+      let
+        comp = do
+         parseSourceFileGhc "./src/Foo/Bar.hs"
+         tm <- getRefactTargetModule
+         g <- clientModsAndFiles tm
+         return g
+      (mg,_s) <- cdAndDo dir $ runRefactGhc comp initialState testOptions
+      -- (mg,_s) <- ct $ runRefactGhc comp initialLogOnState testOptions
+      showGhc (map GM.mpModule mg) `shouldBe` "[Main]"
+    ------------------------------------
+
     it "gets modules which import a module in different cabal targets" $ do
       currentDir <- getCurrentDirectory
       setCurrentDirectory "./test/testdata/cabal/cabal2"
@@ -629,7 +642,7 @@ spec = do
       ((t, mg), _s) <- ct $ runRefactGhc comp  initialState testOptions
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       (show $ getModuleName parsed) `shouldBe` "Just (ModuleName \"DupDef.Dd1\",\"DupDef.Dd1\")"
-      showGhc (map GM.mpModule mg) `shouldBe` "[DupDef.Dd2, DupDef.Dd3]"
+      showGhc (map GM.mpModule mg) `shouldBe` "[DupDef.Dd2, DupDef.Dd3, Main, Main]"
 
 
   -- -------------------------------------------------------------------

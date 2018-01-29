@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-module HList3 where
+module Main where
 
 --Super contrived example
 explode :: Int -> [a] -> [a]
@@ -10,3 +10,5 @@ f = do
   (lst :: [Int]) <- read <$> getLine
   let newLst = explode 3 lst
   print newLst
+
+main = putStrLn "hello"

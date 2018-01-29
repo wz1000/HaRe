@@ -750,7 +750,7 @@ negative=[(["PatBindIn2.hs"],["17","7"]),
     it "fails D2 5 1" $ do
      res <- catchException (ct $ demote defaultTestSettings testOptions "./Demote/D2.hs" (5,1))
      -- res <- catchException (ct $ demote logTestSettings testOptions "./Demote/D2.hs" (5,1))
-     (show res) `shouldBe` "Just \"This definition can not be demoted, as it is used in the client module 'Demote.A2'!\""
+     (show res) `shouldBe` "Just \"This definition can not be demoted, as it is used in the client module 'Main'!\""
 
     -- -----------------------------------------------------------------
 

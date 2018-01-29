@@ -1,4 +1,4 @@
-module GA2 where
+module Main where
 import Text.ParserCombinators.Parsec
 
 parseStr :: CharParser () String
@@ -6,3 +6,5 @@ parseStr = char '"' *> (many1 (noneOf "\"")) <* char '"'
 
 objEntry :: CharParser () (String, String)
 objEntry = (,) <$> (spaces *> parseStr <* spaces <* char ':') <*> (spaces *> (many1 digit) <* spaces)
+
+main = putStrLn "hello"

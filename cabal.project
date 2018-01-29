@@ -1,5 +1,6 @@
 packages: .
-          ../../DanielG/cabal-helper
           ../../alanz/ghc-mod/core
+          ../../alanz/cabal-helper
+          -- ../../alanz/ghc-exactprint
 
 

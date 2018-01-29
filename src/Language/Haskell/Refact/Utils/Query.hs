@@ -24,7 +24,7 @@ import Language.Haskell.GHC.ExactPrint.Types
 
 --Takes a single match and returns a tuple containing the grhs and the pattern
 --Assumptions:
-  -- Only a single pattern will be returned. Which pattern is returned depends on the behaviour of SYB.something. 
+  -- Only a single pattern will be returned. Which pattern is returned depends on the behaviour of SYB.something.
 getVarAndRHS :: GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> RefactGhc (GHC.LPat GHC.RdrName, ParsedGRHSs)
 getVarAndRHS match = do
   let (Just pat) = SYB.something (Nothing `SYB.mkQ` varPat) (GHC.m_pats match)
@@ -64,7 +64,7 @@ getFunName str = SYB.something (Nothing `SYB.mkQ` comp)
         --This seems pretty dangerous but it'll do in a pinch
     isNameString :: GHC.Name -> String -> Bool
     isNameString nm str = (GHC.nameOccName nm) == (GHC.mkVarOcc str)
-          
+
 
 getTypedHsBind :: (Data a) => GHC.OccName -> a -> Maybe (GHC.HsBind GHC.Id)
 getTypedHsBind occ = SYB.something (Nothing `SYB.mkQ` isBind)
@@ -76,11 +76,11 @@ getTypedHsBind occ = SYB.something (Nothing `SYB.mkQ` isBind)
 #endif
             |  (GHC.occName (GHC.idName nm)) == occ = (Just bnd)
         isBind _ = Nothing
-  
+
 
 --This looks up the type signature of the given identifier.
 --The given position is assumed to be the location of where the identifier is defined
---NOT the location of the type signature 
+--NOT the location of the type signature
 getTypeSig :: (Data a) => SimpPos -> String -> a -> Maybe (GHC.Sig GHC.RdrName)
 getTypeSig pos funNm a =
   let rdrNm = locToRdrName pos a in
@@ -119,22 +119,29 @@ extTwinQ f g a1 a2 =
   case mr of
     Nothing -> f a1 a2
     (Just r) -> r
-  where mr = cast a1 >>= (\b1 -> cast a2 >>= (\b2 -> Just $ g b1 b2))                        
+  where mr = cast a1 >>= (\b1 -> cast a2 >>= (\b2 -> Just $ g b1 b2))
 
 
 lookupByLoc :: (SYB.Data a,  SYB.Data b) => GHC.SrcSpan -> a -> Maybe (GHC.Located b)
+lookupByLoc loc = nameSybQuery comp
+  where comp :: (SYB.Data a) => GHC.Located a -> Maybe (GHC.Located a)
+        comp a@(GHC.L l _)
+          | l == loc = Just a
+          | otherwise = Nothing
+{-
 lookupByLoc loc = SYB.something (Nothing `SYB.mkQ` comp)
   where comp :: (SYB.Data a) => GHC.Located a -> Maybe (GHC.Located a)
         comp a@(GHC.L l _)
           | l == loc = Just a
           | otherwise = Nothing
+-}
 
-
-
-getIdFromVar :: ParsedLExpr -> RefactGhc (Maybe GHC.Id)
-getIdFromVar (GHC.L l var) = do
+getIdFromVar :: GHC.LHsExpr GHC.RdrName -> RefactGhc (Maybe GHC.Id)
+getIdFromVar v@(GHC.L l var) = do
+  logDataWithAnns "getIdFromVar:v=" v
   typed <- getRefactTyped
   let (mElem :: Maybe (GHC.LHsExpr GHC.Id)) = lookupByLoc l typed
+  logDataWithAnns "getIdFromVar" mElem
   return $ mElem >>= (\e -> SYB.something (Nothing `SYB.mkQ` comp) e)
   where
 #if __GLASGOW_HASKELL__ <= 710

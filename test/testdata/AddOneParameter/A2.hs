@@ -1,4 +1,4 @@
-module AddOneParameter.A2 where
+module Main where
 
 import AddOneParameter.C2
 
@@ -8,5 +8,7 @@ sumSq xs = sum (map sq xs) + sumSquares xs + sumSquares1 xs
 
 sq_f_2  = 2
 
-main = sumSq [1..4]
+maim :: Int
+maim = sumSq [1..4]
 
+main = putStrLn "hello"

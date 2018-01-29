@@ -2498,7 +2498,7 @@ spec = do
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (19, 1) parsed
-      (showGhcQual n) `shouldBe` "TokenTest.foo"
+      (showGhcQual n) `shouldBe` "Main.foo"
 
       let
         comp = do
@@ -2513,8 +2513,8 @@ spec = do
 
       ((nb,nn),s) <- runRefactGhc comp (initialState { rsModule = initRefactModule [] t }) testOptions
       -- ((nb,nn),s) <- runRefactGhc comp (initialLogOnState { rsModule = initRefactModule [] t }) testOptions
-      (showGhcQual (n,nn)) `shouldBe` "(TokenTest.foo, bar2)"
-      (sourceFromState s) `shouldBe` "module TokenTest where\n\n-- Test new style token manager\n\nbob a b = x\n  where x = 3\n\nbib a b = x\n  where\n    x = 3\n\n\nbab a b =\n  let bar = 3\n  in     b + bar -- ^trailing comment\n\n\n-- leading comment\nbar2 x y =\n  do c <- getChar\n     return c\n\n\n\n\n"
+      (showGhcQual (n,nn)) `shouldBe` "(Main.foo, bar2)"
+      (sourceFromState s) `shouldBe` "module Main where\n\n-- Test new style token manager\n\nbob a b = x\n  where x = 3\n\nbib a b = x\n  where\n    x = 3\n\n\nbab a b =\n  let bar = 3\n  in     b + bar -- ^trailing comment\n\n\n-- leading comment\nbar2 x y =\n  do c <- getChar\n     return c\n\nmain = putStrLn \"hello\"\n\n\n\n"
 #if __GLASGOW_HASKELL__ >= 802
       (showGhcQual nb) `shouldBe` "bar2 x y\n  = do c <- getChar\n       return c"
 #else
@@ -2529,7 +2529,7 @@ spec = do
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
       let Just n = locToNameRdrPure nm (19, 1) parsed
-      (showGhcQual n) `shouldBe` "TokenTest.foo"
+      (showGhcQual n) `shouldBe` "Main.foo"
 
       let
         comp = do
@@ -2546,8 +2546,8 @@ spec = do
 
       ((nb,_nn),s) <- runRefactGhc comp (initialState { rsModule = initRefactModule [] t }) testOptions
 
-      (showGhcQual n) `shouldBe` "TokenTest.foo"
-      (sourceFromState s) `shouldBe` "module TokenTest where\n\n-- Test new style token manager\n\nbob a b = x\n  where x = 3\n\nbib a b = x\n  where\n    x = 3\n\n\nbab a b =\n  let bar = 3\n  in     b + bar -- ^trailing comment\n\n\n-- leading comment\nbar2 x y =\n  do c <- getChar\n     return c\n\n\n\n\n"
+      (showGhcQual n) `shouldBe` "Main.foo"
+      (sourceFromState s) `shouldBe` "module Main where\n\n-- Test new style token manager\n\nbob a b = x\n  where x = 3\n\nbib a b = x\n  where\n    x = 3\n\n\nbab a b =\n  let bar = 3\n  in     b + bar -- ^trailing comment\n\n\n-- leading comment\nbar2 x y =\n  do c <- getChar\n     return c\n\nmain = putStrLn \"hello\"\n\n\n\n"
 #if __GLASGOW_HASKELL__ >= 802
       (showGhcQual nb) `shouldBe` "bar2 x y\n  = do c <- getChar\n       return c"
 #else
@@ -3095,7 +3095,7 @@ spec = do
       -- ((_nb,nn),s) <- ct $ runRefactGhc comp (initialLogOnState { rsModule = initRefactModule [] t }) testOptions
 
       (showGhcQual (n,nn)) `shouldBe` "(Renaming.QualServer.foo, foo1)"
-      (sourceFromState s) `shouldBe` "module Renaming.QualClient where\n\n{- foo is imported qualified as in QualClient. Renaming should\n   preserve the qualification there\n-}\n\nimport qualified Renaming.QualServer as QS\n\nbaz :: String\nbaz = QS.foo1 : \"hello\"\n"
+      (sourceFromState s) `shouldBe` "module Main where\n\n{- foo is imported qualified as in QualClient. Renaming should\n   preserve the qualification there\n-}\n\nimport qualified Renaming.QualServer as QS\n\nbaz :: String\nbaz = QS.foo1 : \"hello\"\n\nmain = putStrLn \"hello\"\n"
 
     ------------------------------------
 
@@ -3396,7 +3396,7 @@ spec = do
 
       -- putStrLn $ showAnnDataFromState s
 
-      (sourceFromState s) `shouldBe` "module DupDef.Dd2 where\n\nimport DupDef.Dd1 hiding (n1,n2)\n\n\nf2 x = ff (x+1)\n\nmm = 5\n\n\n"
+      (sourceFromState s) `shouldBe` "module DupDef.Dd2 where\n\nimport DupDef.Dd1 hiding (n1,n2)\n\n\nf2 x = ff (x+1)\n\nmm = 5\n"
 
     ------------------------------------
 
@@ -3423,7 +3423,7 @@ spec = do
 
          return (res,renamed2)
       ((_r,_r2),s) <- ct $ runRefactGhc comp (initialState { rsModule = initRefactModule [] t1}) testOptions
-      (sourceFromState s) `shouldBe` "module DupDef.Dd3 where\n\nimport DupDef.Dd1 hiding (dd,n1,n2)\n\n\nf2 x = ff (x+1)\n\nmm = 5\n\n\n"
+      (sourceFromState s) `shouldBe` "module DupDef.Dd3 where\n\nimport DupDef.Dd1 hiding (dd,n1,n2)\n\n\nf2 x = ff (x+1)\n\nmm = 5\n"
 
   -- ---------------------------------------------
 
@@ -3702,7 +3702,7 @@ spec = do
 
          return (res,renamed2)
       ((_r,_r2),s) <- ct $ runRefactGhc comp (initialState { rsModule = initRefactModule [] t }) testOptions
-      (sourceFromState s) `shouldBe` "module DupDef.Dd2 where\n\nimport DupDef.Dd1\nimport Data.List\n\n\nf2 x = ff (x+1)\n\nmm = 5\n\n\n"
+      (sourceFromState s) `shouldBe` "module DupDef.Dd2 where\n\nimport DupDef.Dd1\nimport Data.List\n\n\nf2 x = ff (x+1)\n\nmm = 5\n"
 
     -- ---------------------------------
 
@@ -3994,7 +3994,7 @@ spec = do
       ((r,n),_s) <- runRefactGhc comp (initialState { rsModule = initRefactModule [] t }) testOptions
       -- ((r,n),_s) <- runRefactGhc comp (initialLogOnState { rsModule = initRefactModule [] t }) testOptions
 
-      (showGhcQual (r,n)) `shouldBe` "(bob, TokenTest.bob)"
+      (showGhcQual (r,n)) `shouldBe` "(bob, Main.bob)"
 
     -- ---------------------------------
 

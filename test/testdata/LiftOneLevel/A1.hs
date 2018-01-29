@@ -1,7 +1,10 @@
-module LiftOneLevel.A1 where
- 
+module Main where
+
 import LiftOneLevel.C1
 
-main xs = case xs of
+maim :: [[Integer]] -> Integer
+maim xs = case xs of
              [] -> 0
              [x:xs] -> x^pow + sumSquares1 xs
+
+main = putStrLn "hello"

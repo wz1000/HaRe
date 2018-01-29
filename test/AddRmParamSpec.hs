@@ -2,6 +2,7 @@ module AddRmParamSpec (main, spec) where
 
 import           Test.Hspec
 
+import Data.List
 import Language.Haskell.Refact.Refactoring.AddRmParam
 
 import TestUtils
@@ -24,9 +25,9 @@ spec = do
 
       r' <- ct $ mapM makeRelativeToCurrentDirectory r
 
-      r' `shouldBe` [ "AddOneParameter/D3.hs"
-                    , "AddOneParameter/A3.hs"
-                    ]
+      sort r' `shouldBe` [ "AddOneParameter/A3.hs"
+                         , "AddOneParameter/D3.hs"
+                         ]
 
       diffD <- ct $ compareFiles "./AddOneParameter/D3.expected.hs"
                                  "./AddOneParameter/D3.refactored.hs"
@@ -44,10 +45,10 @@ spec = do
 
       r' <- ct $ mapM makeRelativeToCurrentDirectory r
 
-      r' `shouldBe` [ "AddOneParameter/D1.hs"
-                    , "AddOneParameter/A1.hs"
-                    , "AddOneParameter/C1.hs"
-                    ]
+      sort r' `shouldBe` [ "AddOneParameter/A1.hs"
+                         , "AddOneParameter/C1.hs"
+                         , "AddOneParameter/D1.hs"
+                         ]
 
       diffD <- ct $ compareFiles "./AddOneParameter/D1.expected.hs"
                                  "./AddOneParameter/D1.refactored.hs"
@@ -69,10 +70,10 @@ spec = do
 
       r' <- ct $ mapM makeRelativeToCurrentDirectory r
 
-      r' `shouldBe` [ "AddOneParameter/D2.hs"
-                    , "AddOneParameter/A2.hs"
-                    , "AddOneParameter/C2.hs"
-                    ]
+      sort r' `shouldBe` [ "AddOneParameter/A2.hs"
+                         , "AddOneParameter/C2.hs"
+                         , "AddOneParameter/D2.hs"
+                         ]
 
       diffD <- ct $ compareFiles "./AddOneParameter/D2.expected.hs"
                                  "./AddOneParameter/D2.refactored.hs"
@@ -253,9 +254,9 @@ negative=[(["PatIn2.hs"],["x","7","20"]),
 
       r' <- ct $ mapM makeRelativeToCurrentDirectory r
 
-      r' `shouldBe` [ "RmOneParameter/D1.hs"
-                    , "RmOneParameter/A1.hs"
-                    ]
+      sort r' `shouldBe` [ "RmOneParameter/A1.hs"
+                         , "RmOneParameter/D1.hs"
+                         ]
 
       diffD <- ct $ compareFiles "./RmOneParameter/D1.expected.hs"
                                  "./RmOneParameter/D1.refactored.hs"
@@ -274,9 +275,9 @@ negative=[(["PatIn2.hs"],["x","7","20"]),
 
       r' <- ct $ mapM makeRelativeToCurrentDirectory r
 
-      r' `shouldBe` [ "RmOneParameter/D2.hs"
-                    , "RmOneParameter/A2.hs"
-                    ]
+      sort r' `shouldBe` [ "RmOneParameter/A2.hs"
+                         , "RmOneParameter/D2.hs"
+                         ]
 
       diffD <- ct $ compareFiles "./RmOneParameter/D2.expected.hs"
                                  "./RmOneParameter/D2.refactored.hs"

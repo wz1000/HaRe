@@ -1,5 +1,5 @@
 {-#LANGUAGE DeriveGeneric, DeriveDataTypeable,OverloadedStrings #-}
-module HTMLTokenizer
+module GenApplicative.HTMLTokenizer
 (
   -- * Model
   Token(..),

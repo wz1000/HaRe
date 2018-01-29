@@ -1,8 +1,9 @@
-module Demote.A1 where
+module Main where
 
-import Demote.C1 
+import Demote.C1
 
-main xs = case xs of 
+maim xs = case xs of
              [] -> 0
              [x:xs] -> x^pow + sumSquares xs
 
+main = putStrLn "hello"

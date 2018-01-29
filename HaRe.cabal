@@ -222,6 +222,7 @@ test-suite spec
       -O0
       -- reinstate these later  -Wall
       -Wall
+      -threaded
       -- reinstate these later  -Werror
       -- -fhpc
       -- -fhpc -hpcdir dist/hpc/app-1.0

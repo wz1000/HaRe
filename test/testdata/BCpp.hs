@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE CPP #-}
 -- Check that we can parse a file which requires CPP
-module BCpp where
+module Main where
 
 bob :: Int -> Int -> Int
 #if __GLASGOW_HASKELL__ > 704
@@ -10,4 +10,4 @@ bob x y = x + y
 bob x y = x + y * 2
 #endif
 
-
+main = putStrLn "hello"

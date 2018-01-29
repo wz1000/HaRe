@@ -48,13 +48,13 @@ Executable foo
   default-language:    Haskell2010
 
 Executable dd2
-  Main-Is: DupDef/Dd2.hs
+  Main-Is: DupDef/Dd2Main.hs
   Build-Depends:          base >= 4.0  && < 5
                         , syb
   default-language:    Haskell2010
 
 Executable dd3
-  Main-Is: DupDef/Dd3.hs
+  Main-Is: DupDef/Dd3Main.hs
   Build-Depends:          base >= 4.0  && < 5
   default-language:    Haskell2010
 
@@ -96,7 +96,7 @@ Executable a5
   default-language:    Haskell2010
 
 Executable c7
-  Main-Is: Renaming/C7.hs
+  Main-Is: Renaming/C7Main.hs
   Other-Modules : Renaming.D7
   Build-Depends:          base >= 4.0  && < 5
                         , syb
@@ -247,7 +247,8 @@ Executable ga2
 -- ---------------------------------------------------------------------
 
 Executable gaHTML
-  Main-Is: GenApplicative/HTMLTokenizer.hs
+  Main-Is: GenApplicative/GaTokenizer.hs
+  Other-Modules:        GenApplicative.HTMLTokenizer
   Build-Depends:          base >= 4.0 && < 5
                         , attoparsec
                         , conversion-text
@@ -298,6 +299,7 @@ Executable fhlist1
   Build-Depends:          base >= 4.0 && < 5
                         , deepseq
   default-language:    Haskell2010
+
 -- ---------------------------------------------------------------------
 
 Executable fhlist2

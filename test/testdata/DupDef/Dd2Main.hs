@@ -1,7 +1,5 @@
 module Main where
 
-import DeleteDef.Dd2
-
-f x = 2 * (c x)
+import DupDef.Dd2
 
 main = putStrLn "hello"

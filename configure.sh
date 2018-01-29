@@ -15,7 +15,5 @@
 
 rm cabal.project.local
 rm -fr dist*
-# cabal-1.25 new-build --with-compiler=/opt/ghc/8.2.0.20170505/bin/ghc
-# cabal-1.25 new-configure --with-compiler=/opt/ghc/8.2.0.20170507/bin/ghc --allow-newer
-# cabal-1.25 new-configure --with-compiler=/opt/ghc/8.2.0.20170507/bin/ghc
-cabal-1.25 new-configure --with-compiler=ghc-8.0.2 --enable-tests
+# cabalm new-configure --with-compiler=ghc-8.0.2 --enable-tests
+cabalm new-configure --with-compiler=ghc-8.0.2 --enable-tests

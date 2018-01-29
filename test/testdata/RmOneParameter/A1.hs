@@ -1,8 +1,10 @@
-module RmOneParameter.A1 where
- 
+module Main where
+
 import RmOneParameter.D1
 
 sumSq xs ys= sum (map sq xs) + sumSquares xs ys
 
-main = sumSq [1..4]
+maim = sumSq [1..4]
+
+main = putStrLn "hello"
 

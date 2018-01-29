@@ -1,7 +1,5 @@
 module Main where
 
-import DeleteDef.Dd2
-
-f x = 2 * (c x)
+import Renaming.C7
 
 main = putStrLn "hello"

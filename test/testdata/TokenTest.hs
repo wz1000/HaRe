@@ -1,4 +1,4 @@
-module TokenTest where
+module Main where
 
 -- Test new style token manager
 
@@ -20,6 +20,7 @@ foo x y =
   do c <- getChar
      return c
 
+main = putStrLn "hello"
 
 
 

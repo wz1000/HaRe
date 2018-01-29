@@ -1,6 +1,8 @@
-module AddOneParameter.A3 where
+module Main where
 
 import AddOneParameter.D3
 
-main = (sumSquares sumSquares_y) [1..4]
+maim :: Int
+maim = (sumSquares sumSquares_y) [1..4]
 
+main = putStrLn "hello"

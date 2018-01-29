@@ -1,6 +1,8 @@
-module LiftToToplevel.A2 where
- 
-import LiftToToplevel.C2 
+module Main where
 
-main  = sumSquares [1..4] + anotherFun [1..4] 
+import LiftToToplevel.C2
+
+maim  = sumSquares [1..4] + anotherFun [1..4]
+
+main = putStrLn "hello"
 

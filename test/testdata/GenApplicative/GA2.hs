@@ -1,4 +1,4 @@
-module GA2 where
+module Main where
 import Text.ParserCombinators.Parsec
 
 parseStr :: CharParser () String 
@@ -14,3 +14,5 @@ objEntry = do
   i <- many1 digit
   spaces
   return (str, i)
+
+main = putStrLn "hello"

@@ -180,7 +180,7 @@ getRefactParsed = do
 
 putRefactParsed :: GHC.ParsedSource -> Anns -> RefactGhc ()
 putRefactParsed parsed newAnns = do
-  logm $ "putRefactParsed:setting rsStreamModified"
+  -- logm $ "putRefactParsed:setting rsStreamModified"
   st <- get
   mrm <- gets rsModule
   let rm = gfromJust "putRefactParsed" mrm
@@ -691,7 +691,6 @@ nameSybQuery checker = q
 #if __GLASGOW_HASKELL__ <= 710
                 `SYB.extQ` workerBind
                 `SYB.extQ` workerExpr
-                -- `SYB.extQ` workerLIE
                 `SYB.extQ` workerHsTyVarBndr
                 `SYB.extQ` workerLHsType
 #endif
