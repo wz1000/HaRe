@@ -257,8 +257,8 @@ clearParsedModule = do
   put $ st { rsModule = Nothing }
 
 
---Manually runs the typechecker on the target module parsed source,
---Updates the rsModule accordingly
+-- | Manually runs the typechecker on the target module parsed source, updates
+--the rsModule accordingly
 typeCheckModule :: RefactGhc ()
 typeCheckModule = do
   st <- get

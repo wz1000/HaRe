@@ -88,7 +88,7 @@ getTargetGhc (GM.ModulePath _mn fp) = parseSourceFileGhc fp
 -- | Parse a single source file into a GHC session
 parseSourceFileGhc :: FilePath -> RefactGhc ()
 parseSourceFileGhc targetFile = do
-  logm $ "parseSourceFileGhc:targetFile=" ++ targetFile
+  -- logm $ "parseSourceFileGhc:targetFile=" ++ targetFile
   (_, mtm) <- RefactGhc $ GM.getTypecheckedModuleGhc' id targetFile
   case mtm of
     Nothing -> error $ "Couldn't get typechecked module for " ++ targetFile
@@ -284,7 +284,7 @@ applyRefac' clearSt refac source = do
                                case mfn of
                                  Just fname -> return fname
                                  Nothing -> error "applyRefac RSAlreadyLoaded: nothing loaded"
-    logm $ "applyRefac':(fileName,source)=" ++ show (fileName,source)
+    -- logm $ "applyRefac':(fileName,source)=" ++ show (fileName,source)
 
     res <- refac  -- Run the refactoring, updating the state as required
 

@@ -26,15 +26,15 @@ import qualified Data.Map as Map
 import Data.Data
 import Data.Maybe
 import qualified Data.Generics as SYB
-import qualified GHC.SYB.Utils as SYB
-import qualified FastString as GHC
+-- import qualified GHC.SYB.Utils as SYB
+-- import qualified FastString as GHC
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Parsers
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.MonadFunctions
 import Language.Haskell.Refact.Utils.Types
-import Language.Haskell.Refact.Utils.Utils
+-- import Language.Haskell.Refact.Utils.Utils
 import Language.Haskell.Refact.Utils.TypeUtils
 import Language.Haskell.Refact.Utils.Synonyms
 import Language.Haskell.Refact.Utils.ExactPrint
@@ -77,7 +77,7 @@ wrapInLambda varPat rhs = do
   lMatchLst <- locate [match]
   let mg = GHC.MG lMatchLst [] GHC.PlaceHolder GHC.Generated
 #endif
-  currAnns <- fetchAnnsFinal
+  -- currAnns <- fetchAnnsFinal
   --logm $ "Anns :" ++ (show $ getAllAnns currAnns match)
   let l_lam = GHC.L l (GHC.HsLam mg)
   par_lam <- wrapInPars l_lam
@@ -312,10 +312,14 @@ traverseTypeSig argNum f (GHC.TypeSig lst (GHC.HsWC wcs (GHC.HsIB v ty c))) = do
   newTy <- comp argNum ty
   return (GHC.TypeSig lst (GHC.HsWC wcs (GHC.HsIB v newTy c)))
   where
-    comp argNum (GHC.L l (GHC.HsForAllTy bndrs ty)) =
+    comp argNum' (GHC.L l (GHC.HsForAllTy bndrs ty)) =
       case ty of
-        (GHC.L _ (GHC.HsFunTy _ _)) -> comp' argNum ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy bndrs res)))
+        (GHC.L _ (GHC.HsFunTy _ _)) -> comp' argNum' ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy bndrs res)))
         _ -> f ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy bndrs res)))
+    comp _ ty = do
+      logDataWithAnns "traverseTypeSig.comp:unknwon ty" ty
+      error "foo"
+
     comp' 1 (GHC.L l (GHC.HsFunTy lhs rhs)) = do
       resLHS <- f lhs
       let funTy = (GHC.L l (GHC.HsFunTy resLHS rhs))
@@ -323,7 +327,7 @@ traverseTypeSig argNum f (GHC.TypeSig lst (GHC.HsWC wcs (GHC.HsIB v ty c))) = do
       return funTy
     comp' 1 lTy = f lTy
     comp' n (GHC.L l (GHC.HsFunTy lhs rhs)) = comp' (n-1) rhs >>= (\res -> return (GHC.L l (GHC.HsFunTy lhs res)))
-    comp' _ lHsTy@(GHC.L _ ty) = return lHsTy
+    comp' _ lHsTy = return lHsTy
 #elif __GLASGOW_HASKELL__ >= 800
 traverseTypeSig argNum f (GHC.TypeSig lst (GHC.HsIB vs (GHC.HsWC ns mc ty) )) = do
   newTy <- comp argNum ty

@@ -4,37 +4,37 @@
 module Language.Haskell.Refact.Refactoring.HughesList
        (hughesList, compHughesList, fastHughesList, compFastHughesList) where
 
-import Control.Applicative
-import Data.Generics as SYB
+-- import Control.Applicative
+-- import Data.Generics as SYB
 import Data.Generics.Strafunski.StrategyLib.StrategyLib
-import qualified Data.Map as M
-import Data.Maybe (fromMaybe)
-import Exception
+-- import qualified Data.Map as M
+-- import Data.Maybe (fromMaybe)
+-- import Exception
 import qualified GHC.SYB.Utils as SYB
 import qualified GhcModCore as GM (Options(..))
 import Language.Haskell.GHC.ExactPrint.Parsers
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.Refact.API
-import Language.Haskell.Refact.Utils.Types
+-- import Language.Haskell.Refact.Utils.Types
 import System.Directory
 
-import qualified Bag        as GHC
-import qualified ErrUtils   as GHC
+-- import qualified Bag        as GHC
+-- import qualified ErrUtils   as GHC
 import qualified FastString as GHC
 import qualified GHC        as GHC
-import qualified HscMain    as GHC
-import qualified HscTypes   as GHC
-import qualified Id         as GHC
-import qualified Module     as GHC
+-- import qualified HscMain    as GHC
+-- import qualified HscTypes   as GHC
+-- import qualified Id         as GHC
+-- import qualified Module     as GHC
 import qualified Name       as GHC
-import qualified OccName    as GHC
+-- import qualified OccName    as GHC
 import qualified RdrName    as GHC
-import qualified RnExpr     as GHC
-import qualified TcRnDriver as GHC
-import qualified TyCon      as GHC
-import qualified Unique     as GHC
+-- import qualified RnExpr     as GHC
+-- import qualified TcRnDriver as GHC
+-- import qualified TyCon      as GHC
+-- import qualified Unique     as GHC
 
-import Outputable
+-- import Outputable
 #if __GLASGOW_HASKELL__ >= 800
 import qualified TyCoRep as GHC
 #else
@@ -74,7 +74,7 @@ TODO: Figure out strategy for name conflicts. Probably need another optional arg
 hughesList :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> Int -> IO [FilePath]
 hughesList settings cradle fileName funNm pos argNum = do
   absFileName <- canonicalizePath fileName
-  runRefacSession settings cradle (compHughesList fileName funNm pos argNum)
+  runRefacSession settings cradle (compHughesList absFileName funNm pos argNum)
 
 compHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]
 compHughesList fileName funNm pos argNum = do
@@ -87,7 +87,7 @@ compHughesList fileName funNm pos argNum = do
 fastHughesList :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> Int -> IO [FilePath]
 fastHughesList settings cradle fileName funNm pos argNum = do
   absFileName <- canonicalizePath fileName
-  runRefacSession settings cradle (compFastHughesList fileName funNm pos argNum)
+  runRefacSession settings cradle (compFastHughesList absFileName funNm pos argNum)
 
 compFastHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]
 compFastHughesList fileName funNm pos argNum = do
@@ -100,6 +100,7 @@ compFastHughesList fileName funNm pos argNum = do
 
 doHughesList :: FilePath -> String -> SimpPos -> Int -> IsoFuncStrings -> RefactGhc ()
 doHughesList fileName funNm pos argNum fStrs = do
+  logm $ "doHughesList:entered"
   let mqual = Just "DList"
   loadHList
   addSimpleImportDecl "HughesList.DList" mqual
@@ -110,16 +111,16 @@ doHughesList fileName funNm pos argNum fStrs = do
     rdr = GHC.unLoc lrdr
     dlistCon = getTyCon ty
     newFType = resultTypeToDList dlistCon
-#if __GLASGOW_HASKELL__ >= 800
     (Just funBind) = getHsBind pos parsed
-#else
-    (Just funBind) = getHsBind pos parsed
-#endif
-    (Just tySig) = getTypeSig pos funNm parsed
+    (Just tySig)   = getTypeSig pos funNm parsed
     newResTy = getResultType ty
+  logDataWithAnns "doHughesList:newResTy" newResTy
   iDecl <- dlistImportDecl mqual
-  iSt <- getInitState iDecl fStrs "toList" "fromList" mqual newResTy
+  logm "doHughesList:got iDecl"
+  iSt   <- getInitState iDecl fStrs "toList" "fromList" mqual newResTy
+  logm "doHughesList:got iSt"
   bind' <- isoRefact argNum mqual rdr ty iSt funBind
+  logm "doHughesList:got bind'"
   replaceFunBind pos bind'
   newTySig <- fixTypeSig argNum tySig
   replaceTypeSig pos newTySig
@@ -298,8 +299,8 @@ modResultType f (GHC.FunTy t1 t2) = let newT2 = comp t2 in
 #endif
 modResultType f ty = f ty
 
---This function inserts a definition and grabs the DList type constructor
---From that definition's type then deletes the definition from the module
+-- | This function inserts a definition and grabs the DList type constructor
+--  from that definition's type then deletes the definition from the module
 getDListTy :: Maybe String -> RefactGhc GHC.Type
 getDListTy mqual = do
   let prefix = case mqual of
@@ -309,8 +310,8 @@ getDListTy mqual = do
   decl <- insertNewDecl $ "emdl = " ++ prefix ++ "empty"
   typeCheckModule
   renamed <- getRefactRenamed
-  parsed <- getRefactParsed
-  typed <- getRefactTyped
+  -- parsed  <- getRefactParsed
+  typed   <- getRefactTyped
   let nm = gfromJust "Getting emdl's name" $ getFunName "emdl" renamed
   let mBind = getTypedHsBind (getOcc decl) typed
   ty <- case mBind of
@@ -332,8 +333,10 @@ getDListTy mqual = do
       getOcc (GHC.L _ (GHC.ValD (GHC.FunBind nm _ _ _ _ _))) = GHC.rdrNameOcc $ GHC.unLoc nm
 #endif
 
+fullStrs :: [(String,String)]
 fullStrs = [("[]","empty"),(":","cons"),("++","append"),("concat", "concat"),("replicate","replicate"), ("head","head"),("tail","tail"),("foldr","foldr"),("map","map"), ("unfoldr", "unfoldr")]
 
+fastStrs :: [(String,String)]
 fastStrs = [("[]","empty"), (":","cons"),("++", "append")]
 
 dlistImportDecl :: Maybe String -> RefactGhc ParsedLImportDecl

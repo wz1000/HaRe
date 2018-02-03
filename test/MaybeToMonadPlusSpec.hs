@@ -14,6 +14,7 @@ spec = do
   describe "doMaybeToMonadPlus" $ do
     it "Simple function that uses pattern matching to be collapsed into a bind." $ do
       res <- ct $ maybeToMonadPlus defaultTestSettings testOptions "./MaybeToMonadPlus/MMP1.hs" (4,1) "f" 1
+      -- res <- ct $ maybeToMonadPlus logTestSettings testOptions "./MaybeToMonadPlus/MMP1.hs" (4,1) "f" 1
       res' <- ct $ mapM makeRelativeToCurrentDirectory res
       res' `shouldBe` ["MaybeToMonadPlus/MMP1.hs"]
       diff <- ct $ compareFiles "./MaybeToMonadPlus/MMP1.refactored.hs"
@@ -30,7 +31,8 @@ spec = do
 
     it "Function with nothing to nothing case but has mzero value and an extra parameter." $ do
       -- res <- ct $ maybeToMonadPlus defaultTestSettings testOptions "./MaybeToMonadPlus/MMP3.hs" (4,1) "dv" 3
-      res <- ct $ maybeToMonadPlus logTestSettings testOptions "./MaybeToMonadPlus/MMP3.hs" (4,1) "dv" 3
+      -- res <- ct $ maybeToMonadPlus logTestSettings testOptions "./MaybeToMonadPlus/MMP3.hs" (4,1) "dv" 3
+      res <- ct $ maybeToMonadPlus logTestSettings testOptions "./MaybeToMonadPlus/MMP3.hs" (4,1) "dv" 2
       res' <- ct $ mapM makeRelativeToCurrentDirectory res
       res' `shouldBe` ["MaybeToMonadPlus/MMP3.hs"]
       diff <- ct $ compareFiles "./MaybeToMonadPlus/MMP3.refactored.hs"

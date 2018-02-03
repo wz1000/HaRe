@@ -1,83 +1,107 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Language.Haskell.Refact.Refactoring.MaybeToMonadPlus where
+module Language.Haskell.Refact.Refactoring.MaybeToMonadPlus
+  (
+    maybeToMonadPlus
+  , compMaybeToMonadPlus
+  ) where
 
-import Language.Haskell.Refact.API
-import qualified GhcModCore as GM (Options(..))
-import System.Directory
-import qualified GHC as GHC
-import Data.Generics as SYB
-import GHC.SYB.Utils as SYB
-import Data.Generics.Strafunski.StrategyLib.StrategyLib
-import Language.Haskell.GHC.ExactPrint.Parsers
-import Language.Haskell.GHC.ExactPrint
-import Language.Haskell.GHC.ExactPrint.Utils
-import Language.Haskell.GHC.ExactPrint.Types
-import Control.Applicative
-import qualified Data.Map as Map
+import FastString
+import qualified GHC     as GHC
 import qualified OccName as GHC
 import qualified RdrName as GHC
-import qualified Type as GHC
-import FastString
+import qualified Type    as GHC
+
+import Data.Generics as SYB
+import GHC.SYB.Utils as SYB
+
+import Control.Applicative
+import Data.Generics.Strafunski.StrategyLib.StrategyLib
+import qualified Data.Map as Map
+import qualified GhcModCore as GM (Options(..))
+import Language.Haskell.GHC.ExactPrint
+import Language.Haskell.GHC.ExactPrint.Parsers
+import Language.Haskell.GHC.ExactPrint.Types
+import Language.Haskell.GHC.ExactPrint.Utils
+import Language.Haskell.Refact.API
+import System.Directory
+
+-- ---------------------------------------------------------------------
 
 maybeToMonadPlus :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> String -> Int -> IO [FilePath]
 maybeToMonadPlus settings cradle fileName pos funNm argNum = do
   absFileName <- canonicalizePath fileName
-  runRefacSession settings cradle (comp absFileName pos funNm argNum)
+  runRefacSession settings cradle (compMaybeToMonadPlus absFileName pos funNm argNum)
 
-comp :: FilePath -> SimpPos -> String -> Int -> RefactGhc [ApplyRefacResult]
-comp fileName (row,col) funNm argNum = do
-  (refRes@((_fp,ismod), _),()) <- applyRefac (doMaybeToPlus fileName (row,col) funNm argNum) (RSFile fileName)
+compMaybeToMonadPlus :: FilePath -> SimpPos -> String -> Int -> RefactGhc [ApplyRefacResult]
+compMaybeToMonadPlus fileName pos funNm argNum = do
+  (refRes@((_fp,ismod), _),()) <- applyRefac (doMaybeToPlus pos funNm argNum) (RSFile fileName)
   case ismod of
     RefacUnmodifed -> error "Maybe to MonadPlus synonym failed"
     RefacModified -> return ()
   return [refRes]
 
+-- ---------------------------------------------------------------------
 
-doMaybeToPlus :: FilePath -> SimpPos -> String -> Int -> RefactGhc ()
-doMaybeToPlus fileName pos funNm argNum = do
+
+-- | This refactoring tries to generalise something of type Maybe to become
+-- either of type 'Monad' or 'MonadPlus'. The implementation of this refactoring
+-- attempts to produce the “most general" version of the source program. This
+-- means that when possible the refactoring will replace the targetted 'Maybe'
+-- type with a value of type 'Monad', if this is not possible the value will be
+-- of type 'MonadPlus', and finally if that also isn’t possible the refactoring
+-- cannot continue and the source and target programs of the refactoring are
+-- identical.
+
+doMaybeToPlus :: SimpPos -> String -> Int -> RefactGhc ()
+doMaybeToPlus pos funNm argNum = do
   parsed <- getRefactParsed
-  -- Add test that position defines function with name `funNm`
+  -- TODO:Add test that position defines function with name `funNm`
   let mBind = getHsBind pos parsed
   case mBind of
     Nothing -> error "Function bind not found"
     Just funBind -> do
+      -- Most general: contains Nothing to Nothing, can be Monadic
+      -- otherwise canReplaceConstructors coming up true means MonadPlus
+      hasNtoN <- containsNothingToNothing funNm argNum pos funBind
+      logm $ "Result of searching for nothing to nothing: " ++ (show hasNtoN)
       canReplaceConstructors <- isOutputType argNum pos funBind
-      case canReplaceConstructors of
-        True -> do
-          logm $ "Can replace constructors"
-          replaceConstructors pos funNm argNum
-        False -> do
-          logm $ "Can't replace constructors"
-          hasNtoN <- containsNothingToNothing funNm argNum pos funBind
-          logm $ "Result of searching for nothing to nothing: " ++ (show hasNtoN)
-          case hasNtoN of
-            False -> return ()
-            True  -> doRewriteAsBind pos funNm
-          return ()
+      logm $ "Result of canReplaceConstructors: " ++ (show canReplaceConstructors)
+      if hasNtoN
+        then do
+          logm "Converting to Monad"
+          doRewriteAsBind pos funNm
+        else
+          if canReplaceConstructors
+            then do
+              logm "Converting to MonadPlus"
+              replaceConstructors pos funNm argNum
+            else
+              -- AZ:TODO should this be an error, to cause feedback to the user?
+              logm "Cannot perform conversion"
 
--- This checks if the argument to be refactored is the output type
--- If this is true then the refactoring will just consist of replacing all RHS
--- calls to the Maybe type with their MPlus equivalents
--- I need some way of checking if the type
+-- | This checks if the argument to be refactored is the output type. If this is
+-- true then the refactoring will just consist of replacing all RHS calls to the
+-- Maybe type with their MPlus equivalents. I need some way of checking if the
+-- type
 isOutputType :: Int -> SimpPos -> GHC.HsBind GHC.RdrName -> RefactGhc Bool
 isOutputType argNum pos funBind = do
-  -- renamed <- getRefactRenamed
   parsed <- getRefactParsed
   (Just name) <- locToNameRdr pos parsed
-  (Just ty) <- getTypeForName name
-  logDataWithAnns "isOutputType:ty" ty
+  (Just ty)   <- getTypeForName name
+  -- logDataWithAnns "isOutputType:ty" ty
   let depth = typeDepth ty
   logm $ "isOutputType:depth=" ++ show depth
   return $ depth == argNum
     where typeDepth :: GHC.Type -> Int
           typeDepth ty = case (GHC.isFunTy ty) of
-            True -> 1 + typeDepth (GHC.funResultTy ty)
+            True  -> 1 + typeDepth (GHC.funResultTy ty)
             False -> 1
 
---This handles the case where only the output type of the function is being modified so calls to
---Nothing and Just can be replaced with mzero and return respectively in GRHSs
+-- | This handles the case where only the output type of the function is being
+-- modified so calls to Nothing and Just can be replaced with mzero and return
+-- respectively in GRHSs
 replaceConstructors :: SimpPos -> String -> Int -> RefactGhc ()
 replaceConstructors pos funNm argNum = do
   parsed <- getRefactParsed
@@ -85,25 +109,26 @@ replaceConstructors pos funNm argNum = do
   newBind <- applyInGRHSs bind replaceNothingAndJust
   replaceBind pos newBind
   fixType' funNm argNum
-    where applyInGRHSs :: (Data a) => UnlocParsedHsBind -> (a -> RefactGhc a) -> RefactGhc UnlocParsedHsBind
-          applyInGRHSs parsed fun = applyTP (stop_tdTP (failTP `adhocTP` (runGRHSFun fun))) parsed
+    where applyInGRHSs :: (Data a) => GHC.HsBind GHC.RdrName -> (a -> RefactGhc a) -> RefactGhc (GHC.HsBind GHC.RdrName)
+          applyInGRHSs bind fun = applyTP (stop_tdTP (failTP `adhocTP` (runGRHSFun fun))) bind
+
           runGRHSFun :: (Data a) => (a -> RefactGhc a) -> ParsedGRHSs -> RefactGhc ParsedGRHSs
           runGRHSFun fun grhss@(GHC.GRHSs _ _) = SYB.everywhereM (SYB.mkM fun) grhss
+
           mzeroOcc = GHC.mkVarOcc "mzero"
-          -- nothingOcc = GHC.mkVarOcc "Nothing"
           returnOcc = GHC.mkVarOcc "return"
-          -- justOcc = GHC.mkVarOcc "Just"
+
           replaceNothingAndJust :: GHC.OccName -> RefactGhc GHC.OccName
           replaceNothingAndJust nm
-            | (GHC.occNameString nm) == "Nothing" = do
+            | GHC.occNameString nm == "Nothing" = do
                 logm "Replacing nothing"
                 return mzeroOcc
-            | (GHC.occNameString nm) == "Just" = do
+            | GHC.occNameString nm == "Just" = do
                 logm "Replace just"
                 return returnOcc
             | otherwise = return nm
 
-replaceBind :: SimpPos -> UnlocParsedHsBind -> RefactGhc ()
+replaceBind :: SimpPos -> GHC.HsBind GHC.RdrName -> RefactGhc ()
 replaceBind pos newBind = do
   oldParsed <- getRefactParsed
   let rdrNm = locToRdrName pos oldParsed
@@ -112,7 +137,7 @@ replaceBind pos newBind = do
     (Just (GHC.L _ rNm)) -> do
       newParsed <- SYB.everywhereM (SYB.mkM (worker rNm)) oldParsed
       --logm $ SYB.showData SYB.Parser 3 newParsed
-      (liftT getAnnsT) >>= putRefactParsed newParsed
+      putRefactParsed newParsed mempty
       addMonadImport
 #if __GLASGOW_HASKELL__ >= 800
   where worker rNm (funBnd@(GHC.FunBind (GHC.L _ name) _matches _ _ _) :: GHC.HsBind GHC.RdrName)
@@ -120,13 +145,16 @@ replaceBind pos newBind = do
   where worker rNm (funBnd@(GHC.FunBind (GHC.L _ name) _ _matches _ _ _) :: GHC.HsBind GHC.RdrName)
 #endif
           | name == rNm = return newBind
-          | otherwise = return funBnd
+          | otherwise   = return funBnd
         worker rNm bind = error $ "replaceBind:unmatched type(rnM,bind):" ++ showGhc (rNm,bind)
 
---Handles the case where the function can be rewritten with bind.
+-- | Handles the case where the function can be rewritten with 'bind'.
+-- i.e. Conversion to a fully general Monad
+-- doRewriteAsBind :: GHC.HsBind GHC.RdrName -> String -> RefactGhc ()
 doRewriteAsBind :: SimpPos -> String -> RefactGhc ()
 doRewriteAsBind pos funNm = do
   -- logParsedSource "doRewriteAsBind"
+
   parsed <- getRefactParsed
   let bind = gfromJust "doRewriteAsBind" $ getHsBind pos parsed
 #if __GLASGOW_HASKELL__ >= 800
@@ -156,20 +184,21 @@ doRewriteAsBind pos funNm = do
       --logm $ "Final anns: " ++ (show currAnns)
       fixType funNm
       addMonadImport
-      prsed <- getRefactParsed
-      logExactprint "Final parsed: " prsed
+      logParsedSource "Final parsed: "
         where mkNewNm rdr = let str = GHC.occNameString $ GHC.rdrNameOcc rdr in
                 GHC.Unqual $ GHC.mkVarOcc ("m_" ++ str)
 
 addMonadImport :: RefactGhc ()
 addMonadImport = addSimpleImportDecl "Control.Monad" Nothing
 
---This function finds the function binding and replaces the pattern match.
---The LHS is replaced with the provided name (3rd argument)
---The RHS is replaced with the provided GRHSs
---Asumptions made:
-  --Only one LMatch in the match group
-  --Only one variable in LHS
+-- ---------------------------------------------------------------------
+
+-- | This function finds the function binding and replaces the pattern match.
+-- The LHS is replaced with the provided name (3rd argument)
+-- The RHS is replaced with the provided GRHSs
+-- Asumptions made:
+--  Only one LMatch in the match group
+--  Only one variable in LHS
 replaceGRHS :: String -> (GHC.GRHSs GHC.RdrName (GHC.LHsExpr GHC.RdrName)) -> GHC.RdrName -> RefactGhc ()
 replaceGRHS funNm new_rhs lhs_name = do
   parsed <- getRefactParsed
@@ -250,7 +279,8 @@ createBindGRHS name lam_par = do
   return $ GHC.GRHSs [lgrhs] GHC.EmptyLocalBinds
 #endif
 
---This takes an AST chunk traverses it and changes any calls to the "Just" constructor to "return"
+-- | This takes an AST chunk traverses it and changes any calls to the "Just"
+-- constructor to "return"
 justToReturn :: (Data a) => a -> a
 justToReturn ast = SYB.everywhere (SYB.mkT worker) ast
   where worker :: GHC.OccName -> GHC.OccName
@@ -284,8 +314,11 @@ getHsBind pos funNm a =
           isBind _ = Nothing
 -}
 
---This function takes in the name of a function and determines if the binding contains the case "Nothing = Nothing"
---If the Nothing to Nothing case is found then it is removed from the parsed source.
+-- ---------------------------------------------------------------------
+
+-- | This function takes in the name of a function and determines if the binding
+-- contains the case "Nothing = Nothing" If the Nothing to Nothing case is found
+-- then it is removed from the parsed source.
 containsNothingToNothing :: String -> Int -> SimpPos -> GHC.HsBind GHC.RdrName -> RefactGhc Bool
 containsNothingToNothing funNm argNum pos a = do
   -- dFlags <- GHC.getSessionDynFlags
@@ -374,13 +407,13 @@ removeMatches pos newBind matches = do
             | name == rdrNm = return newBind
           replaceBind _ a = return a
 
---This function is very specific to Maybe to MonadPlus refactoring. It rewrites the type signature so that the calls to maybe will be replaced with type variable "m"
---and adds the MonadPlus type class constraint to m
+-- | This function is very specific to Maybe to MonadPlus refactoring. It rewrites
+--the type signature so that the calls to maybe will be replaced with type
+--variable "m" and adds the MonadPlus type class constraint to m
 --Assumptions:
-  --Assumes the function is of type Maybe a -> Maybe a
-  --
-  -- Should refactor to take in the argNum parameter and fix the type depending on that
-
+--  Assumes the function is of type Maybe a -> Maybe a
+--
+--   Should refactor to take in the argNum parameter and fix the type depending on that
 fixType' :: String -> Int -> RefactGhc ()
 fixType' funNm argPos = do
   logm "Fixing type"
@@ -390,15 +423,16 @@ fixType' funNm argPos = do
   fixedClass <- fixTypeClass sig
   --This needs to be fixed to replace only the correct argument and output type
   replacedMaybe <- replaceMaybeWithVariable fixedClass
+
   newSig <- locate (GHC.SigD replacedMaybe)
-  addNewKeyword ((G GHC.AnnDcolon), DP (0,1)) newSig
-  logm $ "Span: " ++ show sigL
-  newParsed <- replaceAtLocation sigL newSig
   synthesizeAnns newSig
   addNewLines 2 newSig
-  anns <- liftT getAnnsT
-  logm $ showAnnData anns 3 newParsed
-  putRefactParsed newParsed anns
+  addNewKeyword ((G GHC.AnnDcolon), DP (0,1)) newSig
+
+  logm $ "fixType':Span: " ++ show sigL
+  newParsed <- replaceAtLocation sigL newSig
+  -- logDataWithAnns "fixType':newParsed" newParsed
+  putRefactParsed newParsed mempty
     where replaceMaybeWithVariable :: GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
           replaceMaybeWithVariable sig = SYB.everywhereM (SYB.mkM worker) sig
 #if __GLASGOW_HASKELL__ >= 802
@@ -460,15 +494,15 @@ fixType' funNm argPos = do
                 -- return (GHC.TypeSig names newForAll p)
                 return (GHC.TypeSig names (GHC.HsWC wcs (GHC.HsIB a newForAll b)))
               unexpected -> do
-                logDataWithAnns "fixTypeClass:unexpected" unexpected
+                logm "fixTypeClass:unexpected"
+                -- logDataWithAnns "fixTypeClass:unexpected" unexpected
                 newContext <- do
-                                  tyCls <- genMonadPlusClass
-                                  parTy <- locate (GHC.HsParTy tyCls)
-                                  -- addNewKeyword ((G GHC.AnnCloseP),DP (0,0)) parTy
-                                  liftT $ setPrecedingLinesT parTy 0 (-1)
-                                  lList <- locate [parTy]
-                                  addNewKeywords [((G GHC.AnnOpenP), DP (0,1)),((G GHC.AnnCloseP), DP (0,0)),((G GHC.AnnDarrow), DP (0,1))] lList
-                                  return lList
+                  tyCls <- genMonadPlusClass
+                  parTy <- locate (GHC.HsParTy tyCls)
+                  liftT $ setPrecedingLinesT parTy 0 (-1)
+                  lList <- locate [parTy]
+                  addNewKeywords [((G GHC.AnnOpenP), DP (0,1)),((G GHC.AnnCloseP), DP (0,0)),((G GHC.AnnDarrow), DP (0,1))] lList
+                  return lList
                 let qualTy = GHC.HsQualTy newContext (GHC.L lt hsType)
                 qualTyL <- locate qualTy
                 return (GHC.TypeSig names (GHC.HsWC wcs (GHC.HsIB a qualTyL b)))
@@ -668,7 +702,7 @@ getInnerType = SYB.everything (<|>) (Nothing `SYB.mkQ` getTy)
 
 replaceAtLocation :: (Data a) => GHC.SrcSpan -> GHC.Located a -> RefactGhc (GHC.ParsedSource)
 replaceAtLocation span new = do
-  logm $ "Span: " ++ (show span)
+  logm $ "replaceAtLocation:Span: " ++ (show span)
   parsed <- getRefactParsed
   newParsed <- SYB.everywhereM (SYB.mkM findLoc) parsed
   return newParsed

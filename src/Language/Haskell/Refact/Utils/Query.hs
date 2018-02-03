@@ -137,11 +137,12 @@ lookupByLoc loc = SYB.something (Nothing `SYB.mkQ` comp)
 -}
 
 getIdFromVar :: GHC.LHsExpr GHC.RdrName -> RefactGhc (Maybe GHC.Id)
-getIdFromVar v@(GHC.L l var) = do
+getIdFromVar v@(GHC.L l _var) = do
   logDataWithAnns "getIdFromVar:v=" v
   typed <- getRefactTyped
+  logDataWithAnns "getIdFromVar:typed=" typed
   let (mElem :: Maybe (GHC.LHsExpr GHC.Id)) = lookupByLoc l typed
-  logDataWithAnns "getIdFromVar" mElem
+  logDataWithAnns "getIdFromVar:mElem" mElem
   return $ mElem >>= (\e -> SYB.something (Nothing `SYB.mkQ` comp) e)
   where
 #if __GLASGOW_HASKELL__ <= 710
@@ -151,10 +152,12 @@ getIdFromVar v@(GHC.L l var) = do
 #endif
     comp _ = Nothing
 
+{-
 getFunBindType :: SimpPos -> RefactGhc (Maybe GHC.Type)
 getFunBindType pos = do
   typedMod <- getTypecheckedModule
   return undefined
+-}
 
 --This checks if a syntax element is wrapped in parenthesis
 --by checking the annotatations contain AnnCloseP and AnnOpenP

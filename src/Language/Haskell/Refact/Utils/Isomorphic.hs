@@ -43,10 +43,11 @@ import Outputable
 import Data.Generics.Strafunski.StrategyLib.StrategyLib
 
 
---Going to assume it's only the result type that will be modified right now
-isoRefact :: Int -> Maybe String -> GHC.RdrName -> GHC.Type -> IsoRefactState -> ParsedBind -> RefactGhc ParsedBind
-isoRefact _ mqual funNm newFTy iST bnd = do
-  typedS <- getRefactTyped
+-- Going to assume it's only the result type that will be modified right now
+isoRefact :: Int -> Maybe String -> GHC.RdrName -> GHC.Type -> IsoRefactState
+          -> GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
+isoRefact argNum mqual funNm newFTy iST bnd = do
+  -- typedS <- getRefactTyped
   -- let m_fTy = getTypeFromRdr funNm typedS
   --     fTy = gfromJust "isoRefact: getting function type" m_fTy
   --     newResTy = getResultType newFTy
@@ -71,17 +72,18 @@ skipCurrent = do
       return True
     Just _ -> return False
 
-doIsoRefact :: ParsedLExpr -> IsoRefact ParsedLExpr
+doIsoRefact :: GHC.LHsExpr GHC.RdrName -> IsoRefact (GHC.LHsExpr GHC.RdrName)
 doIsoRefact expr = do
+  lift $ logDataWithAnns "doIsoRefact" expr
   b1 <- isoDone
   b2 <- skipCurrent
   if b1 || b2
     then do
-    lift $ logm "Skipping this expr: "
-    lift $ logm (SYB.showData SYB.Parser 3 expr)
-    return expr
+      lift $ logm "Skipping this expr: "
+      lift $ logm (SYB.showData SYB.Parser 3 expr)
+      return expr
     else doIsoRefact' expr
-  where doIsoRefact' :: ParsedLExpr -> IsoRefact ParsedLExpr
+  where doIsoRefact' :: GHC.LHsExpr GHC.RdrName -> IsoRefact (GHC.LHsExpr GHC.RdrName)
         doIsoRefact' (GHC.L l (GHC.HsApp le re)) = do
           le' <- doIsoRefact le
           wrapWithAbs <- shouldInsertAbs
@@ -121,12 +123,13 @@ doIsoRefact expr = do
           st <- get
           let tq = typeQueue st
               fs = funcs st
-          typed <- lift getRefactTyped
+          -- typed <- lift getRefactTyped
           mId <- lift (getIdFromVar var)
-          let id = gfromJust ("Tried to get id for: " ++ SYB.showData SYB.Parser 3 rdr) mId
+          lift $ logDataWithAnns "doIsoRefact'mId" mId
+          let id' = gfromJust ("Tried to get id for: " ++ SYB.showData SYB.Parser 3 rdr) mId
               goalType = gfromJust "Getting goal type" $ head tq
-              currTy = GHC.idType id
-              currRes = getResultType currTy
+              currTy = GHC.idType id'
+              -- currRes = getResultType currTy
               keyOcc = GHC.rdrNameOcc rdr
               mVal = (GHC.occNameString keyOcc) `M.lookup` (eqFuns fs)
           case mVal of
@@ -271,15 +274,15 @@ consumeOuterForAlls ty = ty
 --NOTE: May want to change this to use GHC.Name
 data IsomorphicFuncs = IF {
   projFun :: GHC.RdrName,
-  absFun :: GHC.RdrName,
-  eqFuns :: M.Map String (GHC.RdrName, GHC.Type)
+  absFun  :: GHC.RdrName,
+  eqFuns  :: M.Map String (GHC.RdrName, GHC.Type)
   }
 
 data IsoRefactState = IsoState {
-  funcs :: IsomorphicFuncs,
+  funcs     :: IsomorphicFuncs,
   typeQueue :: [Maybe GHC.Type],
   insertAbs :: Bool
-                               }
+  }
 
 instance Show IsoRefactState where
   show (IsoState fs tq _) = "There are currently " ++ show (length tq) ++ " types in the queue"
