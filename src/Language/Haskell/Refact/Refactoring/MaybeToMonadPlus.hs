@@ -18,7 +18,7 @@ import GHC.SYB.Utils as SYB
 
 import Control.Applicative
 import Data.Generics.Strafunski.StrategyLib.StrategyLib
-import qualified Data.Map as Map
+-- import qualified Data.Map as Map
 import qualified GhcModCore as GM (Options(..))
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Parsers
@@ -44,6 +44,10 @@ compMaybeToMonadPlus fileName pos funNm argNum = do
 
 -- ---------------------------------------------------------------------
 
+-- TODO:AZ do not compare RdrName's, use Name's instead
+
+-- TODO:AZ simplify real world use, require the pos to be on the parameter to be
+--         changed
 
 -- | This refactoring tries to generalise something of type Maybe to become
 -- either of type 'Monad' or 'MonadPlus'. The implementation of this refactoring
@@ -53,7 +57,6 @@ compMaybeToMonadPlus fileName pos funNm argNum = do
 -- of type 'MonadPlus', and finally if that also isn’t possible the refactoring
 -- cannot continue and the source and target programs of the refactoring are
 -- identical.
-
 doMaybeToPlus :: SimpPos -> String -> Int -> RefactGhc ()
 doMaybeToPlus pos funNm argNum = do
   parsed <- getRefactParsed
@@ -65,14 +68,14 @@ doMaybeToPlus pos funNm argNum = do
       -- Most general: contains Nothing to Nothing, can be Monadic
       -- otherwise canReplaceConstructors coming up true means MonadPlus
       hasNtoN <- containsNothingToNothing funNm argNum pos funBind
-      logm $ "Result of searching for nothing to nothing: " ++ (show hasNtoN)
+      -- logm $ "Result of searching for nothing to nothing: " ++ (show hasNtoN)
       canReplaceConstructors <- isOutputType argNum pos funBind
       logm $ "Result of canReplaceConstructors: " ++ (show canReplaceConstructors)
-      if hasNtoN
-        then do
+      case hasNtoN of
+        Just newBind -> do
           logm "Converting to Monad"
-          doRewriteAsBind pos funNm
-        else
+          doRewriteAsBind newBind funNm
+        Nothing -> do
           if canReplaceConstructors
             then do
               logm "Converting to MonadPlus"
@@ -150,19 +153,15 @@ replaceBind pos newBind = do
 
 -- | Handles the case where the function can be rewritten with 'bind'.
 -- i.e. Conversion to a fully general Monad
--- doRewriteAsBind :: GHC.HsBind GHC.RdrName -> String -> RefactGhc ()
-doRewriteAsBind :: SimpPos -> String -> RefactGhc ()
-doRewriteAsBind pos funNm = do
-  -- logParsedSource "doRewriteAsBind"
-
-  parsed <- getRefactParsed
-  let bind = gfromJust "doRewriteAsBind" $ getHsBind pos parsed
+doRewriteAsBind :: GHC.HsBind GHC.RdrName -> String -> RefactGhc ()
+-- doRewriteAsBind :: GHC.HsBind GHC.RdrName -> String -> RefactGhc (GHC.HsBind GHC.RdrName)
+doRewriteAsBind bind funNm = do
 #if __GLASGOW_HASKELL__ >= 800
-      matches = GHC.unLoc . GHC.mg_alts . GHC.fun_matches $ bind
+  let matches = GHC.unLoc . GHC.mg_alts . GHC.fun_matches $ bind
 #else
-      matches = GHC.mg_alts . GHC.fun_matches $ bind
+  let matches = GHC.mg_alts . GHC.fun_matches $ bind
 #endif
-  if (length matches) > 1
+  if length matches > 1
     then error "Multiple matches not supported"
     else do
       let (GHC.L _ match) = head matches
@@ -177,7 +176,8 @@ doRewriteAsBind pos funNm = do
 #else
       let (GHC.L _ (GHC.VarPat nm)) = newPat
 #endif
-          newNm = mkNewNm nm
+          -- TODO:AZ: we need to check that this name is unique, within the existing params
+          newNm = mkRdrName ("m_" ++ (showGhc nm))
       new_rhs <- createBindGRHS newNm lam
       replaceGRHS funNm new_rhs newNm
 
@@ -185,8 +185,6 @@ doRewriteAsBind pos funNm = do
       fixType funNm
       addMonadImport
       logParsedSource "Final parsed: "
-        where mkNewNm rdr = let str = GHC.occNameString $ GHC.rdrNameOcc rdr in
-                GHC.Unqual $ GHC.mkVarOcc ("m_" ++ str)
 
 addMonadImport :: RefactGhc ()
 addMonadImport = addSimpleImportDecl "Control.Monad" Nothing
@@ -199,7 +197,7 @@ addMonadImport = addSimpleImportDecl "Control.Monad" Nothing
 -- Asumptions made:
 --  Only one LMatch in the match group
 --  Only one variable in LHS
-replaceGRHS :: String -> (GHC.GRHSs GHC.RdrName (GHC.LHsExpr GHC.RdrName)) -> GHC.RdrName -> RefactGhc ()
+replaceGRHS :: String -> GHC.GRHSs GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> GHC.RdrName -> RefactGhc ()
 replaceGRHS funNm new_rhs lhs_name = do
   parsed <- getRefactParsed
   newParsed <- SYB.everywhereM (SYB.mkM worker) parsed
@@ -319,24 +317,17 @@ getHsBind pos funNm a =
 -- | This function takes in the name of a function and determines if the binding
 -- contains the case "Nothing = Nothing" If the Nothing to Nothing case is found
 -- then it is removed from the parsed source.
-containsNothingToNothing :: String -> Int -> SimpPos -> GHC.HsBind GHC.RdrName -> RefactGhc Bool
-containsNothingToNothing funNm argNum pos a = do
+containsNothingToNothing :: String -> Int -> SimpPos -> GHC.HsBind GHC.RdrName
+                         -> RefactGhc (Maybe (GHC.HsBind GHC.RdrName))
+containsNothingToNothing funNm argNum pos bind = do
   -- dFlags <- GHC.getSessionDynFlags
   parsed <- getRefactParsed
   let
-      -- nToNStr = funNm ++ " Nothing = Nothing"
-      bind = gfromJust "containsNothingToNothing" $ getHsBind pos parsed
+      -- bind = gfromJust "containsNothingToNothing" $ getHsBind pos parsed
       mg = GHC.fun_matches bind
-#if __GLASGOW_HASKELL__ >= 800
-      -- (GHC.L _ alt) = (GHC.unLoc $ GHC.mg_alts mg) !! 0
-#else
-      -- (GHC.L _ alt) = (GHC.mg_alts mg) !! 0
-#endif
---  logm $ "mg_alts: " ++ (SYB.showData SYB.Parser 3 alt)
---  logm $ show $ length (GHC.m_pats alt)
   let oldMatches = SYB.everything (++) ([] `SYB.mkQ` isNtoNMatch) bind
-  if (length oldMatches == 0)
-    then return False
+  if null oldMatches
+    then return Nothing
     else do
 #if __GLASGOW_HASKELL__ >= 800
     let GHC.L lm ms = GHC.mg_alts mg
@@ -347,8 +338,8 @@ containsNothingToNothing funNm argNum pos a = do
         newMg = mg {GHC.mg_alts = newMs}
 #endif
         newBind = bind {GHC.fun_matches = newMg}
-    removeMatches pos newBind oldMatches
-    return True
+    removeMatches pos newBind oldMatches -- AZ, remove this some time
+    return (Just newBind)
   where
     isNtoNMatch :: ParsedLMatch -> [ParsedLMatch]
     isNtoNMatch lm@(GHC.L _ m) =
@@ -357,21 +348,26 @@ containsNothingToNothing funNm argNum pos a = do
       if (rhsCheck && lhsCheck)
         then [lm]
         else []
+
     checkGRHS :: ParsedGRHSs -> Bool
     checkGRHS (GHC.GRHSs [(GHC.L _ (GHC.GRHS _ (GHC.L _ body)))] _)  = isNothingVar body
     checkGRHS _ = False
+
     checkPats :: [GHC.LPat GHC.RdrName] -> Bool
     checkPats patLst =
       if argNum <= length patLst
       then let (GHC.L _ pat) = patLst !! (argNum - 1) in
       isNothingPat pat
       else False
+
     filterMatch :: ParsedLMatch -> [ParsedLMatch] -> [ParsedLMatch]
     filterMatch (GHC.L l1 _) = filter (\(GHC.L l2 _) -> l1 /= l2)
+
     getNewMs :: [ParsedLMatch] -> [ParsedLMatch] -> [ParsedLMatch]
     getNewMs [] lst = lst
     getNewMs (m:ms) lst = let newLst = filterMatch m lst in
       getNewMs ms newLst
+
     isNothingPat :: GHC.Pat GHC.RdrName -> Bool
 #if __GLASGOW_HASKELL__ >= 800
     isNothingPat (GHC.VarPat (GHC.L _ nm)) = ((GHC.occNameString . GHC.rdrNameOcc) nm) == "Nothing"
@@ -389,14 +385,14 @@ containsNothingToNothing funNm argNum pos a = do
     isNothingVar _ = False
 
 -- Removes the given matches from the given binding. Uses the position to retrieve the rdrName.
-removeMatches :: SimpPos -> GHC.HsBind GHC.RdrName -> [GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName)] -> RefactGhc ()
+removeMatches :: SimpPos -> GHC.HsBind GHC.RdrName -> [GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName)]
+              -> RefactGhc ()
 removeMatches pos newBind matches = do
   parsed <- getRefactParsed
   let rdrNm = gfromJust "Couldn't get rdrName in removeMatch" $ locToRdrName pos parsed
   newParsed <- SYB.everywhereMStaged SYB.Parser (SYB.mkM (replaceBind rdrNm)) parsed
-  -- currAnns <- fetchAnnsFinal
   mapM_ removeAnns matches
-  (liftT getAnnsT) >>= putRefactParsed newParsed
+  putRefactParsed newParsed mempty
   return ()
     where replaceBind :: GHC.Located GHC.RdrName -> GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
 #if __GLASGOW_HASKELL__ >= 800
@@ -628,7 +624,7 @@ fixType funNm = do
   currAnns <- fetchAnnsFinal
   dFlags <- GHC.getSessionDynFlags
   logm $ "fixType:funNm=" ++ funNm
-  logParsedSource "fixType"
+  -- logParsedSource "fixType"
   let m_sig = getSigD funNm parsed
       (GHC.L sigL (GHC.SigD sig)) = gfromJust "fixType: getting sig" m_sig
       iType = gfromJust "fixType: iType" $ getInnerType sig
@@ -640,8 +636,7 @@ fixType funNm = do
   -- logDataWithAnns "fixType:sig" sig
   (anns, newSig) <- handleParseResult "MaybeToMonadPlus.fixType" pRes
   newParsed <- replaceAtLocation sigL newSig
-  let newAnns = Map.union currAnns anns
-  putRefactParsed newParsed newAnns
+  putRefactParsed newParsed anns
   addNewLines 2 newSig
 
 getSigD :: (Data a) => String -> a -> Maybe (GHC.LHsDecl GHC.RdrName)

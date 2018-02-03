@@ -57,9 +57,9 @@ module Language.Haskell.Refact.Utils.TypeUtils
     , findIdForName
     , getTypeForName
 
-    ,definesTypeSigRdr
-    ,sameBindRdr
-    ,UsedByRhs(..)
+    , definesTypeSigRdr
+    , sameBindRdr
+    , UsedByRhs(..)
 
     -- ** Modules and files
     -- ,clientModsAndFiles,serverModsAndFiles,isAnExistingMod
