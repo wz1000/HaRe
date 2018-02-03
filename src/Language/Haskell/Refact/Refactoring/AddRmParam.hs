@@ -57,7 +57,7 @@ compAddOneParameter fileName paramName (row, col) = do
         logParsedSource "compAdd entry"
         targetModule <- getRefactTargetModule
         logm $ "AddRmParam.compAdd:got targetModule"
-        let maybePn = locToNameRdrPure nm (row, col) parsed
+        let maybePn = locToNamePure nm (row, col) parsed
         case maybePn of
           Just pn ->
             do

@@ -49,7 +49,7 @@ module Language.Haskell.Refact.Utils.Variables
   , hsTypeVbls
   , hsNamessRdr
   , findLRdrName
-  , locToNameRdr, locToNameRdrPure
+  , locToName, locToNamePure
   , locToRdrName
   , locToId
   ) where
@@ -1902,11 +1902,11 @@ sameNameSpace n1 n2
 -- |Find the identifier(in GHC.Name format) whose start position is
 -- (row,col) in the file specified by the fileName, and returns
 -- `Nothing` if such an identifier does not exist.
-locToNameRdr :: (SYB.Data t)
+locToName :: (SYB.Data t)
                      => SimpPos          -- ^ The row and column number
                      -> t                -- ^ The syntax phrase, parameterised by RdrName
                      -> RefactGhc (Maybe GHC.Name)  -- ^ The result
-locToNameRdr pos t = do
+locToName pos t = do
    nm <- getRefactNameMap
    let mn = locToRdrName pos t
    return $ fmap (rdrName2NamePure nm) mn
@@ -1914,12 +1914,12 @@ locToNameRdr pos t = do
 -- |Find the identifier(in GHC.Name format) whose start position is
 -- (row,col) in the file specified by the fileName, and returns
 -- `Nothing` if such an identifier does not exist.
-locToNameRdrPure :: (SYB.Data t)
+locToNamePure :: (SYB.Data t)
                     => NameMap
                     -> SimpPos         -- ^ The row and column number
                     -> t               -- ^ The syntax phrase, parameterised by RdrName
                     -> Maybe GHC.Name  -- ^ The result
-locToNameRdrPure nm pos t =
+locToNamePure nm pos t =
   let mn = locToRdrName pos t
   in fmap (rdrName2NamePure nm) mn
 

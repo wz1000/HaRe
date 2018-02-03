@@ -162,8 +162,8 @@ module Language.Haskell.Refact.API
     -- *** Locations
     ,defineLoc, useLoc, locToExp
     ,findLRdrName
-    ,locToNameRdr
-    ,locToNameRdrPure
+    ,locToName
+    ,locToNamePure
     ,locToRdrName
     ,locToId
     ,getName

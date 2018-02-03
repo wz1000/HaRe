@@ -7,25 +7,24 @@ module Language.Haskell.Refact.Refactoring.MaybeToMonadPlus
   , compMaybeToMonadPlus
   ) where
 
-import FastString
-import qualified GHC     as GHC
-import qualified OccName as GHC
-import qualified RdrName as GHC
-import qualified Type    as GHC
+import qualified FastString as GHC
+import qualified GHC        as GHC
+import qualified OccName    as GHC
+import qualified RdrName    as GHC
+import qualified Type       as GHC
 
-import Data.Generics as SYB
-import GHC.SYB.Utils as SYB
+import           Data.Generics as SYB
+import           GHC.SYB.Utils as SYB
 
-import Control.Applicative
-import Data.Generics.Strafunski.StrategyLib.StrategyLib
--- import qualified Data.Map as Map
+import           Control.Applicative
+import           Data.Generics.Strafunski.StrategyLib.StrategyLib
 import qualified GhcModCore as GM (Options(..))
-import Language.Haskell.GHC.ExactPrint
-import Language.Haskell.GHC.ExactPrint.Parsers
-import Language.Haskell.GHC.ExactPrint.Types
-import Language.Haskell.GHC.ExactPrint.Utils
-import Language.Haskell.Refact.API
-import System.Directory
+import           Language.Haskell.GHC.ExactPrint
+import           Language.Haskell.GHC.ExactPrint.Parsers
+import           Language.Haskell.GHC.ExactPrint.Types
+import           Language.Haskell.GHC.ExactPrint.Utils
+import           Language.Haskell.Refact.API
+import           System.Directory
 
 -- ---------------------------------------------------------------------
 
@@ -91,7 +90,7 @@ doMaybeToPlus pos funNm argNum = do
 isOutputType :: Int -> SimpPos -> GHC.HsBind GHC.RdrName -> RefactGhc Bool
 isOutputType argNum pos funBind = do
   parsed <- getRefactParsed
-  (Just name) <- locToNameRdr pos parsed
+  (Just name) <- locToName pos parsed
   (Just ty)   <- getTypeForName name
   -- logDataWithAnns "isOutputType:ty" ty
   let depth = typeDepth ty
@@ -433,17 +432,17 @@ fixType' funNm argPos = do
           replaceMaybeWithVariable sig = SYB.everywhereM (SYB.mkM worker) sig
 #if __GLASGOW_HASKELL__ >= 802
             where worker tyVar@(GHC.HsTyVar p (GHC.L lv rdrName))
-                    | compNames "Maybe" rdrName = let newRdr = (GHC.mkVarUnqual . fsLit) "m" in
+                    | compNames "Maybe" rdrName = let newRdr = (GHC.mkVarUnqual . GHC.fsLit) "m" in
                         return (GHC.HsTyVar p (GHC.L lv newRdr))
                     | otherwise = return tyVar
 #elif __GLASGOW_HASKELL__ >= 800
             where worker tyVar@(GHC.HsTyVar (GHC.L lv rdrName))
-                    | compNames "Maybe" rdrName = let newRdr = (GHC.mkVarUnqual . fsLit) "m" in
+                    | compNames "Maybe" rdrName = let newRdr = (GHC.mkVarUnqual . GHC.fsLit) "m" in
                         return (GHC.HsTyVar (GHC.L lv newRdr))
                     | otherwise = return tyVar
 #else
             where worker tyVar@(GHC.HsTyVar rdrName)
-                    | compNames "Maybe" rdrName = let newRdr = (GHC.mkVarUnqual . fsLit) "m" in
+                    | compNames "Maybe" rdrName = let newRdr = (GHC.mkVarUnqual . GHC.fsLit) "m" in
                         return (GHC.HsTyVar newRdr)
                     | otherwise = return tyVar
 #endif
@@ -587,8 +586,10 @@ fixType' funNm argPos = do
 
           genMonadPlusClass :: RefactGhc (GHC.LHsType GHC.RdrName)
           genMonadPlusClass = do
-            let mPlusNm = GHC.mkVarUnqual (fsLit "MonadPlus")
-                mNm     = GHC.mkVarUnqual (fsLit "m")
+            -- let mPlusNm = GHC.mkVarUnqual (GHC.fsLit "MonadPlus")
+            --     mNm     = GHC.mkVarUnqual (GHC.fsLit "m")
+            let mPlusNm = mkRdrName "MonadPlus"
+                mNm     = mkRdrName "m"
 #if __GLASGOW_HASKELL__ >= 802
             mPlusNmL <- locate mPlusNm
             addAnnValWithDP mPlusNmL (DP (0,0))

@@ -49,7 +49,7 @@ compDuplicateDef fileName newName (row, col) = do
 
         let (Just (modName,_)) = getModuleName parsed
         let maybePn = locToRdrName (row,col) parsed
-        -- let maybePn = locToNameRdrPure nm (row, col) parsed
+        -- let maybePn = locToNamePure nm (row, col) parsed
         case maybePn of
           Just lr@(GHC.L l _) ->
             do

@@ -35,7 +35,7 @@ comp fileName (row, col) = do
        parsed  <- getRefactParsed
        nm      <- getRefactNameMap
 
-       let name = locToNameRdrPure nm (row, col) parsed
+       let name = locToNamePure nm (row, col) parsed
 
        case name of
             -- (Just pn) -> do refactoredMod@(_, (_t, s)) <- applyRefac (doSwap pnt pn) (Just modInfo) fileName

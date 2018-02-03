@@ -36,7 +36,7 @@ compDeleteDef fileName (row,col) = do
     Just pn@(GHC.L _ n) ->
       do
         logm $ "DeleteDef.comp: before isPNUsed"
-        Just ghcn <- locToNameRdr (row,col) parsed
+        Just ghcn <- locToName (row,col) parsed
         pnIsUsedLocal <- isPNUsed ghcn targetModule fileName
         clients <- clientModsAndFiles targetModule
         pnUsedClients <- isPNUsedInClients ghcn n targetModule
