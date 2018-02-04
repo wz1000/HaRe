@@ -205,10 +205,10 @@ syntax phrase but in an outer scope.
 
 -}
 
--- |Some non-trivial condition checking.
+-- | Some non-trivial condition checking.
 -- Returns on success, throws an error on check failure
-condChecking2 :: (SYB.Data t) => NameMap -> GHC.Name -> String -> t -> RefactGhc ()
-condChecking2 nm oldPN newName t = do
+condChecking2 :: (SYB.Data ast) => NameMap -> GHC.Name -> String -> ast -> RefactGhc ()
+condChecking2 nm oldPN newName ast = do
   void $ applyTP (once_buTP (failTP `adhocTP` inMod
                              `adhocTP` inMatch
                              `adhocTP` inExp
@@ -216,13 +216,13 @@ condChecking2 nm oldPN newName t = do
                              `adhocTP` inDataDefn
                              `adhocTP` inConDecl
                              `adhocTP` inTyClDecl
-                     )) t
+                     )) ast
   where
     -- return True if oldPN is declared by t.
-    isDeclaredBy t = isDeclaredBy' t
+    isDeclaredBy t'' = isDeclaredBy' t''
       where
-        isDeclaredBy' t
-          = do (_ , d) <- hsFreeAndDeclaredPNs t
+        isDeclaredBy' t'
+          = do (_ , d) <- hsFreeAndDeclaredPNs t'
                -- logDataWithAnns "isDeclaredBy:t" t
                logm $ "isDeclaredBy:d=" ++ showGhc d
                return (oldPN `elem` d )
@@ -241,10 +241,10 @@ condChecking2 nm oldPN newName t = do
     inMatch (GHC.Match f@(Just (ln,_)) pats  mtype (GHC.GRHSs rhs ds)
              ::GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName)) = do
 #elif __GLASGOW_HASKELL__ <= 800
-    inMatch (GHC.Match f@(GHC.FunBindMatch ln isInfix) pats  mtype (GHC.GRHSs rhs ds)
+    inMatch (GHC.Match f@(GHC.FunBindMatch _ln _isInfix) pats  mtype (GHC.GRHSs rhs ds)
              ::GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName)) = do
 #else
-    inMatch (GHC.Match f@(GHC.FunRhs ln isInfix s) pats  mtype (GHC.GRHSs rhs ds)
+    inMatch (GHC.Match f@(GHC.FunRhs _ln _isInfix _s) pats  mtype (GHC.GRHSs rhs ds)
              ::GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName)) = do
 #endif
       isDeclaredPats <- isDeclaredBy pats
@@ -258,13 +258,13 @@ condChecking2 nm oldPN newName t = do
     inMatch _ = mzero
 
     -- The name is declared in a expression.
-    inExp expr@((GHC.L _ (GHC.HsLet ds e)):: GHC.LHsExpr GHC.RdrName) = do
+    inExp expr@((GHC.L _ (GHC.HsLet ds _e)):: GHC.LHsExpr GHC.RdrName) = do
       isDeclaredDs   <- isDeclaredBy ds
       -- logm $ "inExp.HsLet:isDeclaredDs=" ++ show isDeclaredDs
       if isDeclaredDs
         then condChecking' expr
         else mzero
-    inExp expr@((GHC.L _ (GHC.HsDo _ ds e)):: GHC.LHsExpr GHC.RdrName) = do
+    inExp expr@((GHC.L _ (GHC.HsDo _ ds _e)):: GHC.LHsExpr GHC.RdrName) = do
       isDeclared   <- isDeclaredBy ds
       -- logDataWithAnns "inExp.HsDo:expr" expr
       logm $ "inExp.HsDo:isDeclared=" ++ show isDeclared
@@ -299,7 +299,7 @@ condChecking2 nm oldPN newName t = do
         else mzero
     inStmts _ = mzero
 
-    inDataDefn dd@(GHC.HsDataDefn _ ctxt mctype mkindsig cons derivs :: GHC.HsDataDefn GHC.RdrName) = do
+    inDataDefn dd@(GHC.HsDataDefn _ _ctxt _mctype _mkindsig cons _derivs :: GHC.HsDataDefn GHC.RdrName) = do
       declared <- isDeclaredBy cons
       if declared
         then condChecking' dd
@@ -340,9 +340,9 @@ condChecking2 nm oldPN newName t = do
 #if __GLASGOW_HASKELL__ <= 710
     inTyClDecl dd@(GHC.DataDecl ln (GHC.HsQTvs _ns tyvars) defn _ :: GHC.TyClDecl GHC.RdrName) = do
 #elif __GLASGOW_HASKELL__ <= 800
-    inTyClDecl dd@(GHC.DataDecl ln tyvars defn _ _ :: GHC.TyClDecl GHC.RdrName) = do
+    inTyClDecl dd@(GHC.DataDecl _ln tyvars _defn _ _ :: GHC.TyClDecl GHC.RdrName) = do
 #else
-    inTyClDecl dd@(GHC.DataDecl ln tyvars fixity defn _ _ :: GHC.TyClDecl GHC.RdrName) = do
+    inTyClDecl dd@(GHC.DataDecl _ln tyvars _fixity _defn _ _ :: GHC.TyClDecl GHC.RdrName) = do
 #endif
       declared <- isDeclaredBy dd
       declaredtv <- isDeclaredBy tyvars
@@ -359,7 +359,7 @@ condChecking2 nm oldPN newName t = do
       -- logm $ "condChecking':sameGroupDecls=" ++ showGhc sameGroupDecls
       when (newName `elem` sameGroupDecls)
             $ error "The new name exists in the same binding group!"
-      (f, d) <- hsFreeAndDeclaredNameStrings t
+      (f, _d) <- hsFreeAndDeclaredNameStrings t
       when (newName `elem` f) $ error "Existing uses of the new name will be captured!"
       -- fetch all the declared variables in t that
       -- are visible to the places where oldPN occurs.

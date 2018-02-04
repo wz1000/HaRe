@@ -265,11 +265,13 @@ constructAppChain retRhs lst = do
     cluster (i1:i2:is) l c = let b = i1 + ((i2-i1) `div` 2) in
       [c .. b]:(cluster (i2:is) l (b+1))
 
+{-
 --Checks if a name occurs in the given ast chunk
 nameOccurs :: Data a => GHC.RdrName -> a -> Bool
 nameOccurs nm = SYB.everything (||) (False `SYB.mkQ` isName)
   where isName :: GHC.RdrName -> Bool
         isName mName = nm == mName
+-}
 
 isBindStmt :: GHC.ExprLStmt GHC.RdrName -> Bool
 #if __GLASGOW_HASKELL__ <= 710

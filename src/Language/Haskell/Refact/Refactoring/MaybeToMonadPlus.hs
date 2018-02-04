@@ -66,15 +66,15 @@ doMaybeToPlus pos funNm argNum = do
     Just funBind -> do
       -- Most general: contains Nothing to Nothing, can be Monadic
       -- otherwise canReplaceConstructors coming up true means MonadPlus
-      hasNtoN <- containsNothingToNothing funNm argNum pos funBind
+      hasNtoN <- containsNothingToNothing argNum pos funBind
       -- logm $ "Result of searching for nothing to nothing: " ++ (show hasNtoN)
-      canReplaceConstructors <- isOutputType argNum pos funBind
-      logm $ "Result of canReplaceConstructors: " ++ (show canReplaceConstructors)
       case hasNtoN of
         Just newBind -> do
           logm "Converting to Monad"
           doRewriteAsBind newBind funNm
         Nothing -> do
+          canReplaceConstructors <- isOutputType argNum pos funBind
+          logm $ "Result of canReplaceConstructors: " ++ (show canReplaceConstructors)
           if canReplaceConstructors
             then do
               logm "Converting to MonadPlus"
@@ -202,7 +202,7 @@ replaceGRHS funNm new_rhs lhs_name = do
   newParsed <- SYB.everywhereM (SYB.mkM worker) parsed
   --logm $ "new_rhs: " ++ (SYB.showData SYB.Parser 3 new_rhs)
   --logm $ "The new parsed: " ++ (SYB.showData SYB.Parser 3 newParsed)
-  (liftT getAnnsT) >>= putRefactParsed newParsed
+  putRefactParsed newParsed mempty
  -- return ()
     where
           -- rdrName = GHC.Unqual $ GHC.mkDataOcc funNm
@@ -218,10 +218,12 @@ replaceGRHS funNm new_rhs lhs_name = do
               final_matches <- fix_lhs new_matches
               return $ fb{GHC.fun_matches = final_matches}
           worker bind = return bind
+
           worker' :: ParsedGRHSs -> RefactGhc ParsedGRHSs
           worker' (GHC.GRHSs _ _) = do
             logm "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! worker'!!!!!!!!!!!!!!!!!!!!!!"
             return new_rhs
+
           fix_lhs :: ParsedMatchGroup -> RefactGhc ParsedMatchGroup
           fix_lhs mg = do
 #if __GLASGOW_HASKELL__ >= 800
@@ -237,14 +239,14 @@ replaceGRHS funNm new_rhs lhs_name = do
             let newMatch = match {GHC.m_pats = [lPat]}
                 mAnn = annNone {annsDP = [(G GHC.AnnEqual, (DP (0,1)))]}
             new_l_match <- locate newMatch
-            addAnn new_l_match mAnn
+            liftT $ addAnn new_l_match mAnn
 #if __GLASGOW_HASKELL__ >= 800
             return $ mg {GHC.mg_alts = GHC.L lm [new_l_match]}
 #else
             return $ mg {GHC.mg_alts = [new_l_match]}
 #endif
 
--- This creates a GRHS of the form "name >>= expr" and adds the appropriate annotations, returns the GRHSs.
+-- | This creates a GRHS of the form "name >>= expr" and adds the appropriate annotations, returns the GRHSs.
 createBindGRHS :: GHC.RdrName -> GHC.LHsExpr GHC.RdrName -> RefactGhc (GHC.GRHSs GHC.RdrName (GHC.LHsExpr GHC.RdrName))
 createBindGRHS name lam_par = do
 #if __GLASGOW_HASKELL__ >= 800
@@ -256,7 +258,7 @@ createBindGRHS name lam_par = do
 #endif
   let occDp = [(G GHC.AnnVal, DP (0,1))]
       occAnn = annNone {annsDP = occDp}
-  addAnn bind_occ occAnn
+  liftT $ addAnn bind_occ occAnn
 #if __GLASGOW_HASKELL__ >= 800
   nameL <- locate name
   liftT $ addSimpleAnnT nameL (DP (0,1)) [((G GHC.AnnVal),DP (0,0))]
@@ -265,7 +267,7 @@ createBindGRHS name lam_par = do
   l_name <- locate $ GHC.HsVar name
 #endif
   let l_ann = annNone {annsDP = [(G GHC.AnnVal, DP (0,1))]}
-  addAnn l_name l_ann
+  liftT $ addAnn l_name l_ann
   oppApp <- locate $ GHC.OpApp l_name bind_occ GHC.PlaceHolder lam_par
   addEmptyAnn oppApp
   lgrhs <- locate $ GHC.GRHS [] oppApp
@@ -283,8 +285,8 @@ justToReturn ast = SYB.everywhere (SYB.mkT worker) ast
   where worker :: GHC.OccName -> GHC.OccName
         worker nm = let just = GHC.mkDataOcc "Just" in
           if nm == just
-          then GHC.mkDataOcc "return"
-          else nm
+            then GHC.mkDataOcc "return"
+            else nm
 
 {-
 
@@ -316,11 +318,9 @@ getHsBind pos funNm a =
 -- | This function takes in the name of a function and determines if the binding
 -- contains the case "Nothing = Nothing" If the Nothing to Nothing case is found
 -- then it is removed from the parsed source.
-containsNothingToNothing :: String -> Int -> SimpPos -> GHC.HsBind GHC.RdrName
+containsNothingToNothing :: Int -> SimpPos -> GHC.HsBind GHC.RdrName
                          -> RefactGhc (Maybe (GHC.HsBind GHC.RdrName))
-containsNothingToNothing funNm argNum pos bind = do
-  -- dFlags <- GHC.getSessionDynFlags
-  parsed <- getRefactParsed
+containsNothingToNothing argNum pos bind = do
   let
       -- bind = gfromJust "containsNothingToNothing" $ getHsBind pos parsed
       mg = GHC.fun_matches bind

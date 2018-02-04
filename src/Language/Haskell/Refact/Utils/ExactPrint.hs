@@ -185,33 +185,40 @@ locate ast = do
 
 --Adds an empty annotation at the provided location
 addEmptyAnn :: (SYB.Data a) => GHC.Located a -> RefactGhc ()
-addEmptyAnn a = addAnn a annNone
+addEmptyAnn a = liftT $ addAnn a annNone
 
 addAnnValWithDP :: (SYB.Data a) => GHC.Located a -> DeltaPos -> RefactGhc ()
-addAnnValWithDP a dp = addAnn a valAnn
-    where valAnn = annNone {annEntryDelta = dp, annsDP = [(G GHC.AnnVal, DP (0,0))]}
+-- addAnnValWithDP a dp = addAnn a valAnn
+--     where valAnn = annNone {annEntryDelta = dp, annsDP = [(G GHC.AnnVal, DP (0,0))]}
+addAnnValWithDP a dp = liftT $ addSimpleAnnT a dp [(G GHC.AnnVal, DP (0,0))]
 
 --Adds an "AnnVal" annotation at the provided location
 addAnnVal :: (SYB.Data a) => GHC.Located a -> RefactGhc ()
 addAnnVal a = addAnnValWithDP a (DP (0,1))
 
---Adds the given annotation at the provided location
-addAnn :: (SYB.Data a) => GHC.Located a -> Annotation -> RefactGhc ()
+-- TODO:AZ use the standard API instead
+-- | Adds the given annotation at the provided location
+-- addAnn :: (SYB.Data a) => GHC.Located a -> Annotation -> RefactGhc ()
+addAnn :: (SYB.Data a) => GHC.Located a -> Annotation -> Transform ()
 addAnn a ann = do
-  currAnns <- fetchAnnsFinal
+  -- currAnns <- fetchAnnsFinal
+  -- let k = mkAnnKey a
+  -- setRefactAnns $ Map.insert k ann currAnns
   let k = mkAnnKey a
-  setRefactAnns $ Map.insert k ann currAnns
+  modifyAnnsT (\currAnns -> Map.insert k ann currAnns)
 
 
---Sets the entry delta position of an ast chunk
+-- TODO:AZ replace this with the ghc-exactprint one directly
+-- |Sets the entry delta position of an ast chunk
 setDP :: (SYB.Data a) => DeltaPos -> GHC.Located a -> RefactGhc ()
 setDP dp ast = do
-  currAnns <- fetchAnnsFinal
-  let k = mkAnnKey ast
-      mv = Map.lookup k currAnns
-  case mv of
-    Nothing -> return ()
-    Just v -> addAnn ast (v {annEntryDelta = dp})
+  liftT $ setEntryDPT ast dp
+  -- currAnns <- fetchAnnsFinal
+  -- let k = mkAnnKey ast
+  --     mv = Map.lookup k currAnns
+  -- case mv of
+  --   Nothing -> return ()
+  --   Just v -> addAnn ast (v {annEntryDelta = dp})
 
 --Resets the given AST chunk's delta position to zero.
 zeroDP :: (SYB.Data a) => GHC.Located a -> RefactGhc ()

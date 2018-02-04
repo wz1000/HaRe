@@ -68,7 +68,7 @@ locWithAnnVal a = do
 --expression
 wrapInLambda :: GHC.LPat GHC.RdrName -> ParsedGRHSs -> RefactGhc (GHC.LHsExpr GHC.RdrName)
 wrapInLambda varPat rhs = do
-  match@(GHC.L l match')  <- mkLamMatch varPat rhs
+  match@(GHC.L l _match)  <- mkLamMatch varPat rhs
   --logm $ "Match: " ++ (SYB.showData SYB.Parser 3 match)
 #if __GLASGOW_HASKELL__ <= 710
   let mg = GHC.MG [match] [] GHC.PlaceHolder GHC.Generated
@@ -85,20 +85,21 @@ wrapInLambda varPat rhs = do
   -- logExactprint "lam2" l_lam
   return par_lam
 
-  --This function makes a match suitable for use inside of a lambda expression.
-mkLamMatch :: GHC.LPat GHC.RdrName -> GHC.GRHSs GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> RefactGhc (GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+-- |This function makes a match suitable for use inside of a lambda expression.
+mkLamMatch :: GHC.LPat GHC.RdrName -> GHC.GRHSs GHC.RdrName (GHC.LHsExpr GHC.RdrName)
+           -> RefactGhc (GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName))
 mkLamMatch varPat rhs = do
 #if __GLASGOW_HASKELL__ <= 710
-  lMatch@(GHC.L l m) <- locate (GHC.Match Nothing [varPat] Nothing rhs)
+  lMatch <- locate (GHC.Match Nothing [varPat] Nothing rhs)
 #elif __GLASGOW_HASKELL__ <= 800
-  lMatch@(GHC.L l m) <- locate (GHC.Match GHC.NonFunBindMatch [varPat] Nothing rhs)
+  lMatch <- locate (GHC.Match GHC.NonFunBindMatch [varPat] Nothing rhs)
 #else
-  lMatch@(GHC.L l m) <- locate (GHC.Match GHC.LambdaExpr [varPat] Nothing rhs)
+  lMatch <- locate (GHC.Match GHC.LambdaExpr [varPat] Nothing rhs)
 #endif
   let dp = [(G GHC.AnnRarrow, DP (0,1)),(G GHC.AnnLam, DP (0,0))]
       newAnn = annNone {annsDP = dp, annEntryDelta = DP (0,0)}
   zeroDP varPat
-  addAnn lMatch newAnn
+  liftT $ addAnn lMatch newAnn
   return lMatch
 
 wrapInParsWithDPs :: DeltaPos -> DeltaPos -> GHC.LHsExpr GHC.RdrName -> RefactGhc (GHC.LHsExpr GHC.RdrName)
@@ -106,7 +107,7 @@ wrapInParsWithDPs openDP closeDP expr = do
   newAst <- locate (GHC.HsPar expr)
   let dp = [(G GHC.AnnOpenP, openDP), (G GHC.AnnCloseP, closeDP)]
       newAnn = annNone {annsDP = dp}
-  addAnn newAst newAnn
+  liftT $ addAnn newAst newAnn
   return newAst
 
 
@@ -181,7 +182,7 @@ addBackquotes var = do
       bqtAnn = ((G GHC.AnnBackquote),DP (0,0))
       newLst = bqtAnn:(annsLst++[bqtAnn])
       newAnn = oldAnn {annsDP = newLst}
-  addAnn var newAnn
+  liftT $ addAnn var newAnn
 
 
 --The next two functions construct variables and type variables respectively from RdrNames.
@@ -308,8 +309,8 @@ replaceFunRhs pos newRhs = do
 traverseTypeSig :: Int -> (GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName))
                 -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
 #if __GLASGOW_HASKELL__ >= 802
-traverseTypeSig argNum f (GHC.TypeSig lst (GHC.HsWC wcs (GHC.HsIB v ty c))) = do
-  newTy <- comp argNum ty
+traverseTypeSig argNum f (GHC.TypeSig lst (GHC.HsWC wcs (GHC.HsIB v ty' c))) = do
+  newTy <- comp argNum ty'
   return (GHC.TypeSig lst (GHC.HsWC wcs (GHC.HsIB v newTy c)))
   where
     comp argNum' (GHC.L l (GHC.HsForAllTy bndrs ty)) =

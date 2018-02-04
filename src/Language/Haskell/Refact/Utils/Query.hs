@@ -22,9 +22,10 @@ import Language.Haskell.Refact.Utils.MonadFunctions
 import qualified Data.Map as Map
 import Language.Haskell.GHC.ExactPrint.Types
 
---Takes a single match and returns a tuple containing the grhs and the pattern
---Assumptions:
-  -- Only a single pattern will be returned. Which pattern is returned depends on the behaviour of SYB.something.
+-- | Takes a single match and returns a tuple containing the grhs and the pattern
+-- Assumptions:
+--   Only a single pattern will be returned. Which pattern is returned depends
+--   on the behaviour of SYB.something.
 getVarAndRHS :: GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> RefactGhc (GHC.LPat GHC.RdrName, ParsedGRHSs)
 getVarAndRHS match = do
   let (Just pat) = SYB.something (Nothing `SYB.mkQ` varPat) (GHC.m_pats match)
@@ -32,13 +33,15 @@ getVarAndRHS match = do
     where varPat lPat@(GHC.L _ (GHC.VarPat _ )) = Just lPat
           varPat _ = Nothing
 
---Looks up the function binding at the given position. Returns nothing if the position does not contain a binding.
-getHsBind :: (Data a) => SimpPos -> a -> Maybe (GHC.HsBind GHC.RdrName)
-getHsBind pos a =
-  let rdrNm = locToRdrName pos a in
+-- TODO:AZ remove this, use the API version instead
+-- | Looks up the function binding at the given position. Returns nothing if the
+-- position does not contain a binding.
+getHsBind :: (Data ast) => SimpPos -> ast -> Maybe (GHC.HsBind GHC.RdrName)
+getHsBind pos ast =
+  let rdrNm = locToRdrName pos ast in
   case rdrNm of
   Nothing -> Nothing
-  (Just (GHC.L _ rNm)) -> SYB.everythingStaged SYB.Parser (<|>) Nothing (Nothing `SYB.mkQ` isBind) a
+  (Just (GHC.L _ rNm)) -> SYB.everythingStaged SYB.Parser (<|>) Nothing (Nothing `SYB.mkQ` isBind) ast
     where
 #if __GLASGOW_HASKELL__ <= 710
         isBind (bnd@(GHC.FunBind (GHC.L _ name) _ _ _ _ _) :: GHC.HsBind GHC.RdrName)
@@ -48,6 +51,7 @@ getHsBind pos a =
             | name == rNm = (Just bnd)
         isBind _ = Nothing
 
+-- TODO:AZ get rid of this, use the API version instead
 --Get the name of a function from a string
 getFunName :: (SYB.Data t) => String -> t -> Maybe GHC.Name
 getFunName str = SYB.something (Nothing `SYB.mkQ` comp)
@@ -66,6 +70,7 @@ getFunName str = SYB.something (Nothing `SYB.mkQ` comp)
     isNameString nm str = (GHC.nameOccName nm) == (GHC.mkVarOcc str)
 
 
+-- TODO:AZ use a Name, not OccName, and compare properly
 getTypedHsBind :: (Data a) => GHC.OccName -> a -> Maybe (GHC.HsBind GHC.Id)
 getTypedHsBind occ = SYB.something (Nothing `SYB.mkQ` isBind)
   where
@@ -78,9 +83,10 @@ getTypedHsBind occ = SYB.something (Nothing `SYB.mkQ` isBind)
         isBind _ = Nothing
 
 
---This looks up the type signature of the given identifier.
---The given position is assumed to be the location of where the identifier is defined
---NOT the location of the type signature
+-- TODO:AZ use Name, match on unique
+-- | This looks up the type signature of the given identifier. The given
+-- position is assumed to be the location of where the identifier is defined
+-- NOT the location of the type signature
 getTypeSig :: (Data a) => SimpPos -> String -> a -> Maybe (GHC.Sig GHC.RdrName)
 getTypeSig pos funNm a =
   let rdrNm = locToRdrName pos a in
@@ -159,8 +165,9 @@ getFunBindType pos = do
   return undefined
 -}
 
---This checks if a syntax element is wrapped in parenthesis
---by checking the annotatations contain AnnCloseP and AnnOpenP
+-- TODO:AZ this info should come from the AST?
+-- | This checks if a syntax element is wrapped in parenthesis
+-- by checking the annotatations contain AnnCloseP and AnnOpenP
 isWrappedInPars :: (Data a) => (GHC.Located a) -> RefactGhc Bool
 isWrappedInPars a = do
   anns <- fetchAnnsFinal
