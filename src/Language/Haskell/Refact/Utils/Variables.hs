@@ -40,6 +40,7 @@ module Language.Haskell.Refact.Utils.Variables
   , findNameInRdr
   , findNamesRdr
   , sameOccurrence
+  , sameName
   , definedPNsRdr,definedNamesRdr
   , definingDeclsRdrNames,definingDeclsRdrNames',definingSigsRdrNames
   , definingTyClDeclsNames
@@ -188,6 +189,13 @@ sameOccurrence :: (GHC.Located t) -> (GHC.Located t) -> Bool
 sameOccurrence (GHC.L l1 _) (GHC.L l2 _)
  = l1 == l2
 
+-- ---------------------------------------------------------------------
+
+-- |Check that the given Located RdrName is the same as the given Name, by
+-- looking up the equivalent name in the NameMap, and comparing Name unique
+-- values.
+sameName :: NameMap -> GHC.Located GHC.RdrName -> GHC.Name -> Bool
+sameName nm ln name = GHC.nameUnique (rdrName2NamePure nm ln) == GHC.nameUnique name
 
 -- ---------------------------------------------------------------------
 

@@ -43,7 +43,7 @@ module Language.Haskell.Refact.API
        , clientModsAndFiles
        , serverModsAndFiles
        -- , lookupAnns
-         
+
        , stripCallStack
 
  -- * from `Language.Haskell.Refact.Utils.MonadFunctions`
@@ -148,7 +148,8 @@ module Language.Haskell.Refact.API
     ,usedWithoutQualR
     ,findNameInRdr
     ,findNamesRdr, findEntity, findEntity'
-    ,sameOccurrence
+    , sameOccurrence
+    , sameName
     , findIdForName
     , getTypeForName
     , definesTypeSigRdr,definesSigDRdr

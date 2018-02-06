@@ -26,15 +26,12 @@ import qualified Data.Map as Map
 import Data.Data
 import Data.Maybe
 import qualified Data.Generics as SYB
--- import qualified GHC.SYB.Utils as SYB
--- import qualified FastString as GHC
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Parsers
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.MonadFunctions
 import Language.Haskell.Refact.Utils.Types
--- import Language.Haskell.Refact.Utils.Utils
 import Language.Haskell.Refact.Utils.TypeUtils
 import Language.Haskell.Refact.Utils.Synonyms
 import Language.Haskell.Refact.Utils.ExactPrint

@@ -1,0 +1,23 @@
+#####################################################################
+## IGNORES
+
+# would require module cycles
+#- ignore: {name: Use toNamed, within: HSE.Util}
+# doesn't fit with the other statements
+#- ignore: {name: Use let, within: [HLint, Test.All]}
+# would be a lot of is/from exports
+#- ignore: {name: Use explicit module export list, within: HSE.Util}
+# this const has meaingful argument names
+#- ignore: {name: Use const, within: Config.Yaml}
+- ignore: {name: Eta reduce }
+- ignore: {name: Redundant bracket }
+- ignore: {name: Redundant $ }
+- ignore: {name: Reduce duplication }
+- ignore: {name: Use list comprehension }
+- ignore: {name: Use infix }
+- ignore: {name: Move brackets to avoid $ }
+
+# ignore arrows stuff
+- ignore: {name: Use &&& }
+- ignore: {name: Use second }
+

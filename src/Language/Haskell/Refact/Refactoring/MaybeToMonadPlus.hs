@@ -28,14 +28,14 @@ import           System.Directory
 
 -- ---------------------------------------------------------------------
 
-maybeToMonadPlus :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> String -> Int -> IO [FilePath]
-maybeToMonadPlus settings cradle fileName pos funNm argNum = do
+maybeToMonadPlus :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> Int -> IO [FilePath]
+maybeToMonadPlus settings cradle fileName pos argNum = do
   absFileName <- canonicalizePath fileName
-  runRefacSession settings cradle (compMaybeToMonadPlus absFileName pos funNm argNum)
+  runRefacSession settings cradle (compMaybeToMonadPlus absFileName pos argNum)
 
-compMaybeToMonadPlus :: FilePath -> SimpPos -> String -> Int -> RefactGhc [ApplyRefacResult]
-compMaybeToMonadPlus fileName pos funNm argNum = do
-  (refRes@((_fp,ismod), _),()) <- applyRefac (doMaybeToPlus pos funNm argNum) (RSFile fileName)
+compMaybeToMonadPlus :: FilePath -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]
+compMaybeToMonadPlus fileName pos argNum = do
+  (refRes@((_fp,ismod), _),()) <- applyRefac (doMaybeToPlus pos argNum) (RSFile fileName)
   case ismod of
     RefacUnmodifed -> error "Maybe to MonadPlus synonym failed"
     RefacModified -> return ()
@@ -56,14 +56,16 @@ compMaybeToMonadPlus fileName pos funNm argNum = do
 -- of type 'MonadPlus', and finally if that also isn’t possible the refactoring
 -- cannot continue and the source and target programs of the refactoring are
 -- identical.
-doMaybeToPlus :: SimpPos -> String -> Int -> RefactGhc ()
-doMaybeToPlus pos funNm argNum = do
+doMaybeToPlus :: SimpPos -> Int -> RefactGhc ()
+doMaybeToPlus pos argNum = do
   parsed <- getRefactParsed
   -- TODO:Add test that position defines function with name `funNm`
   let mBind = getHsBind pos parsed
   case mBind of
     Nothing -> error "Function bind not found"
     Just funBind -> do
+      nm <- getRefactNameMap
+      let funNm = ghead "doMaybeToPlus" (definedNamesRdr nm (GHC.noLoc (GHC.ValD funBind)))
       -- Most general: contains Nothing to Nothing, can be Monadic
       -- otherwise canReplaceConstructors coming up true means MonadPlus
       hasNtoN <- containsNothingToNothing argNum pos funBind
@@ -104,7 +106,7 @@ isOutputType argNum pos funBind = do
 -- | This handles the case where only the output type of the function is being
 -- modified so calls to Nothing and Just can be replaced with mzero and return
 -- respectively in GRHSs
-replaceConstructors :: SimpPos -> String -> Int -> RefactGhc ()
+replaceConstructors :: SimpPos -> GHC.Name -> Int -> RefactGhc ()
 replaceConstructors pos funNm argNum = do
   parsed <- getRefactParsed
   let (Just bind) = getHsBind pos parsed
@@ -152,7 +154,7 @@ replaceBind pos newBind = do
 
 -- | Handles the case where the function can be rewritten with 'bind'.
 -- i.e. Conversion to a fully general Monad
-doRewriteAsBind :: GHC.HsBind GHC.RdrName -> String -> RefactGhc ()
+doRewriteAsBind :: GHC.HsBind GHC.RdrName -> GHC.Name -> RefactGhc ()
 -- doRewriteAsBind :: GHC.HsBind GHC.RdrName -> String -> RefactGhc (GHC.HsBind GHC.RdrName)
 doRewriteAsBind bind funNm = do
 #if __GLASGOW_HASKELL__ >= 800
@@ -183,7 +185,7 @@ doRewriteAsBind bind funNm = do
       --logm $ "Final anns: " ++ (show currAnns)
       fixType funNm
       addMonadImport
-      logParsedSource "Final parsed: "
+      -- logParsedSource "Final parsed: "
 
 addMonadImport :: RefactGhc ()
 addMonadImport = addSimpleImportDecl "Control.Monad" Nothing
@@ -196,28 +198,30 @@ addMonadImport = addSimpleImportDecl "Control.Monad" Nothing
 -- Asumptions made:
 --  Only one LMatch in the match group
 --  Only one variable in LHS
-replaceGRHS :: String -> GHC.GRHSs GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> GHC.RdrName -> RefactGhc ()
+replaceGRHS :: GHC.Name -> GHC.GRHSs GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> GHC.RdrName -> RefactGhc ()
 replaceGRHS funNm new_rhs lhs_name = do
+  nm <- getRefactNameMap
   parsed <- getRefactParsed
-  newParsed <- SYB.everywhereM (SYB.mkM worker) parsed
+  newParsed <- SYB.everywhereM (SYB.mkM (worker nm)) parsed
   --logm $ "new_rhs: " ++ (SYB.showData SYB.Parser 3 new_rhs)
   --logm $ "The new parsed: " ++ (SYB.showData SYB.Parser 3 newParsed)
   putRefactParsed newParsed mempty
  -- return ()
     where
           -- rdrName = GHC.Unqual $ GHC.mkDataOcc funNm
-          worker :: GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
+          worker :: NameMap ->  GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
 #if __GLASGOW_HASKELL__ >= 800
-          worker fb@(GHC.FunBind (GHC.L _ nm) _ _ _ _) |
+          worker nm fb@(GHC.FunBind ln _ _ _ _)
 #else
-          worker fb@(GHC.FunBind (GHC.L _ nm) _ _ _ _ _) |
+          worker nm fb@(GHC.FunBind ln _ _ _ _ _)
 #endif
-            (GHC.occNameString . GHC.rdrNameOcc) nm == funNm = do
+            -- *| (GHC.occNameString . GHC.rdrNameOcc) nm == funNm = do
+            | sameName nm ln funNm = do
               logm $ "=======Found funbind========"
               new_matches <- SYB.everywhereM (SYB.mkM worker') (GHC.fun_matches fb)
               final_matches <- fix_lhs new_matches
               return $ fb{GHC.fun_matches = final_matches}
-          worker bind = return bind
+          worker _ bind = return bind
 
           worker' :: ParsedGRHSs -> RefactGhc ParsedGRHSs
           worker' (GHC.GRHSs _ _) = do
@@ -409,11 +413,13 @@ removeMatches pos newBind matches = do
 --  Assumes the function is of type Maybe a -> Maybe a
 --
 --   Should refactor to take in the argNum parameter and fix the type depending on that
-fixType' :: String -> Int -> RefactGhc ()
+fixType' :: GHC.Name -> Int -> RefactGhc ()
 fixType' funNm argPos = do
-  logm "Fixing type"
+  nm <- getRefactNameMap
+  logm "fixType':Fixing type"
   parsed <- getRefactParsed
-  let m_sig = getSigD funNm parsed
+  -- TODO:AZ what if there is no signature?
+  let m_sig                       = getSigD nm funNm parsed
       (GHC.L sigL (GHC.SigD sig)) = gfromJust "fixType'" m_sig
   fixedClass <- fixTypeClass sig
   --This needs to be fixed to replace only the correct argument and output type
@@ -619,19 +625,22 @@ fixType' funNm argPos = do
             return lApp
 
 
-fixType :: String -> RefactGhc ()
+fixType :: GHC.Name -> RefactGhc ()
 fixType funNm = do
+  nm <- getRefactNameMap
   parsed <- getRefactParsed
   currAnns <- fetchAnnsFinal
   dFlags <- GHC.getSessionDynFlags
-  logm $ "fixType:funNm=" ++ funNm
+  logm $ "fixType:funNm=" ++ showGhc funNm
   -- logParsedSource "fixType"
-  let m_sig = getSigD funNm parsed
+  let m_sig = getSigD nm funNm parsed
       (GHC.L sigL (GHC.SigD sig)) = gfromJust "fixType: getting sig" m_sig
       iType = gfromJust "fixType: iType" $ getInnerType sig
       strTy = exactPrint iType currAnns
-      tyStr = funNm ++ " :: (MonadPlus m) => m " ++ strTy ++ " -> m " ++ strTy
+      tyStr = showGhc funNm ++ " :: (MonadPlus m) => m " ++ strTy ++ " -> m " ++ strTy
       pRes = parseDecl dFlags "MaybeToMonadPlus.hs" tyStr
+  logm $ "fixType:sig " ++ showGhc sig
+  logm $ "fixType:iType " ++ showGhc iType
   logm $ "Type string:strTy " ++ strTy
   logm $ "Type string:tyStr " ++ tyStr
   -- logDataWithAnns "fixType:sig" sig
@@ -640,34 +649,43 @@ fixType funNm = do
   putRefactParsed newParsed anns
   addNewLines 2 newSig
 
-getSigD :: (Data a) => String -> a -> Maybe (GHC.LHsDecl GHC.RdrName)
-getSigD funNm = SYB.something (Nothing `SYB.mkQ` isSigD)
+getSigD :: (Data a) => NameMap -> GHC.Name -> a -> Maybe (GHC.LHsDecl GHC.RdrName)
+getSigD nm funNm = SYB.something (Nothing `SYB.mkQ` isSigD)
   where
     isSigD :: GHC.LHsDecl GHC.RdrName -> Maybe (GHC.LHsDecl GHC.RdrName)
     isSigD s@(GHC.L _ (GHC.SigD sig)) = if isSig sig
                                         then Just s
                                         else Nothing
     isSigD _ = Nothing
+
     isSig :: GHC.Sig GHC.RdrName -> Bool
+    -- TODO:AZ: what about a shared signature, where the one we care about is not the first one?
 #if __GLASGOW_HASKELL__ >= 800
-    isSig sig@(GHC.TypeSig [(GHC.L _ nm)] _) = (compNames funNm nm)
+    isSig sig@(GHC.TypeSig [ln] _) = (sameName nm ln funNm)
 #else
-    isSig sig@(GHC.TypeSig [(GHC.L _ nm)] _ _) = (compNames funNm nm)
+    isSig sig@(GHC.TypeSig [ln] _ _) = (sameNAme nm ln funNm)
 #endif
     isSig _ = False
 
+-- TODO:AZ we should be using exact stuff for this, matching things like "Just"
 compNames :: String -> GHC.RdrName -> Bool
 compNames s rdr = let sRdr = (GHC.occNameString . GHC.rdrNameOcc) rdr in
   sRdr == s
 
+
+-- ---------------------------------------------------------------------
+
+-- TODO:AZ this should make use of argNum, to make sure it only processes the
+--      param to be refactored.
+-- | Get the type inside the first Maybe the traversal finds.
 getInnerType :: GHC.Sig GHC.RdrName -> Maybe (GHC.LHsType GHC.RdrName)
 getInnerType = SYB.everything (<|>) (Nothing `SYB.mkQ` getTy)
 #if __GLASGOW_HASKELL__ >= 802
   where getTy :: GHC.HsType GHC.RdrName -> Maybe (GHC.LHsType GHC.RdrName)
         getTy (GHC.HsAppsTy [GHC.L _ (GHC.HsAppPrefix mCon), GHC.L _ (GHC.HsAppPrefix otherTy)])
           = if isMaybeTy mCon
-                                             then Just otherTy
-                                             else Nothing
+              then Just otherTy
+              else Nothing
         getTy _ = Nothing
 
         isMaybeTy :: GHC.LHsType GHC.RdrName -> Bool
@@ -695,6 +713,8 @@ getInnerType = SYB.everything (<|>) (Nothing `SYB.mkQ` getTy)
         isMaybeTy (GHC.L _ (GHC.HsTyVar (GHC.Unqual occNm))) = (GHC.occNameString occNm) == "Maybe"
         isMaybeTy _ = False
 #endif
+
+-- ---------------------------------------------------------------------
 
 replaceAtLocation :: (Data a) => GHC.SrcSpan -> GHC.Located a -> RefactGhc (GHC.ParsedSource)
 replaceAtLocation span new = do
