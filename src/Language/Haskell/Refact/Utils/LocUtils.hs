@@ -22,9 +22,9 @@ import qualified FastString    as GHC
 import qualified GHC           as GHC
 
 import qualified Data.Generics as SYB
-import qualified GHC.SYB.Utils as SYB
 
 import Language.Haskell.Refact.Utils.Types
+import Language.Haskell.GHC.ExactPrint.Types
 
 -- ---------------------------------------------------------------------
 
@@ -122,7 +122,7 @@ nonEmptyList _  = True
 getSrcSpan::(SYB.Data t) => t -> Maybe GHC.SrcSpan
 getSrcSpan t = res t
   where
-    res = SYB.somethingStaged SYB.Parser Nothing
+    res = SYB.something
             (Nothing
                     `SYB.mkQ`  bind
                     `SYB.extQ` decl
@@ -134,28 +134,28 @@ getSrcSpan t = res t
                     `SYB.extQ` ty
             )
 
-    bind :: GHC.GenLocated GHC.SrcSpan (GHC.HsBind GHC.RdrName) -> Maybe GHC.SrcSpan
+    bind :: GHC.GenLocated GHC.SrcSpan (GHC.HsBind GhcPs) -> Maybe GHC.SrcSpan
     bind (GHC.L l _)              = Just l
 
-    decl :: GHC.GenLocated GHC.SrcSpan (GHC.HsDecl GHC.RdrName) -> Maybe GHC.SrcSpan
+    decl :: GHC.GenLocated GHC.SrcSpan (GHC.HsDecl GhcPs) -> Maybe GHC.SrcSpan
     decl (GHC.L l _)              = Just l
 
-    sig :: (GHC.LSig GHC.RdrName) -> Maybe GHC.SrcSpan
+    sig :: (GHC.LSig GhcPs) -> Maybe GHC.SrcSpan
     sig (GHC.L l _)              = Just l
 
-    ty :: (GHC.LHsType GHC.RdrName) -> Maybe GHC.SrcSpan
+    ty :: (GHC.LHsType GhcPs) -> Maybe GHC.SrcSpan
     ty (GHC.L l _) = Just l
 
-    pnt :: GHC.GenLocated GHC.SrcSpan GHC.RdrName -> Maybe GHC.SrcSpan
+    pnt :: GHC.GenLocated GHC.SrcSpan GhcPs -> Maybe GHC.SrcSpan
     pnt (GHC.L l _)              = Just l
 
-    literalInExp :: GHC.LHsExpr GHC.RdrName -> Maybe GHC.SrcSpan
+    literalInExp :: GHC.LHsExpr GhcPs -> Maybe GHC.SrcSpan
     literalInExp (GHC.L l _) = Just l
 
-    literalInPat :: GHC.LPat GHC.RdrName -> Maybe GHC.SrcSpan
+    literalInPat :: GHC.LPat GhcPs -> Maybe GHC.SrcSpan
     literalInPat (GHC.L l _) = Just l
 
-    importDecl :: GHC.LImportDecl GHC.RdrName -> Maybe GHC.SrcSpan
+    importDecl :: GHC.LImportDecl GhcPs -> Maybe GHC.SrcSpan
     importDecl (GHC.L l _) = Just l
 
 -- ---------------------------------------------------------------------

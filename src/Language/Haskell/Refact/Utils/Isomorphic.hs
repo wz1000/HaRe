@@ -33,7 +33,6 @@ import qualified TcRnDriver as GHC
 import qualified ErrUtils as GHC
 import qualified Bag as GHC
 import qualified Unique as GHC
-import qualified GHC.SYB.Utils as SYB
 import Data.Generics as SYB
 import qualified Data.Map as M
 import Control.Monad.State
@@ -45,7 +44,7 @@ import Data.Generics.Strafunski.StrategyLib.StrategyLib
 
 -- Going to assume it's only the result type that will be modified right now
 isoRefact :: Int -> Maybe String -> GHC.RdrName -> GHC.Type -> IsoRefactState
-          -> GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
+          -> GHC.HsBind GhcPs -> RefactGhc (GHC.HsBind GhcPs)
 isoRefact argNum mqual funNm newFTy iST bnd = do
   -- typedS <- getRefactTyped
   -- let m_fTy = getTypeFromRdr funNm typedS
@@ -72,7 +71,7 @@ skipCurrent = do
       return True
     Just _ -> return False
 
-doIsoRefact :: GHC.LHsExpr GHC.RdrName -> IsoRefact (GHC.LHsExpr GHC.RdrName)
+doIsoRefact :: GHC.LHsExpr GhcPs -> IsoRefact (GHC.LHsExpr GhcPs)
 doIsoRefact expr = do
   lift $ logDataWithAnns "doIsoRefact" expr
   b1 <- isoDone
@@ -80,10 +79,10 @@ doIsoRefact expr = do
   if b1 || b2
     then do
       lift $ logm "Skipping this expr: "
-      lift $ logm (SYB.showData SYB.Parser 3 expr)
+      lift $ logm (showAnnData mempty 3 expr)
       return expr
     else doIsoRefact' expr
-  where doIsoRefact' :: GHC.LHsExpr GHC.RdrName -> IsoRefact (GHC.LHsExpr GHC.RdrName)
+  where doIsoRefact' :: GHC.LHsExpr GhcPs -> IsoRefact (GHC.LHsExpr GhcPs)
         doIsoRefact' (GHC.L l (GHC.HsApp le re)) = do
           le' <- doIsoRefact le
           wrapWithAbs <- shouldInsertAbs
@@ -113,7 +112,7 @@ doIsoRefact expr = do
           return (GHC.L l (GHC.OpApp le' op' rn re'))
         doIsoRefact' lam@(GHC.L l (GHC.HsLam mg)) = do
           lift $ logm "Found lambda"
-          lift $ logm (SYB.showData SYB.Parser 3 lam)
+          lift $ logm (showAnnData mempty 3 lam)
           return lam
 #if __GLASGOW_HASKELL__ >= 800
         doIsoRefact' var@(GHC.L l (GHC.HsVar (GHC.L lr rdr))) = do
@@ -126,7 +125,7 @@ doIsoRefact expr = do
           -- typed <- lift getRefactTyped
           mId <- lift (getIdFromVar var)
           lift $ logDataWithAnns "doIsoRefact'mId" mId
-          let id' = gfromJust ("Tried to get id for: " ++ SYB.showData SYB.Parser 3 rdr) mId
+          let id' = gfromJust ("Tried to get id for: " ++ showAnnData mempty 3 rdr) mId
               goalType = gfromJust "Getting goal type" $ head tq
               currTy = GHC.idType id'
               -- currRes = getResultType currTy
@@ -136,7 +135,7 @@ doIsoRefact expr = do
             Nothing -> do
               -- If this happens we have a problem and need to insert a fromList higher up the tree
               -- Need to figure out how to handle this case
-              lift $ logm $ "No map on var: " ++ (SYB.showData SYB.Parser 3 keyOcc) ++ ": " ++ show (GHC.getUnique keyOcc)
+              lift $ logm $ "No map on var: " ++ (showAnnData mempty 3 keyOcc) ++ ": " ++ show (GHC.getUnique keyOcc)
               --pop the current goal type
               popTQ
               --Since we aren't changing the function we don't have to modify any of the right sub-trees
@@ -155,7 +154,7 @@ doIsoRefact expr = do
 #else
                     newE = (GHC.L l (GHC.HsVar oNm))
 #endif
-                lift $ logm $ "Swapping " ++  (SYB.showData SYB.Parser 3 keyOcc)
+                lift $ logm $ "Swapping " ++  (showAnnData mempty 3 keyOcc)
                 lift $ logm $ "CURRENT TYPE: \n" ++ showType 3 currTy
                 lift $ logm $ "NEW VAR TYPE: \n" ++ showType 3 ty
 --                mapM_ (\t -> lift $ logm (SYB.showData SYB.TypeChecker 3 t)) changedTypes
@@ -292,7 +291,7 @@ printQueue = do
   st <- get
   let tq = typeQueue st
   lift $ logm "Current Type queue: "
-  mapM_ (\t -> lift $ logm (SYB.showData SYB.TypeChecker 3 t)) tq
+  mapM_ (\t -> lift $ logm (showAnnData mempty 3 t)) tq
     where printType :: Maybe GHC.Type -> IsoRefact ()
           printType mTy = do
             case mTy of
@@ -324,7 +323,7 @@ runIsoRefact :: IsoRefact a -> IsoRefactState -> RefactGhc a
 runIsoRefact m initSt = evalStateT m initSt
 
 showType :: Int -> GHC.Type -> String
-showType n (GHC.TyVarTy v) = indent n ++ "(TyVarTy " ++ SYB.showData SYB.TypeChecker (n+1) v ++ ")"
+showType n (GHC.TyVarTy v) = indent n ++ "(TyVarTy " ++ showAnnData mempty (n+1) v ++ ")"
 showType n (GHC.AppTy t1 t2) = indent n ++ "(AppTy\n" ++ (showType (n+1) t1) ++ "\n" ++ (showType (n+1) t2) ++ "\n)"
 showType n (GHC.TyConApp tc lst) = indent n ++ "(TyConApp: " ++ (printCon tc) ++
                                 (foldl (\rst ty -> rst ++ "\n" ++ (showType (n+1) ty)) "" lst) ++ ")"
@@ -332,7 +331,7 @@ showType n (GHC.TyConApp tc lst) = indent n ++ "(TyConApp: " ++ (printCon tc) ++
 #else
 showType n (GHC.FunTy t1 t2) = indent n ++ "(FunTy " ++ (showType (n+1) t1) ++ indent n ++ "->" ++ (showType (n+1) t2) ++ ")"
 #endif
-showType n (GHC.ForAllTy v ty) = indent n ++ "(ForAllTy: " ++ (SYB.showData SYB.TypeChecker (n+1) v) ++ "\n" ++ (showType (n+1) ty) ++ "\n)"
+showType n (GHC.ForAllTy v ty) = indent n ++ "(ForAllTy: " ++ (showAnnData mempty (n+1) v) ++ "\n" ++ (showType (n+1) ty) ++ "\n)"
 showType n (GHC.LitTy tl) = indent n ++ "(LitTy: " ++ showTyLit tl ++ ")"
 
 
@@ -346,7 +345,7 @@ printCon tc
   | GHC.isAlgTyCon tc = "AlgTyCon: " ++ shwTc tc
   | otherwise = "TyCon: " ++ (show $ toConstr tc) ++ "|" ++ shwTc tc
 
-shwTc = SYB.showSDoc_ . ppr
+shwTc = showSDoc_ . ppr
 indent i = "\n" ++ replicate i ' '
 
 --This takes in a type and returns its result type
@@ -370,7 +369,7 @@ modMGAltsRHS :: (ParsedLExpr -> RefactGhc ParsedLExpr) -> ParsedBind -> RefactGh
 modMGAltsRHS f bnd = do
   applyTP (stop_tdTP (failTP `adhocTP` comp)) bnd
   where
-    comp :: GHC.GRHS GHC.RdrName ParsedLExpr -> RefactGhc (GHC.GRHS GHC.RdrName ParsedLExpr)
+    comp :: GHC.GRHS GhcPs ParsedLExpr -> RefactGhc (GHC.GRHS GhcPs ParsedLExpr)
     comp (GHC.GRHS lst expr) = do
       newExpr <- f expr
       return (GHC.GRHS lst newExpr)
@@ -380,7 +379,7 @@ getTyCon (GHC.TyConApp tc _) = tc
 
 getTypeFromRdr :: (Data a) => GHC.RdrName -> a -> Maybe GHC.Type
 getTypeFromRdr nm a = SYB.something (Nothing `SYB.mkQ` comp) a
-  where comp :: GHC.HsBind GHC.Id -> Maybe GHC.Type
+  where comp :: GHC.HsBind GhcTc -> Maybe GHC.Type
 #if __GLASGOW_HASKELL__ >= 800
         comp (GHC.FunBind (GHC.L _ id) _ _ _ _)
 #else
@@ -431,7 +430,7 @@ mkFuncs iDecl projStr absStr fStrings mqual = do
         (Just ty) -> return (s1,(rdr,ty))
 
 
-tcExprInTargetMod :: GHC.LImportDecl GHC.RdrName -> ParsedLExpr -> RefactGhc (GHC.Messages, Maybe GHC.Type)
+tcExprInTargetMod :: GHC.LImportDecl GhcPs -> ParsedLExpr -> RefactGhc (GHC.Messages, Maybe GHC.Type)
 tcExprInTargetMod idecl ex = do
   pm <- getRefactParsedMod
   oldCntx <- GHC.getContext

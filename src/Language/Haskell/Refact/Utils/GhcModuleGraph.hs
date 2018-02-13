@@ -13,6 +13,7 @@ import Digraph
 import FastString
 #endif
 import GHC
+import GhcMake
 import HscTypes
 import Panic
 
@@ -70,16 +71,35 @@ getModulesAsGraph drop_hs_boot_nodes summaries mb_root_mod
             -- the specified node.
             let root | Just node <- lookup_node HsSrcFile root_mod, graph `hasVertexG` node = node
                      | otherwise = panic "module does not exist"
-#if __GLASGOW_HASKELL__ <= 800
-            in graphFromEdgedVertices (seq root (reachableG graph root))
-#else
+#if __GLASGOW_HASKELL__ >= 804
             in graphFromEdgedVerticesUniq (seq root (reachableG graph root))
+#elif __GLASGOW_HASKELL__ > 800
+            in graphFromEdgedVerticesUniq (seq root (reachableG graph root))
+#else
+            in graphFromEdgedVertices (seq root (reachableG graph root))
 #endif
 
 
 
 -- ---------------------------------------------------------------------
+
+summaryNodeKey :: SummaryNode -> Int
+#if __GLASGOW_HASKELL__ >= 804
+summaryNodeKey (DigraphNode _ k _) = k
+#else
+summaryNodeKey (_, k, _) = k
+#endif
+
+summaryNodeSummary :: SummaryNode -> ModSummary
+#if __GLASGOW_HASKELL__ >= 804
+summaryNodeSummary (DigraphNode s _ _) = s
+#else
+summaryNodeSummary (s, _, _) = s
+#endif
+
 -- This bit is from the GHC source >>>>>>>
+#if __GLASGOW_HASKELL__ >= 804
+#else
 type SummaryNode = (ModSummary, Int, [Int])
 
 {-
@@ -102,18 +122,15 @@ topSortModuleGraph drop_hs_boot_nodes summaries mb_root_mod
             in graphFromEdgedVertices (seq root (reachableG graph root))
 -}
 
-summaryNodeKey :: SummaryNode -> Int
-summaryNodeKey (_, k, _) = k
-
-summaryNodeSummary :: SummaryNode -> ModSummary
-summaryNodeSummary (s, _, _) = s
 
 moduleGraphNodes :: Bool -> [ModSummary]
   -> (Graph SummaryNode, HscSource -> ModuleName -> Maybe SummaryNode)
-#if __GLASGOW_HASKELL__ <= 800
-moduleGraphNodes drop_hs_boot_nodes summaries = (graphFromEdgedVertices nodes, lookup_node)
-#else
+#if __GLASGOW_HASKELL__ >= 804
 moduleGraphNodes drop_hs_boot_nodes summaries = (graphFromEdgedVerticesUniq nodes, lookup_node)
+#elif __GLASGOW_HASKELL__ > 800
+moduleGraphNodes drop_hs_boot_nodes summaries = (graphFromEdgedVerticesUniq nodes, lookup_node)
+#else
+moduleGraphNodes drop_hs_boot_nodes summaries = (graphFromEdgedVertices nodes, lookup_node)
 #endif
   where
     numbered_summaries = zip summaries [1..]
@@ -224,3 +241,5 @@ ms_home_imps ms = map snd $ ms_imps ms
 #endif
 
 -- GHC source end
+
+#endif

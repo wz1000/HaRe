@@ -138,13 +138,13 @@ balanceAllComments la
     inMod :: GHC.ParsedSource -> Transform (GHC.ParsedSource)
     inMod m = doBalance m
 
-    inExpr :: GHC.LHsExpr GHC.RdrName -> Transform (GHC.LHsExpr GHC.RdrName)
+    inExpr :: GHC.LHsExpr GhcPs -> Transform (GHC.LHsExpr GhcPs)
     inExpr e = doBalance e
 
-    inMatch :: (GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName)) -> Transform (GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+    inMatch :: (GHC.LMatch GhcPs (GHC.LHsExpr GhcPs)) -> Transform (GHC.LMatch GhcPs (GHC.LHsExpr GhcPs))
     inMatch m = doBalance m
 
-    inStmt :: GHC.LStmt GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> Transform (GHC.LStmt GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+    inStmt :: GHC.LStmt GhcPs (GHC.LHsExpr GhcPs) -> Transform (GHC.LStmt GhcPs (GHC.LHsExpr GhcPs))
     inStmt s = doBalance s
 
     -- |Balance all comments between adjacent decls, as well as pushing all

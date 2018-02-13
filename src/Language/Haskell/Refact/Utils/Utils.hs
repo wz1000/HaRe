@@ -61,6 +61,9 @@ import Language.Haskell.Refact.Utils.Types
 import System.Directory
 import System.FilePath.Posix
 
+#if __GLASGOW_HASKELL__ >= 804
+import qualified GhcMake       as GHC
+#endif
 import qualified Digraph       as GHC
 import qualified GHC           as GHC
 
@@ -484,10 +487,20 @@ serverModsAndFiles
 serverModsAndFiles m = do
   ms <- GHC.getModuleGraph
   modsum <- GHC.getModSummary m
+#if __GLASGOW_HASKELL__ >= 804
+  let mg = getModulesAsGraph False (GHC.mgModSummaries ms) Nothing
+#else
   let mg = getModulesAsGraph False ms Nothing
+#endif
+#if __GLASGOW_HASKELL__ >= 804
+      modNode = gfromJust "serverModsAndFiles" $ find (\(GHC.DigraphNode msum' _ _) -> mycomp msum' modsum) (GHC.verticesG mg)
+      serverMods = filter (\msum' -> not (mycomp msum' modsum))
+                 $ map summaryNodeSummary $ GHC.reachableG mg modNode
+#else
       modNode = gfromJust "serverModsAndFiles" $ find (\(msum',_,_) -> mycomp msum' modsum) (GHC.verticesG mg)
       serverMods = filter (\msum' -> not (mycomp msum' modsum))
                  $ map summaryNodeSummary $ GHC.reachableG mg modNode
+#endif
 
   return serverMods
 

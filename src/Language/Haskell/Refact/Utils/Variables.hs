@@ -79,7 +79,6 @@ import qualified Name          as GHC
 import qualified RdrName       as GHC
 
 import qualified Data.Generics as SYB
-import qualified GHC.SYB.Utils as SYB
 
 import qualified Data.Map as Map
 
@@ -101,7 +100,7 @@ instance FindEntity GHC.Name where
 
   findEntity n t = fromMaybe False res
    where
-    res = SYB.somethingStaged SYB.Renamer Nothing (Nothing `SYB.mkQ` worker) t
+    res = SYB.something (Nothing `SYB.mkQ` worker) t
 
     worker (name::GHC.Name)
       | n == name = Just True
@@ -129,7 +128,7 @@ instance FindEntity (GHC.Located GHC.Name) where
 
   findEntity n t = fromMaybe False res
    where
-    res = SYB.somethingStaged SYB.Renamer Nothing (Nothing `SYB.mkQ` worker) t
+    res = SYB.something (Nothing `SYB.mkQ` worker) t
 
     worker (name::GHC.Located GHC.Name)
       | n == name = Just True
@@ -138,44 +137,44 @@ instance FindEntity (GHC.Located GHC.Name) where
 
 -- ---------------------------------------------------------------------
 
-instance FindEntity (GHC.LHsExpr GHC.RdrName) where
+instance FindEntity (GHC.LHsExpr GhcPs) where
 
   findEntity e t = fromMaybe False res
    where
     res = SYB.something (Nothing `SYB.mkQ` worker) t
 
-    worker (expr :: GHC.LHsExpr GHC.RdrName)
+    worker (expr :: GHC.LHsExpr GhcPs)
       | sameOccurrence e expr = Just True
     worker _ = Nothing
 
 -- TODO: remove this instance
-instance FindEntity (GHC.LHsExpr GHC.Name) where
+instance FindEntity (GHC.LHsExpr GhcRn) where
 
   findEntity e t = fromMaybe False res
    where
     res = SYB.something (Nothing `SYB.mkQ` worker) t
 
-    worker (expr :: GHC.LHsExpr GHC.Name)
+    worker (expr :: GHC.LHsExpr GhcRn)
       | sameOccurrence e expr = Just True
     worker _ = Nothing
 
 -- ---------------------------------------------------------------------
 
-instance FindEntity (GHC.Located (GHC.HsBindLR GHC.Name GHC.Name)) where
+instance FindEntity (GHC.Located (GHC.HsBindLR GhcRn GhcRn)) where
   findEntity e t = fromMaybe False res
    where
-    res = SYB.somethingStaged SYB.Renamer Nothing (Nothing `SYB.mkQ` worker) t
+    res = SYB.something (Nothing `SYB.mkQ` worker) t
 
-    worker (expr::(GHC.Located (GHC.HsBindLR GHC.Name GHC.Name)))
+    worker (expr::(GHC.Located (GHC.HsBindLR GhcRn GhcRn)))
       | sameOccurrence e expr = Just True
     worker _ = Nothing
 
-instance FindEntity (GHC.Located (GHC.HsDecl GHC.Name)) where
+instance FindEntity (GHC.Located (GHC.HsDecl GhcRn)) where
   findEntity d t = fromMaybe False res
    where
-    res = SYB.somethingStaged SYB.Renamer Nothing (Nothing `SYB.mkQ` worker) t
+    res = SYB.something (Nothing `SYB.mkQ` worker) t
 
-    worker (decl::(GHC.Located (GHC.HsDecl GHC.Name)))
+    worker (decl::(GHC.Located (GHC.HsDecl GhcRn)))
       | sameOccurrence d decl = Just True
     worker _ = Nothing
 
@@ -211,9 +210,19 @@ instance Show FreeNames where
 instance Show DeclaredNames where
   show (DN ls) = "DN " ++ showGhcQual ls
 
+#if __GLASGOW_HASKELL__ >= 804
+instance Semigroup FreeNames where
+  (<>) = mappend
+#endif
+
 instance Monoid FreeNames where
   mempty = FN []
   mappend (FN a) (FN b) = FN (a `mappend` b)
+
+#if __GLASGOW_HASKELL__ >= 804
+instance Semigroup DeclaredNames where
+  (<>) = mappend
+#endif
 
 instance Monoid DeclaredNames where
   mempty = DN []
@@ -252,7 +261,7 @@ hsTypeVbls =ghead "hsTypeVbls".(applyTU (stop_tdTU (failTU `adhocTU` pnt)))
 
 -------------------------------------------------------------------------------
 
-isDeclaredInRdr :: NameMap -> GHC.Name -> [GHC.LHsDecl GHC.RdrName] -> Bool
+isDeclaredInRdr :: NameMap -> GHC.Name -> [GHC.LHsDecl GhcPs] -> Bool
 isDeclaredInRdr nm name decls = nonEmptyList $ definingDeclsRdrNames nm [name] decls False True
 
 -- ---------------------------------------------------------------------
@@ -346,10 +355,10 @@ hsFreeAndDeclaredRdr' nm t = do
               fd   <- addFree (rdrName2NamePure nm (GHC.L l n)) efed
               return fd
 
-          expr (GHC.L _ ((GHC.HsLam (GHC.MG matches _ _ _))) :: GHC.LHsExpr GHC.RdrName) =
+          expr (GHC.L _ ((GHC.HsLam (GHC.MG matches _ _ _))) :: GHC.LHsExpr GhcPs) =
              hsFreeAndDeclaredRdr' nm matches
 
-          expr (GHC.L _ ((GHC.HsLet decls e)) :: GHC.LHsExpr GHC.RdrName) =
+          expr (GHC.L _ ((GHC.HsLet decls e)) :: GHC.LHsExpr GhcPs) =
             do
               (FN df,DN dd) <- hsFreeAndDeclaredRdr' nm decls
               (FN ef,_)  <- hsFreeAndDeclaredRdr' nm e
@@ -371,14 +380,14 @@ hsFreeAndDeclaredRdr' nm t = do
 
 
           -- rhs --
-          rhs ((GHC.GRHSs g ds) :: GHC.GRHSs GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+          rhs ((GHC.GRHSs g ds) :: GHC.GRHSs GhcPs (GHC.LHsExpr GhcPs))
             = do (FN df,DN dd) <- hsFreeAndDeclaredRdr' nm g
                  (FN ef,DN ed) <- hsFreeAndDeclaredRdr' nm ds
                  return (FN $ df ++ ef, DN $ dd ++ ed)
 
 
           -- pat --
-          pat :: GHC.LPat GHC.RdrName -> Either String (FreeNames,DeclaredNames)
+          pat :: GHC.LPat GhcPs -> Either String (FreeNames,DeclaredNames)
           pat (GHC.L _ (GHC.WildPat _)) = mzero
 #if __GLASGOW_HASKELL__ <= 710
           pat (GHC.L l (GHC.VarPat n))
@@ -454,7 +463,7 @@ hsFreeAndDeclaredRdr' nm t = do
 
           -- ---------------------------
 
-          details :: GHC.HsConPatDetails GHC.RdrName -> Either String (FreeNames,DeclaredNames)
+          details :: GHC.HsConPatDetails GhcPs -> Either String (FreeNames,DeclaredNames)
           details (GHC.PrefixCon  args) = do
             fds <- mapM pat args
             return $ mconcat fds
@@ -465,7 +474,7 @@ hsFreeAndDeclaredRdr' nm t = do
             return $ mconcat fds
 
           -- Note: this one applies to HsRecFields in LPats
-          recfields :: (GHC.HsRecFields GHC.RdrName (GHC.LPat GHC.RdrName)) -> Either String (FreeNames,DeclaredNames)
+          recfields :: (GHC.HsRecFields GhcPs (GHC.LPat GhcPs)) -> Either String (FreeNames,DeclaredNames)
           recfields (GHC.HsRecFields fields _) = do
             let args = map (\(GHC.L _ (GHC.HsRecField _ arg _)) -> arg) fields
             fds <- mapM pat args
@@ -474,12 +483,12 @@ hsFreeAndDeclaredRdr' nm t = do
           -- -----------------------
 
 #if __GLASGOW_HASKELL__ <= 710
-          bndrs :: GHC.HsWithBndrs GHC.RdrName (GHC.LHsType GHC.RdrName) -> Either String (FreeNames,DeclaredNames)
+          bndrs :: GHC.HsWithBndrs GhcPs (GHC.LHsType GhcPs) -> Either String (FreeNames,DeclaredNames)
           bndrs (GHC.HsWB thing _ _ _) = do
             (FN ft,DN _dt) <- hsFreeAndDeclaredRdr' nm thing
             return (FN ft,DN [])
 #else
-          bndrs :: GHC.LHsSigWcType GHC.RdrName -> Either String (FreeNames,DeclaredNames)
+          bndrs :: GHC.LHsSigWcType GhcPs -> Either String (FreeNames,DeclaredNames)
 #if __GLASGOW_HASKELL__ <= 800
           bndrs (GHC.HsIB _ (GHC.HsWC _ _ ty)) = do
 #else
@@ -492,15 +501,15 @@ hsFreeAndDeclaredRdr' nm t = do
 
           -- ---------------------------
 
-          bindList (ds :: [GHC.LHsBind GHC.RdrName])
+          bindList (ds :: [GHC.LHsBind GhcPs])
             =do (FN f,DN d) <- recurseList ds
                 return (FN (f\\d),DN d)
 
           -- match and patBind, same type--
 #if __GLASGOW_HASKELL__ <= 710
-          binds ((GHC.FunBind ln _ (GHC.MG matches _ _ _) _ _fvs _) :: GHC.HsBind GHC.RdrName)
+          binds ((GHC.FunBind ln _ (GHC.MG matches _ _ _) _ _fvs _) :: GHC.HsBind GhcPs)
 #else
-          binds ((GHC.FunBind ln (GHC.MG matches _ _ _) _ _fvs _) :: GHC.HsBind GHC.RdrName)
+          binds ((GHC.FunBind ln (GHC.MG matches _ _ _) _ _fvs _) :: GHC.HsBind GhcPs)
 #endif
             = do
                 (FN pf,_pd) <- hsFreeAndDeclaredRdr' nm matches
@@ -516,13 +525,17 @@ hsFreeAndDeclaredRdr' nm t = do
 
           binds _ = mzero
 
-          match ((GHC.Match _fn pats _mtype mrhs) :: GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+#if __GLASGOW_HASKELL__ >= 804
+          match ((GHC.Match _fn pats mrhs) :: GHC.Match GhcPs (GHC.LHsExpr GhcPs))
+#else
+          match ((GHC.Match _fn pats _mtype mrhs) :: GHC.Match GhcPs (GHC.LHsExpr GhcPs))
+#endif
             = do
               (FN pf,DN pd) <- hsFreeAndDeclaredRdr' nm pats
               (FN rf,DN rd) <- hsFreeAndDeclaredRdr' nm mrhs
               return (FN (pf `union` (rf \\ (pd `union` rd))),DN [])
 
-          stmtlist (ds :: [GHC.ExprLStmt GHC.RdrName]) = do
+          stmtlist (ds :: [GHC.ExprLStmt GhcPs]) = do
             (FN f,DN d) <- recurseList ds
             -- unless (null ds) $ do
             --   -- error $ "hsFreeAndDeclaredRdr'.stmtlist ds=" ++ showGhc ds
@@ -531,9 +544,9 @@ hsFreeAndDeclaredRdr' nm t = do
 
           -- stmts --
 #if __GLASGOW_HASKELL__ <= 710
-          stmts ((GHC.BindStmt pat' expre _bindOp _failOp) :: GHC.Stmt GHC.RdrName (GHC.LHsExpr GHC.RdrName)) = do
+          stmts ((GHC.BindStmt pat' expre _bindOp _failOp) :: GHC.Stmt GhcPs (GHC.LHsExpr GhcPs)) = do
 #else
-          stmts ((GHC.BindStmt pat' expre _bindOp _failOp _) :: GHC.Stmt GHC.RdrName (GHC.LHsExpr GHC.RdrName)) = do
+          stmts ((GHC.BindStmt pat' expre _bindOp _failOp _) :: GHC.Stmt GhcPs (GHC.LHsExpr GhcPs)) = do
 #endif
             -- TODO ++AZ++ : Not sure it is meaningful to pull
             --               anything out of bindOp/failOp
@@ -543,14 +556,14 @@ hsFreeAndDeclaredRdr' nm t = do
             let sf1 = []
             return (FN $ pf `union` ef `union` (sf1\\pd),DN pd) -- pd) -- Check this
 
-          stmts ((GHC.LetStmt binds') :: GHC.Stmt GHC.RdrName (GHC.LHsExpr GHC.RdrName)) =
+          stmts ((GHC.LetStmt binds') :: GHC.Stmt GhcPs (GHC.LHsExpr GhcPs)) =
             hsFreeAndDeclaredRdr' nm binds'
 
           stmts _ = mzero
 
           -- tycldecls -----------------
 
-          ltydecl :: GHC.TyClDecl GHC.RdrName -> Either String (FreeNames,DeclaredNames)
+          ltydecl :: GHC.TyClDecl GhcPs -> Either String (FreeNames,DeclaredNames)
 
           ltydecl (GHC.FamDecl fd) = hsFreeAndDeclaredRdr' nm fd
 #if __GLASGOW_HASKELL__ <= 800
@@ -588,15 +601,15 @@ hsFreeAndDeclaredRdr' nm t = do
           ------------------------------
 
 #if __GLASGOW_HASKELL__ <= 710
-          tyvarbndrs :: GHC.LHsTyVarBndrs GHC.RdrName -> Either String (FreeNames,DeclaredNames)
+          tyvarbndrs :: GHC.LHsTyVarBndrs GhcPs -> Either String (FreeNames,DeclaredNames)
           tyvarbndrs (GHC.HsQTvs _implicit explicit) = do
             recurseList explicit
 #else
-          tyvarbndrs :: GHC.LHsQTyVars GHC.RdrName -> Either String (FreeNames,DeclaredNames)
+          tyvarbndrs :: GHC.LHsQTyVars GhcPs -> Either String (FreeNames,DeclaredNames)
           tyvarbndrs (GHC.HsQTvs _implicit explicit _dependent ) = recurseList explicit
 #endif
 
-          lhstyvarbndr :: GHC.LHsTyVarBndr GHC.RdrName -> Either String (FreeNames,DeclaredNames)
+          lhstyvarbndr :: GHC.LHsTyVarBndr GhcPs -> Either String (FreeNames,DeclaredNames)
 #if __GLASGOW_HASKELL__ <= 710
           lhstyvarbndr (GHC.L l (GHC.UserTyVar n)) = return (FN [], DN [rdrName2NamePure nm (GHC.L l n)])
 #else
@@ -609,7 +622,7 @@ hsFreeAndDeclaredRdr' nm t = do
           ------------------------------
 
 #if __GLASGOW_HASKELL__ > 710
-          lsigtype :: GHC.LHsSigType GHC.RdrName -> Either String (FreeNames,DeclaredNames)
+          lsigtype :: GHC.LHsSigType GhcPs -> Either String (FreeNames,DeclaredNames)
 #if __GLASGOW_HASKELL__ > 800
           lsigtype (GHC.HsIB _ typ _) = do
 #else
@@ -620,7 +633,7 @@ hsFreeAndDeclaredRdr' nm t = do
 
           ------------------------------
 
-          sig :: GHC.Sig GHC.RdrName -> Either String (FreeNames,DeclaredNames)
+          sig :: GHC.Sig GhcPs -> Either String (FreeNames,DeclaredNames)
 #if __GLASGOW_HASKELL__ <= 710
           sig (GHC.TypeSig lns typ _) = do
 #else
@@ -671,7 +684,7 @@ hsFreeAndDeclaredRdr' nm t = do
 
           ------------------------------
 
-          datadefn :: GHC.HsDataDefn GHC.RdrName -> Either String (FreeNames,DeclaredNames)
+          datadefn :: GHC.HsDataDefn GhcPs -> Either String (FreeNames,DeclaredNames)
           datadefn (GHC.HsDataDefn _ ctxt mtyp mkind cons mderivs) = do
              cts <- mapM (hsFreeAndDeclaredRdr' nm) $ GHC.unLoc ctxt
              ts  <- maybeHelper mtyp
@@ -690,7 +703,7 @@ hsFreeAndDeclaredRdr' nm t = do
 
           ------------------------------
 
-          condecl :: GHC.LConDecl GHC.RdrName -> Either String (FreeNames,DeclaredNames)
+          condecl :: GHC.LConDecl GhcPs -> Either String (FreeNames,DeclaredNames)
 #if __GLASGOW_HASKELL__ <= 710
           condecl (GHC.L _ (GHC.ConDecl ns _expr (GHC.HsQTvs _ns bndrs) ctxt
                                         dets res _ depc_syntax)) =
@@ -715,7 +728,7 @@ hsFreeAndDeclaredRdr' nm t = do
           ------------------------------
 
           -- condetails :: GHC.HsConDetails (GHC.LBangType GHC.RdrName) (GHC.Located [GHC.LConDeclField GHC.RdrName])
-          condetails :: GHC.HsConDeclDetails GHC.RdrName -> Either String (FreeNames,DeclaredNames)
+          condetails :: GHC.HsConDeclDetails GhcPs -> Either String (FreeNames,DeclaredNames)
           condetails (GHC.PrefixCon args)      = do
             -- TODO: get rid of the tyvars
             (FN fs,d) <- recurseList args
@@ -728,7 +741,7 @@ hsFreeAndDeclaredRdr' nm t = do
 
           ------------------------------
 
-          condeclfield :: GHC.LConDeclField GHC.RdrName -> Either String (FreeNames,DeclaredNames)
+          condeclfield :: GHC.LConDeclField GhcPs -> Either String (FreeNames,DeclaredNames)
           condeclfield (GHC.L _ (GHC.ConDeclField fns typ _)) = do
 #if __GLASGOW_HASKELL__ <= 710
             let ns = fns
@@ -740,7 +753,7 @@ hsFreeAndDeclaredRdr' nm t = do
 
           ------------------------------
 
-          hstype :: GHC.LHsType GHC.RdrName -> Either String (FreeNames,DeclaredNames)
+          hstype :: GHC.LHsType GhcPs -> Either String (FreeNames,DeclaredNames)
 #if __GLASGOW_HASKELL__ <= 710
           hstype (GHC.L _ (GHC.HsForAllTy _ _ _ _ typ)) = hsFreeAndDeclaredRdr' nm typ
 #else
@@ -821,7 +834,7 @@ hsFreeAndDeclaredRdr' nm t = do
 
 -- |Get the names of all types declared in the given declaration
 -- getDeclaredTypesRdr :: GHC.LTyClDecl GHC.RdrName -> RefactGhc [GHC.Name]
-getDeclaredTypesRdr :: GHC.LHsDecl GHC.RdrName -> RefactGhc [GHC.Name]
+getDeclaredTypesRdr :: GHC.LHsDecl GhcPs -> RefactGhc [GHC.Name]
 getDeclaredTypesRdr (GHC.L _ (GHC.TyClD decl)) = do
   nm <- getRefactNameMap
   case decl of
@@ -860,7 +873,7 @@ getDeclaredTypesRdr (GHC.L _ (GHC.TyClD decl)) = do
           fds' = map (rdrName2NamePure nm) fds
       return $ nub $ [rdrName2NamePure nm ln] ++ ssn ++ msn ++ fds' -- ++ asn
       where
-        getLSig :: GHC.LSig GHC.RdrName -> [GHC.Name]
+        getLSig :: GHC.LSig GhcPs -> [GHC.Name]
 #if __GLASGOW_HASKELL__ <= 710
         getLSig (GHC.L _ (GHC.TypeSig ns _ _))  = map (rdrName2NamePure nm) ns
 #else
@@ -917,7 +930,7 @@ findNamesRdr nm pns t =
 
 -- ---------------------------------------------------------------------
 
-definedPNsRdr :: GHC.LHsDecl GHC.RdrName -> [GHC.Located GHC.RdrName]
+definedPNsRdr :: GHC.LHsDecl GhcPs -> [GHC.Located GHC.RdrName]
 #if __GLASGOW_HASKELL__ <= 710
 definedPNsRdr (GHC.L _ (GHC.ValD (GHC.FunBind pname _ _ _ _ _)))   = [pname]
 #else
@@ -930,7 +943,7 @@ definedPNsRdr  _ = []
 
 -- ---------------------------------------------------------------------
 
-definedNamesRdr :: NameMap -> GHC.LHsDecl GHC.RdrName -> [GHC.Name]
+definedNamesRdr :: NameMap -> GHC.LHsDecl GhcPs -> [GHC.Name]
 definedNamesRdr nameMap bind = map (rdrName2NamePure nameMap) (definedPNsRdr bind)
 
 -- ---------------------------------------------------------------------
@@ -941,10 +954,10 @@ definedNamesRdr nameMap bind = map (rdrName2NamePure nameMap) (definedPNsRdr bin
 definingDeclsRdrNames ::
             NameMap
             -> [GHC.Name]   -- ^ The specified identifiers.
-            -> [GHC.LHsDecl GHC.RdrName] -- ^ A collection of declarations.
+            -> [GHC.LHsDecl GhcPs] -- ^ A collection of declarations.
             -> Bool       -- ^ True means to include the type signature.
             -> Bool       -- ^ True means to look at the local declarations as well.
-            -> [GHC.LHsDecl GHC.RdrName]  -- ^ The result.
+            -> [GHC.LHsDecl GhcPs]  -- ^ The result.
 definingDeclsRdrNames nameMap pns ds incTypeSig recursive = concatMap defining ds
 -- TODO: Maybe Use hsFreeAndDeclaredRdr to see what is declared in a decl. Recursive?
   where
@@ -953,7 +966,7 @@ definingDeclsRdrNames nameMap pns ds incTypeSig recursive = concatMap defining d
         then SYB.everything  (++) ([]  `SYB.mkQ` definesDecl `SYB.extQ` definesBind)  decl
         else definesDecl decl
      where
-      definesDecl :: (GHC.LHsDecl GHC.RdrName) -> [GHC.LHsDecl GHC.RdrName]
+      definesDecl :: (GHC.LHsDecl GhcPs) -> [GHC.LHsDecl GhcPs]
 #if __GLASGOW_HASKELL__ <= 710
       definesDecl decl'@(GHC.L _ (GHC.ValD (GHC.FunBind _ _ _ _ _ _)))
 #else
@@ -972,7 +985,7 @@ definingDeclsRdrNames nameMap pns ds incTypeSig recursive = concatMap defining d
 
       definesDecl _ = []
 
-      definesBind :: (GHC.LHsBind GHC.RdrName) -> [GHC.LHsDecl GHC.RdrName]
+      definesBind :: (GHC.LHsBind GhcPs) -> [GHC.LHsDecl GhcPs]
       definesBind (GHC.L l b) = definesDecl (GHC.L l (GHC.ValD b))
 
 -- ---------------------------------------------------------------------
@@ -984,13 +997,13 @@ definingDeclsRdrNames' :: (SYB.Data t)
             => NameMap
             -> [GHC.Name]   -- ^ The specified identifiers.
             -> t            -- ^ A collection of declarations.
-            -> [GHC.LHsDecl GHC.RdrName]  -- ^ The result.
+            -> [GHC.LHsDecl GhcPs]  -- ^ The result.
 definingDeclsRdrNames' nameMap pns ds = defining ds
   where
    defining decl
-     = SYB.everythingStaged SYB.Renamer (++) [] ([]  `SYB.mkQ` defines' `SYB.extQ` definesBind) decl
+     = SYB.everything (++) ([]  `SYB.mkQ` defines' `SYB.extQ` definesBind) decl
      where
-      defines' :: (GHC.LHsDecl GHC.RdrName) -> [GHC.LHsDecl GHC.RdrName]
+      defines' :: (GHC.LHsDecl GhcPs) -> [GHC.LHsDecl GhcPs]
       defines' decl'@(GHC.L _ (GHC.ValD (GHC.FunBind{})))
         | any (\n -> definesDeclRdr nameMap n decl') pns = [decl']
 
@@ -1002,7 +1015,7 @@ definingDeclsRdrNames' nameMap pns ds = defining ds
 
       defines' _ = []
 
-      definesBind :: (GHC.LHsBind GHC.RdrName) -> [GHC.LHsDecl GHC.RdrName]
+      definesBind :: (GHC.LHsBind GhcPs) -> [GHC.LHsDecl GhcPs]
       definesBind (GHC.L l b) = defines' (GHC.L l (GHC.ValD b))
 
 -- ---------------------------------------------------------------------
@@ -1012,18 +1025,18 @@ definingSigsRdrNames :: (SYB.Data t) =>
             NameMap
             ->[GHC.Name] -- ^ The specified identifiers.
             ->t        -- ^ A collection of declarations.
-            ->[GHC.LSig GHC.RdrName]  -- ^ The result.
+            ->[GHC.LSig GhcPs]  -- ^ The result.
 definingSigsRdrNames nameMap pns ds = def ds
   where
    def decl
      -- = SYB.everythingStaged SYB.Renamer (++) [] ([]  `SYB.mkQ` inSig) decl
      = SYB.everything (++) ([]  `SYB.mkQ` inSig `SYB.extQ` inSigDecl) decl
      where
-      inSigDecl :: GHC.LHsDecl GHC.RdrName -> [GHC.LSig GHC.RdrName]
+      inSigDecl :: GHC.LHsDecl GhcPs -> [GHC.LSig GhcPs]
       inSigDecl (GHC.L l (GHC.SigD s)) = inSig (GHC.L l s)
       inSigDecl _ = []
 
-      inSig :: (GHC.LSig GHC.RdrName) -> [GHC.LSig GHC.RdrName]
+      inSig :: (GHC.LSig GhcPs) -> [GHC.LSig GhcPs]
 #if __GLASGOW_HASKELL__ <= 710
       inSig (GHC.L l (GHC.TypeSig ns t p))
        | defines' ns /= [] = [(GHC.L l (GHC.TypeSig (defines' ns) t p))]
@@ -1050,15 +1063,15 @@ definingTyClDeclsNames:: (SYB.Data t)
             => NameMap
             -> [GHC.Name]   -- ^ The specified identifiers.
             -> t -- ^ A collection of declarations.
-            -> [GHC.LTyClDecl GHC.RdrName]  -- ^ The result.
+            -> [GHC.LTyClDecl GhcPs]  -- ^ The result.
 definingTyClDeclsNames nm pns t = defining t
   where
    defining decl
-     = SYB.everythingStaged SYB.Parser (++) []
+     = SYB.everything (++)
                    ([]  `SYB.mkQ` defines'
                         `SYB.extQ` definesDecl) decl
      where
-      defines' :: (GHC.LTyClDecl GHC.RdrName) -> [GHC.LTyClDecl GHC.RdrName]
+      defines' :: (GHC.LTyClDecl GhcPs) -> [GHC.LTyClDecl GhcPs]
 #if __GLASGOW_HASKELL__ <= 710
       defines' decl'@(GHC.L _ (GHC.FamDecl (GHC.FamilyDecl _ pname _ _)))
 #elif __GLASGOW_HASKELL__ <= 800
@@ -1108,7 +1121,7 @@ definingTyClDeclsNames nm pns t = defining t
 
 -- | Return True if the function\/pattern binding defines the
 -- specified identifier.
-definesRdr :: NameMap -> GHC.Name -> GHC.LHsBind GHC.RdrName -> Bool
+definesRdr :: NameMap -> GHC.Name -> GHC.LHsBind GhcPs -> Bool
 #if __GLASGOW_HASKELL__ <= 710
 definesRdr nm  nin (GHC.L _ (GHC.FunBind ln _ _ _ _ _))
 #else
@@ -1121,14 +1134,14 @@ definesRdr _ _ _= False
 
 
 -- |Unwraps a LHsDecl and calls definesRdr on the result if a HsBind or calls clsDeclDefinesRdr if a TyClD
-definesDeclRdr :: NameMap -> GHC.Name -> GHC.LHsDecl GHC.RdrName -> Bool
+definesDeclRdr :: NameMap -> GHC.Name -> GHC.LHsDecl GhcPs -> Bool
 definesDeclRdr nameMap nin (GHC.L l (GHC.ValD d)) = definesRdr nameMap nin (GHC.L l d)
 definesDeclRdr nameMap nin (GHC.L _ (GHC.TyClD ty)) = clsDeclDefinesRdr nameMap nin ty
 definesDeclRdr _ _ _ = False
 
 -- | Return True of the type class declaration defines the
 -- specified identifier
-clsDeclDefinesRdr :: NameMap -> GHC.Name -> GHC.TyClDecl GHC.RdrName -> Bool
+clsDeclDefinesRdr :: NameMap -> GHC.Name -> GHC.TyClDecl GhcPs -> Bool
 #if __GLASGOW_HASKELL__ <= 800
 clsDeclDefinesRdr nameMap nin (GHC.SynDecl (GHC.L ln _nm) _ty _rhs _) =
 #else
@@ -1140,7 +1153,7 @@ clsDeclDefinesRdr nameMap nin (GHC.SynDecl (GHC.L ln _nm) _ _ _ _) =
 clsDeclDefinesRdr _ _ _ = False
 
 -- | Returns True if the provided Name is defined in the LHsDecl
-definesNameRdr :: NameMap -> GHC.Name -> GHC.LHsDecl GHC.RdrName -> Bool
+definesNameRdr :: NameMap -> GHC.Name -> GHC.LHsDecl GhcPs -> Bool
 definesNameRdr nameMap nin (GHC.L l (GHC.ValD d))  = definesRdr nameMap nin (GHC.L l d)
 definesNameRdr nameMap nin d = nin `elem` declared
   where
@@ -1151,7 +1164,7 @@ definesNameRdr nameMap nin d = nin `elem` declared
 
 -- | Return True if the declaration defines the type signature of the
 -- specified identifier.
-definesTypeSigRdr :: NameMap -> GHC.Name -> GHC.Sig GHC.RdrName -> Bool
+definesTypeSigRdr :: NameMap -> GHC.Name -> GHC.Sig GhcPs -> Bool
 #if __GLASGOW_HASKELL__ <= 710
 definesTypeSigRdr nameMap pn (GHC.TypeSig names _typ _)
 #else
@@ -1159,10 +1172,10 @@ definesTypeSigRdr nameMap pn (GHC.TypeSig names _typ)
 #endif
   = elem (GHC.nameUnique pn) (map (GHC.nameUnique . rdrName2NamePure nameMap) names)
 -- definesTypeSigRdr _ _  _ = False
-definesTypeSigRdr _ _  x = error $ "definesTypeSigRdr : got " ++ SYB.showData SYB.Parser 0 x
+definesTypeSigRdr _ _  x = error $ "definesTypeSigRdr : got " ++ showAnnData mempty 0 x
 
 -- |Unwraps a LHsDecl and calls definesRdr on the result if a Sig
-definesSigDRdr :: NameMap -> GHC.Name -> GHC.LHsDecl GHC.RdrName -> Bool
+definesSigDRdr :: NameMap -> GHC.Name -> GHC.LHsDecl GhcPs -> Bool
 definesSigDRdr nameMap nin (GHC.L _ (GHC.SigD d)) = definesTypeSigRdr nameMap nin d
 definesSigDRdr _ _ _ = False
 
@@ -1172,7 +1185,7 @@ definesSigDRdr _ _ _ = False
 hsNamessRdr :: (SYB.Data t) => t -> [GHC.Located GHC.RdrName]
 hsNamessRdr t = nub $ fromMaybe [] r
   where
-     r = (SYB.everythingStaged SYB.Parser mappend mempty (inName) t)
+     r = (SYB.everything mappend (inName) t)
 
      checker :: GHC.Located GHC.RdrName -> Maybe [GHC.Located GHC.RdrName]
      checker x = Just [x]
@@ -1197,10 +1210,10 @@ findLRdrName nm n t = isJust $ SYB.something isMatch t
 -- ---------------------------------------------------------------------
 
 
-getDeclaredVarsRdr :: NameMap -> [GHC.LHsDecl GHC.RdrName] -> [GHC.Name]
+getDeclaredVarsRdr :: NameMap -> [GHC.LHsDecl GhcPs] -> [GHC.Name]
 getDeclaredVarsRdr nm bs = concatMap vars bs
   where
-      vars :: (GHC.LHsDecl GHC.RdrName) -> [GHC.Name]
+      vars :: (GHC.LHsDecl GhcPs) -> [GHC.Name]
 #if __GLASGOW_HASKELL__ <= 710
       vars (GHC.L _ (GHC.ValD (GHC.FunBind ln _ _ _ _fvs _)))   = [rdrName2NamePure nm ln]
 #else
@@ -1290,12 +1303,12 @@ hsVisibleDsRdr nm e t = do
          return $ mconcat dfds
     parsed _ = return (DN [])
 
-    lvalbinds :: (GHC.Located (GHC.HsLocalBinds GHC.RdrName)) -> RefactGhc DeclaredNames
+    lvalbinds :: (GHC.Located (GHC.HsLocalBinds GhcPs)) -> RefactGhc DeclaredNames
     lvalbinds (GHC.L _ (GHC.HsValBinds vb)) = valbinds vb
     lvalbinds (GHC.L _ (GHC.HsIPBinds _))   = return (DN [])
     lvalbinds (GHC.L _ GHC.EmptyLocalBinds) = return (DN [])
 
-    valbinds :: (GHC.HsValBinds GHC.RdrName) -> RefactGhc DeclaredNames
+    valbinds :: (GHC.HsValBinds GhcPs) -> RefactGhc DeclaredNames
     valbinds vb@(GHC.ValBindsIn bindsBag sigs)
       | findNameInRdr nm e vb = do
           fdsb <- mapM (hsVisibleDsRdr nm e) $ GHC.bagToList bindsBag
@@ -1310,14 +1323,14 @@ hsVisibleDsRdr nm e t = do
       -- logm $ "hsVisibleDsRdr nm.valbinds:not matched"
       return (DN [])
 
-    lhsdecls :: [GHC.LHsDecl GHC.RdrName] -> RefactGhc DeclaredNames
+    lhsdecls :: [GHC.LHsDecl GhcPs] -> RefactGhc DeclaredNames
     lhsdecls ds
       | findNameInRdr nm e ds = do
          dfds <- mapM (declFun ( hsVisibleDsRdr nm e) ) ds
          return $ mconcat dfds
     lhsdecls _ = return (DN [])
 
-    lhsdecl :: GHC.LHsDecl GHC.RdrName -> RefactGhc DeclaredNames
+    lhsdecl :: GHC.LHsDecl GhcPs -> RefactGhc DeclaredNames
     lhsdecl (GHC.L l dd) = do
         -- logm $ "hsVisibleDsRdr.lhsdecl"
         case dd of
@@ -1339,19 +1352,19 @@ hsVisibleDsRdr nm e t = do
             GHC.QuasiQuoteD d -> hsVisibleDsRdr nm e (GHC.L l d)
 #endif
 
-    lhsbindslr :: GHC.LHsBinds GHC.RdrName -> RefactGhc DeclaredNames
+    lhsbindslr :: GHC.LHsBinds GhcPs -> RefactGhc DeclaredNames
     lhsbindslr bs = do
       fds <- mapM (hsVisibleDsRdr nm e) $ GHC.bagToList bs
       return $ mconcat fds
 
-    hsbinds :: [GHC.LHsBind GHC.RdrName] -> RefactGhc DeclaredNames
+    hsbinds :: [GHC.LHsBind GhcPs] -> RefactGhc DeclaredNames
     hsbinds ds
       | findNameInRdr nm e ds = do
         fds <- mapM (hsVisibleDsRdr nm e) ds
         return $ mconcat fds
     hsbinds _ = return (DN [])
 
-    hsbind :: (GHC.LHsBind GHC.RdrName) -> RefactGhc DeclaredNames
+    hsbind :: (GHC.LHsBind GhcPs) -> RefactGhc DeclaredNames
 #if __GLASGOW_HASKELL__ <= 710
     hsbind ((GHC.L _ (GHC.FunBind _n _ (GHC.MG matches _ _ _) _ _ _)))
 #else
@@ -1364,7 +1377,7 @@ hsVisibleDsRdr nm e t = do
       return (DN [])
 
 
-    hslocalbinds :: (GHC.HsLocalBinds GHC.RdrName) -> RefactGhc DeclaredNames
+    hslocalbinds :: (GHC.HsLocalBinds GhcPs) -> RefactGhc DeclaredNames
     hslocalbinds (GHC.HsValBinds binds)
       | findNameInRdr nm e binds = hsVisibleDsRdr nm e binds
     hslocalbinds (GHC.HsIPBinds binds)
@@ -1372,11 +1385,15 @@ hsVisibleDsRdr nm e t = do
     hslocalbinds (GHC.EmptyLocalBinds) = return (DN [])
     hslocalbinds _ = return (DN [])
 
-    lmatch :: (GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName)) -> RefactGhc DeclaredNames
+    lmatch :: (GHC.LMatch GhcPs (GHC.LHsExpr GhcPs)) -> RefactGhc DeclaredNames
     lmatch (GHC.L _ m) = match m
 
-    match :: (GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName)) -> RefactGhc DeclaredNames
+    match :: (GHC.Match GhcPs (GHC.LHsExpr GhcPs)) -> RefactGhc DeclaredNames
+#if __GLASGOW_HASKELL__ >= 804
+    match (GHC.Match _fn pats rhs)
+#else
     match (GHC.Match _fn pats _mtyp rhs)
+#endif
       | findNameInRdr nm e rhs || findNameInRdr nm e pats = do
            -- logm $ "hsVisibleDsRdr nm.lmatch:doing rhs"
            let (_pf,pd) = hsFreeAndDeclaredRdr nm pats
@@ -1386,7 +1403,7 @@ hsVisibleDsRdr nm e t = do
            return (pd <> rd)
     match _ =return  (DN [])
 
-    grhss :: (GHC.GRHSs GHC.RdrName (GHC.LHsExpr GHC.RdrName)) -> RefactGhc DeclaredNames
+    grhss :: (GHC.GRHSs GhcPs (GHC.LHsExpr GhcPs)) -> RefactGhc DeclaredNames
     grhss (GHC.GRHSs guardedRhss lstmts')
       | findNameInRdr nm e guardedRhss || findNameInRdr nm e lstmts' = do
           -- logm "hsVisibleDsRdr nm.grhss:about to do lstmts"
@@ -1398,7 +1415,7 @@ hsVisibleDsRdr nm e t = do
       -- logm $ "hsVisibleDsRdr.grhss: no match"
       return (DN [])
 
-    lgrhs :: GHC.LGRHS GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> RefactGhc DeclaredNames
+    lgrhs :: GHC.LGRHS GhcPs (GHC.LHsExpr GhcPs) -> RefactGhc DeclaredNames
     lgrhs (GHC.L _ (GHC.GRHS guards ex))
       | findNameInRdr nm e guards = hsVisibleDsRdr nm e guards
       | findNameInRdr nm e ex     = do
@@ -1410,7 +1427,7 @@ hsVisibleDsRdr nm e t = do
       return (DN [])
 
 
-    lexpr :: GHC.LHsExpr GHC.RdrName -> RefactGhc DeclaredNames
+    lexpr :: GHC.LHsExpr GhcPs -> RefactGhc DeclaredNames
 #if __GLASGOW_HASKELL__ <= 710
     lexpr (GHC.L l (GHC.HsVar n))
 #else
@@ -1440,14 +1457,14 @@ hsVisibleDsRdr nm e t = do
 
     -- ---------------------------------
 
-    tyclgroups :: [GHC.TyClGroup GHC.RdrName] -> RefactGhc DeclaredNames
+    tyclgroups :: [GHC.TyClGroup GhcPs] -> RefactGhc DeclaredNames
     tyclgroups tgrps
       | findNameInRdr nm e tgrps = do
         fds <- mapM (hsVisibleDsRdr nm e) tgrps
         return $ mconcat fds
     tyclgroups _ = return (DN [])
 
-    tyclgroup :: GHC.TyClGroup GHC.RdrName -> RefactGhc DeclaredNames
+    tyclgroup :: GHC.TyClGroup GhcPs -> RefactGhc DeclaredNames
 #if __GLASGOW_HASKELL__ <= 800
     tyclgroup (GHC.TyClGroup tyclds _roles)
       | findNameInRdr nm e tyclds = do
@@ -1464,42 +1481,42 @@ hsVisibleDsRdr nm e t = do
 #endif
     tyclgroup _ = return (DN [])
 
-    tycldeclss :: [[GHC.LTyClDecl GHC.RdrName]] -> RefactGhc DeclaredNames
+    tycldeclss :: [[GHC.LTyClDecl GhcPs]] -> RefactGhc DeclaredNames
     tycldeclss tcds
       | findNameInRdr nm e tcds = do
         fds <- mapM (hsVisibleDsRdr nm e) tcds
         return $ mconcat fds
     tycldeclss _ = return (DN [])
 
-    tycldecls :: [GHC.LTyClDecl GHC.RdrName] -> RefactGhc DeclaredNames
+    tycldecls :: [GHC.LTyClDecl GhcPs] -> RefactGhc DeclaredNames
     tycldecls tcds
       | findNameInRdr nm e tcds = do
         fds <- mapM (hsVisibleDsRdr nm e) tcds
         return $ mconcat fds
     tycldecls _ = return (DN [])
 
-    ltycldecl :: GHC.LTyClDecl GHC.RdrName -> RefactGhc DeclaredNames
+    ltycldecl :: GHC.LTyClDecl GhcPs -> RefactGhc DeclaredNames
     ltycldecl tcd
       | findNameInRdr nm e tcd = do
         let (_,ds) = hsFreeAndDeclaredRdr nm tcd
         return ds
     ltycldecl _ = return (DN [])
 
-    tycldecl :: GHC.TyClDecl GHC.RdrName -> RefactGhc DeclaredNames
+    tycldecl :: GHC.TyClDecl GhcPs -> RefactGhc DeclaredNames
     tycldecl tcd
       | findNameInRdr nm e tcd = do
         let (_,ds) = hsFreeAndDeclaredRdr nm tcd
         return ds
     tycldecl _ = return (DN [])
 
-    hsdatadefn :: GHC.HsDataDefn GHC.RdrName -> RefactGhc DeclaredNames
+    hsdatadefn :: GHC.HsDataDefn GhcPs -> RefactGhc DeclaredNames
     hsdatadefn tcd
       | findNameInRdr nm e tcd = do
         let (_,ds) = hsFreeAndDeclaredRdr nm tcd
         return ds
     hsdatadefn _ = return (DN [])
 
-    condecl :: GHC.ConDecl GHC.RdrName -> RefactGhc DeclaredNames
+    condecl :: GHC.ConDecl GhcPs -> RefactGhc DeclaredNames
     condecl tcd
       | findNameInRdr nm e tcd = do
         let (_,ds) = hsFreeAndDeclaredRdr nm tcd
@@ -1508,14 +1525,14 @@ hsVisibleDsRdr nm e t = do
 
     -- ---------------------------------
 
-    instdecls :: [GHC.LInstDecl GHC.RdrName] -> RefactGhc DeclaredNames
+    instdecls :: [GHC.LInstDecl GhcPs] -> RefactGhc DeclaredNames
     instdecls ds
       | findNameInRdr nm e ds = do
         fds <- mapM (hsVisibleDsRdr nm e) ds
         return $ mconcat fds
     instdecls _ = return (DN [])
 
-    instdecl :: GHC.LInstDecl GHC.RdrName -> RefactGhc DeclaredNames
+    instdecl :: GHC.LInstDecl GhcPs -> RefactGhc DeclaredNames
     instdecl (GHC.L _ (GHC.ClsInstD (GHC.ClsInstDecl polytyp binds sigs tyfaminsts dfaminsts _)))
       | findNameInRdr nm e polytyp    = hsVisibleDsRdr nm e polytyp
       | findNameInRdr nm e binds      = hsVisibleDsRdr nm e binds
@@ -1523,19 +1540,25 @@ hsVisibleDsRdr nm e t = do
       | findNameInRdr nm e tyfaminsts = hsVisibleDsRdr nm e tyfaminsts
       | findNameInRdr nm e dfaminsts  = hsVisibleDsRdr nm e dfaminsts
       | otherwise = return (DN [])
-#if __GLASGOW_HASKELL__ <= 800
-    instdecl (GHC.L _ (GHC.DataFamInstD (GHC.DataFamInstDecl _ln pats defn _)))
-#else
+#if __GLASGOW_HASKELL__ >= 804
+    instdecl (GHC.L _ (GHC.DataFamInstD (GHC.DataFamInstDecl (GHC.HsIB _ (GHC.FamEqn ln pats fixity defn ) _ ))))
+#elif __GLASGOW_HASKELL__ > 800
     instdecl (GHC.L _ (GHC.DataFamInstD (GHC.DataFamInstDecl _ln pats _fixity defn _)))
+#else
+    instdecl (GHC.L _ (GHC.DataFamInstD (GHC.DataFamInstDecl _ln pats defn _)))
 #endif
       | findNameInRdr nm e pats = hsVisibleDsRdr nm e pats
       | findNameInRdr nm e defn = hsVisibleDsRdr nm e defn
       | otherwise = return (DN [])
+#if __GLASGOW_HASKELL__ >= 804
+    instdecl (GHC.L _ (GHC.TyFamInstD (GHC.TyFamInstDecl eqn)))
+#else
     instdecl (GHC.L _ (GHC.TyFamInstD (GHC.TyFamInstDecl eqn _)))
+#endif
       | findNameInRdr nm e eqn = hsVisibleDsRdr nm e eqn
       | otherwise = return (DN [])
 
-    lhstype :: GHC.LHsType GHC.RdrName -> RefactGhc DeclaredNames
+    lhstype :: GHC.LHsType GhcPs -> RefactGhc DeclaredNames
 #if __GLASGOW_HASKELL__ <= 710
     lhstype tv@(GHC.L l (GHC.HsTyVar n))
 #elif __GLASGOW_HASKELL__ <= 800
@@ -1554,14 +1577,14 @@ hsVisibleDsRdr nm e t = do
 
     -- -----------------------
 
-    lsigs :: [GHC.LSig GHC.RdrName] -> RefactGhc DeclaredNames
+    lsigs :: [GHC.LSig GhcPs] -> RefactGhc DeclaredNames
     lsigs ss = do
       fds <- mapM (hsVisibleDsRdr nm e) ss
       return $ mconcat fds
 
     -- -----------------------
 
-    lsig :: GHC.LSig GHC.RdrName -> RefactGhc DeclaredNames
+    lsig :: GHC.LSig GhcPs -> RefactGhc DeclaredNames
 #if __GLASGOW_HASKELL__ <= 710
     lsig (GHC.L _ (GHC.TypeSig _ns typ _))
 #else
@@ -1586,7 +1609,7 @@ hsVisibleDsRdr nm e t = do
 
     -- -----------------------
 
-    lstmts :: [GHC.LStmt GHC.RdrName (GHC.LHsExpr GHC.RdrName)] -> RefactGhc DeclaredNames
+    lstmts :: [GHC.LStmt GhcPs (GHC.LHsExpr GhcPs)] -> RefactGhc DeclaredNames
     lstmts ds
       | findNameInRdr nm e ds = do
         fds <- mapM (hsVisibleDsRdr nm e) ds
@@ -1595,7 +1618,7 @@ hsVisibleDsRdr nm e t = do
 
     -- -----------------------
 
-    lstmt :: GHC.LStmt GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> RefactGhc DeclaredNames
+    lstmt :: GHC.LStmt GhcPs (GHC.LHsExpr GhcPs) -> RefactGhc DeclaredNames
 #if __GLASGOW_HASKELL__ <= 710
     lstmt (GHC.L _ (GHC.LastStmt ex _)) = hsVisibleDsRdr nm e ex
 #else
@@ -1641,7 +1664,7 @@ hsVisibleDsRdr nm e t = do
 
     -- -----------------------
 
-    lpats :: [GHC.LPat GHC.RdrName] -> RefactGhc DeclaredNames
+    lpats :: [GHC.LPat GhcPs] -> RefactGhc DeclaredNames
     lpats ps
       | findNameInRdr nm e ps = do
         fds <- mapM (hsVisibleDsRdr nm e) ps
@@ -1650,7 +1673,7 @@ hsVisibleDsRdr nm e t = do
 
     -- -----------------------
 
-    lpat :: GHC.LPat GHC.RdrName -> RefactGhc DeclaredNames
+    lpat :: GHC.LPat GhcPs -> RefactGhc DeclaredNames
     lpat (GHC.L _ (GHC.WildPat _)) = return (DN [])
 #if __GLASGOW_HASKELL__ <= 710
     lpat (GHC.L l (GHC.VarPat n))
@@ -1720,7 +1743,7 @@ hsVisibleDsRdr nm e t = do
 
     -- ---------------------------
 
-    details :: GHC.HsConPatDetails GHC.RdrName -> RefactGhc DeclaredNames
+    details :: GHC.HsConPatDetails GhcPs -> RefactGhc DeclaredNames
     details (GHC.PrefixCon  args) = do
       fds <- mapM lpat args
       return $ mconcat fds
@@ -1731,7 +1754,7 @@ hsVisibleDsRdr nm e t = do
       return $ mconcat fds
 
     -- Note: this one applies to HsRecFields in LPats
-    recfields :: (GHC.HsRecFields GHC.RdrName (GHC.LPat GHC.RdrName)) -> RefactGhc DeclaredNames
+    recfields :: (GHC.HsRecFields GhcPs (GHC.LPat GhcPs)) -> RefactGhc DeclaredNames
     recfields (GHC.HsRecFields fields _) = do
       let args = map (\(GHC.L _ (GHC.HsRecField _ arg _)) -> arg) fields
       fds <- mapM lpat args
@@ -1739,24 +1762,24 @@ hsVisibleDsRdr nm e t = do
 
     -- -----------------------
 #if __GLASGOW_HASKELL__ > 800
-    ibndrs :: GHC.LHsSigWcType GHC.RdrName -> RefactGhc DeclaredNames
+    ibndrs :: GHC.LHsSigWcType GhcPs -> RefactGhc DeclaredNames
     ibndrs (GHC.HsWC _ (GHC.HsIB _ ty _)) = hsVisibleDsRdr nm e ty
 
-    lsigty :: GHC.LHsSigType GHC.RdrName -> RefactGhc DeclaredNames
+    lsigty :: GHC.LHsSigType GhcPs -> RefactGhc DeclaredNames
     lsigty (GHC.HsIB _ ty _) = hsVisibleDsRdr nm e ty
 #elif __GLASGOW_HASKELL__ > 710
-    ibndrs :: GHC.LHsSigWcType GHC.RdrName -> RefactGhc DeclaredNames
+    ibndrs :: GHC.LHsSigWcType GhcPs -> RefactGhc DeclaredNames
     ibndrs (GHC.HsIB _ (GHC.HsWC _ _ ty)) = hsVisibleDsRdr nm e ty
 
-    lsigty :: GHC.LHsSigType GHC.RdrName -> RefactGhc DeclaredNames
+    lsigty :: GHC.LHsSigType GhcPs -> RefactGhc DeclaredNames
     lsigty (GHC.HsIB _ ty) = hsVisibleDsRdr nm e ty
 #endif
     -- -----------------------
-    lanndecl :: GHC.LAnnDecl GHC.RdrName -> RefactGhc DeclaredNames
+    lanndecl :: GHC.LAnnDecl GhcPs -> RefactGhc DeclaredNames
     lanndecl (GHC.L _ (GHC.HsAnnotation _ _ expr)) = hsVisibleDsRdr nm e expr
     -- -----------------------
 
-    err = error $ "hsVisibleDsRdr nm:no match for:" ++ (SYB.showData SYB.Parser 0 t)
+    err = error $ "hsVisibleDsRdr nm:no match for:" ++ (showAnnData mempty 0 t)
 
 -- ---------------------------------------------------------------------
 
@@ -1787,8 +1810,12 @@ hsFDsFromInsideRdr nm t = hsFDsFromInsideRdr' t
 
      -- ----------------------
 
-     match :: GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> Maybe (FreeNames,DeclaredNames)
+     match :: GHC.Match GhcPs (GHC.LHsExpr GhcPs) -> Maybe (FreeNames,DeclaredNames)
+#if __GLASGOW_HASKELL__ >= 804
+     match (GHC.Match _fn pats rhs) = do
+#else
      match (GHC.Match _fn pats _type rhs) = do
+#endif
        let (FN pf, DN pd) = hsFreeAndDeclaredRdr nm pats
            (FN rf, DN rd) = hsFreeAndDeclaredRdr nm rhs
        return (FN $ nub (pf `union` (rf \\ pd)),
@@ -1796,7 +1823,7 @@ hsFDsFromInsideRdr nm t = hsFDsFromInsideRdr' t
 
      -- ----------------------
 
-     decl :: GHC.HsBind GHC.RdrName -> Maybe (FreeNames,DeclaredNames)
+     decl :: GHC.HsBind GhcPs -> Maybe (FreeNames,DeclaredNames)
 #if __GLASGOW_HASKELL__ <= 710
      decl (GHC.FunBind (GHC.L _ _) _ (GHC.MG matches _ _ _) _ _ _) = do
 #else
@@ -1807,7 +1834,7 @@ hsFDsFromInsideRdr nm t = hsFDsFromInsideRdr' t
          -- error (show $ nameToString n)
        return (FN $ nub (concat $ map (fn . fst) fds), DN $ nub (concat $ map (dn . snd) fds))
 
-     decl ((GHC.PatBind p rhs _ _ _) :: GHC.HsBind GHC.RdrName) = do
+     decl ((GHC.PatBind p rhs _ _ _) :: GHC.HsBind GhcPs) = do
        let
          (FN pf, DN pd) = hsFreeAndDeclaredRdr nm p
          (FN rf, DN rd) = hsFreeAndDeclaredRdr nm rhs
@@ -1815,7 +1842,7 @@ hsFDsFromInsideRdr nm t = hsFDsFromInsideRdr' t
            (FN $ nub (pf `union` (rf \\ pd)),
             DN $ nub (pd `union` rd))
 
-     decl ((GHC.VarBind p rhs _) :: GHC.HsBind GHC.RdrName) = do
+     decl ((GHC.VarBind p rhs _) :: GHC.HsBind GhcPs) = do
        let
          (FN pf, DN pd) = hsFreeAndDeclaredRdr nm p
          (FN rf, DN rd) = hsFreeAndDeclaredRdr nm rhs
@@ -1827,16 +1854,16 @@ hsFDsFromInsideRdr nm t = hsFDsFromInsideRdr' t
 
      -- ----------------------
 
-     expr ((GHC.HsLet decls e) :: GHC.HsExpr GHC.RdrName) = do
+     expr ((GHC.HsLet decls e) :: GHC.HsExpr GhcPs) = do
        let
          (FN df,DN dd) = hsFreeAndDeclaredRdr nm decls
          (FN ef,_)     = hsFreeAndDeclaredRdr nm e
        return (FN $ nub (df `union` (ef \\ dd)), DN $ nub dd)
 
-     expr ((GHC.HsLam (GHC.MG matches _ _ _)) :: GHC.HsExpr GHC.RdrName) =
+     expr ((GHC.HsLam (GHC.MG matches _ _ _)) :: GHC.HsExpr GhcPs) =
        return $ hsFreeAndDeclaredRdr nm matches
 
-     expr ((GHC.HsCase e (GHC.MG matches _ _ _)) :: GHC.HsExpr GHC.RdrName) = do
+     expr ((GHC.HsCase e (GHC.MG matches _ _ _)) :: GHC.HsExpr GhcPs) = do
        let
          (FN ef,_)     = hsFreeAndDeclaredRdr nm e
          (FN df,DN dd) = hsFreeAndDeclaredRdr nm matches
@@ -1845,9 +1872,9 @@ hsFDsFromInsideRdr nm t = hsFDsFromInsideRdr' t
      expr _ = return (FN [],DN [])
 
 #if __GLASGOW_HASKELL__ <= 710
-     stmts ((GHC.BindStmt pat e1 e2 e3) :: GHC.Stmt GHC.RdrName (GHC.LHsExpr GHC.RdrName)) = do
+     stmts ((GHC.BindStmt pat e1 e2 e3) :: GHC.Stmt GhcPs (GHC.LHsExpr GhcPs)) = do
 #else
-     stmts ((GHC.BindStmt pat e1 e2 e3 _) :: GHC.Stmt GHC.RdrName (GHC.LHsExpr GHC.RdrName)) = do
+     stmts ((GHC.BindStmt pat e1 e2 e3 _) :: GHC.Stmt GhcPs (GHC.LHsExpr GhcPs)) = do
 #endif
        let
          (FN pf,DN pd)  = hsFreeAndDeclaredRdr nm pat
@@ -1856,7 +1883,7 @@ hsFDsFromInsideRdr nm t = hsFDsFromInsideRdr' t
        return
            (FN $ nub (pf `union` (((ef \\ dd) `union` df) \\ pd)), DN $ nub (pd `union` dd))
 
-     stmts ((GHC.LetStmt binds) :: GHC.Stmt GHC.RdrName (GHC.LHsExpr GHC.RdrName)) =
+     stmts ((GHC.LetStmt binds) :: GHC.Stmt GhcPs (GHC.LHsExpr GhcPs)) =
        return $ hsFreeAndDeclaredRdr nm binds
 
      stmts _ = return (FN [],DN [])

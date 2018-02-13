@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE Rank2Types #-}
 module Language.Haskell.Refact.Utils.Query where
 --This module contains functions that retrieve sections of the ast. It is fairly high level.
@@ -14,7 +15,6 @@ import Language.Haskell.Refact.Utils.Synonyms
 import Language.Haskell.Refact.Utils.Types
 import Language.Haskell.Refact.Utils.TypeUtils
 import Data.Generics as SYB
-import GHC.SYB.Utils as SYB
 import Control.Applicative
 import FastString
 import RdrName
@@ -26,7 +26,7 @@ import Language.Haskell.GHC.ExactPrint.Types
 -- Assumptions:
 --   Only a single pattern will be returned. Which pattern is returned depends
 --   on the behaviour of SYB.something.
-getVarAndRHS :: GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> RefactGhc (GHC.LPat GHC.RdrName, ParsedGRHSs)
+getVarAndRHS :: GHC.Match GhcPs (GHC.LHsExpr GhcPs) -> RefactGhc (GHC.LPat GhcPs, ParsedGRHSs)
 getVarAndRHS match = do
   let (Just pat) = SYB.something (Nothing `SYB.mkQ` varPat) (GHC.m_pats match)
   return (pat , GHC.m_grhss match)
@@ -36,17 +36,17 @@ getVarAndRHS match = do
 -- TODO:AZ remove this, use the API version instead
 -- | Looks up the function binding at the given position. Returns nothing if the
 -- position does not contain a binding.
-getHsBind :: (Data ast) => SimpPos -> ast -> Maybe (GHC.HsBind GHC.RdrName)
+getHsBind :: (Data ast) => SimpPos -> ast -> Maybe (GHC.HsBind GhcPs)
 getHsBind pos ast =
   let rdrNm = locToRdrName pos ast in
   case rdrNm of
   Nothing -> Nothing
-  (Just (GHC.L _ rNm)) -> SYB.everythingStaged SYB.Parser (<|>) Nothing (Nothing `SYB.mkQ` isBind) ast
+  (Just (GHC.L _ rNm)) -> SYB.everything (<|>) (Nothing `SYB.mkQ` isBind) ast
     where
 #if __GLASGOW_HASKELL__ <= 710
-        isBind (bnd@(GHC.FunBind (GHC.L _ name) _ _ _ _ _) :: GHC.HsBind GHC.RdrName)
+        isBind (bnd@(GHC.FunBind (GHC.L _ name) _ _ _ _ _) :: GHC.HsBind GhcPs)
 #else
-        isBind (bnd@(GHC.FunBind (GHC.L _ name) _ _ _ _) :: GHC.HsBind GHC.RdrName)
+        isBind (bnd@(GHC.FunBind (GHC.L _ name) _ _ _ _) :: GHC.HsBind GhcPs)
 #endif
             | name == rNm = (Just bnd)
         isBind _ = Nothing
@@ -56,7 +56,7 @@ getHsBind pos ast =
 getFunName :: (SYB.Data t) => String -> t -> Maybe GHC.Name
 getFunName str = SYB.something (Nothing `SYB.mkQ` comp)
   where
-    comp :: GHC.HsBind GHC.Name -> Maybe GHC.Name
+    comp :: GHC.HsBind GhcRn -> Maybe GHC.Name
 #if __GLASGOW_HASKELL__ <= 710
     comp (GHC.FunBind lid _ _ _ _ _)
 #else
@@ -71,13 +71,13 @@ getFunName str = SYB.something (Nothing `SYB.mkQ` comp)
 
 
 -- TODO:AZ use a Name, not OccName, and compare properly
-getTypedHsBind :: (Data a) => GHC.OccName -> a -> Maybe (GHC.HsBind GHC.Id)
+getTypedHsBind :: (Data a) => GHC.OccName -> a -> Maybe (GHC.HsBind GhcTc)
 getTypedHsBind occ = SYB.something (Nothing `SYB.mkQ` isBind)
   where
 #if __GLASGOW_HASKELL__ <= 710
-        isBind (bnd@(GHC.FunBind (GHC.L _ nm) _ _ _ _ _) :: GHC.HsBind GHC.Id)
+        isBind (bnd@(GHC.FunBind (GHC.L _ nm) _ _ _ _ _) :: GHC.HsBind GhcTc)
 #else
-        isBind (bnd@(GHC.FunBind (GHC.L _ nm) _ _ _ _) :: GHC.HsBind GHC.Id)
+        isBind (bnd@(GHC.FunBind (GHC.L _ nm) _ _ _ _) :: GHC.HsBind GhcTc)
 #endif
             |  (GHC.occName (GHC.idName nm)) == occ = (Just bnd)
         isBind _ = Nothing
@@ -87,7 +87,7 @@ getTypedHsBind occ = SYB.something (Nothing `SYB.mkQ` isBind)
 -- | This looks up the type signature of the given identifier. The given
 -- position is assumed to be the location of where the identifier is defined
 -- NOT the location of the type signature
-getTypeSig :: (Data a) => SimpPos -> String -> a -> Maybe (GHC.Sig GHC.RdrName)
+getTypeSig :: (Data a) => SimpPos -> String -> a -> Maybe (GHC.Sig GhcPs)
 getTypeSig pos funNm a =
   let rdrNm = locToRdrName pos a in
   case rdrNm of
@@ -142,15 +142,16 @@ lookupByLoc loc = SYB.something (Nothing `SYB.mkQ` comp)
           | otherwise = Nothing
 -}
 
-getIdFromVar :: GHC.LHsExpr GHC.RdrName -> RefactGhc (Maybe GHC.Id)
+getIdFromVar :: GHC.LHsExpr GhcPs -> RefactGhc (Maybe GHC.Id)
 getIdFromVar v@(GHC.L l _var) = do
   logDataWithAnns "getIdFromVar:v=" v
   typed <- getRefactTyped
   logDataWithAnns "getIdFromVar:typed=" typed
-  let (mElem :: Maybe (GHC.LHsExpr GHC.Id)) = lookupByLoc l typed
+  let (mElem :: Maybe (GHC.LHsExpr GhcTc)) = lookupByLoc l typed
   logDataWithAnns "getIdFromVar:mElem" mElem
   return $ mElem >>= (\e -> SYB.something (Nothing `SYB.mkQ` comp) e)
   where
+    comp :: GHC.HsExpr GhcTc -> Maybe GHC.Id
 #if __GLASGOW_HASKELL__ <= 710
     comp (GHC.HsVar id) = Just id
 #else

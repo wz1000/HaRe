@@ -57,6 +57,7 @@ import qualified GhcMod.Target      as GM
 import qualified GhcMod.Types       as GM
 import Language.Haskell.Refact.Utils.Types
 import Language.Haskell.GHC.ExactPrint
+import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Utils
 import System.Directory
 import System.Log.Logger
@@ -176,11 +177,11 @@ type ParseResult = GHC.TypecheckedModule
 -- |Provide some temporary storage while the refactoring is taking
 -- place
 data StateStorage = StorageNone
-                  | StorageBind (GHC.LHsBind GHC.Name)
-                  | StorageSig  (GHC.LSig GHC.Name)
-                  | StorageBindRdr (GHC.LHsBind GHC.RdrName)
-                  | StorageDeclRdr (GHC.LHsDecl GHC.RdrName)
-                  | StorageSigRdr  (GHC.LSig GHC.RdrName)
+                  | StorageBind (GHC.LHsBind GhcRn)
+                  | StorageSig  (GHC.LSig GhcRn)
+                  | StorageBindRdr (GHC.LHsBind GhcPs)
+                  | StorageDeclRdr (GHC.LHsDecl GhcPs)
+                  | StorageSigRdr  (GHC.LSig GhcPs)
 
 
 instance Show StateStorage where

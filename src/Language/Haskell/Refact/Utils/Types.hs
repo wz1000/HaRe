@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE CPP    #-}
 module Language.Haskell.Refact.Utils.Types
        (
         ApplyRefacResult
@@ -19,7 +20,6 @@ module Language.Haskell.Refact.Utils.Types
        ) where
 
 import qualified GHC        as GHC
--- import           GHC (TypecheckedModule(..), ModuleInfo)
 
 import Language.Haskell.GHC.ExactPrint
 
@@ -81,7 +81,3 @@ type SimpSpan = (SimpPos,SimpPos)
 
 type NameMap = Map.Map GHC.SrcSpan GHC.Name
 
--- instance GHC.Outputable NameMap where
---   ppr nm = GHC.text "NameMap" GHC.<+> GHC.hcat (map one $ Map.toList nm)
---     where
---       one (s,n) = GHC.text (showGhc (s,n,GHC.nameUnique n))

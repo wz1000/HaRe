@@ -106,13 +106,13 @@ import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Annotate
 import Language.Haskell.GHC.ExactPrint.Parsers
 import Language.Haskell.GHC.ExactPrint.Utils
+import Language.Haskell.GHC.ExactPrint.Types
 
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.TypeSyn
 import Language.Haskell.Refact.Utils.Types
 import qualified Data.Map as Map
 
-import qualified GHC.SYB.Utils as SYB
 import Outputable
 
 -- ---------------------------------------------------------------------
@@ -460,7 +460,8 @@ getStateStorage = do
 -- ---------------------------------------------------------------------
 
 logData :: (SYB.Data a) => String -> a -> RefactGhc ()
-logData str ast = logm $ str ++ (SYB.showData SYB.Parser 3 ast)
+-- logData str ast = logm $ str ++ (SYB.showData SYB.Parser 3 ast)
+logData str ast = logm $ str ++ (showAnnData mempty 3 ast)
 
 -- ---------------------------------------------------------------------
 
@@ -563,14 +564,14 @@ initRdrNameMap tm = r
                                               `SYB.extQ` hsRecFieldN) renamed
     names  = names2 ++ SYB.everything (++) ([] `SYB.mkQ` hsRecFieldT) typechecked
 
-    fieldOcc :: GHC.FieldOcc GHC.Name -> [GHC.Located GHC.Name]
+    fieldOcc :: GHC.FieldOcc GhcRn -> [GHC.Located GHC.Name]
     fieldOcc (GHC.FieldOcc (GHC.L l _) n) = [(GHC.L l n)]
 
-    hsRecFieldN :: GHC.LHsExpr GHC.Name -> [GHC.Located GHC.Name]
+    hsRecFieldN :: GHC.LHsExpr GhcRn -> [GHC.Located GHC.Name]
     hsRecFieldN (GHC.L _ (GHC.HsRecFld (GHC.Unambiguous (GHC.L l _) n) )) = [GHC.L l n]
     hsRecFieldN _ = []
 
-    hsRecFieldT :: GHC.LHsExpr GHC.Id -> [GHC.Located GHC.Name]
+    hsRecFieldT :: GHC.LHsExpr GhcTc -> [GHC.Located GHC.Name]
     hsRecFieldT (GHC.L _ (GHC.HsRecFld (GHC.Ambiguous (GHC.L l _) n) )) = [GHC.L l (Var.varName n)]
     hsRecFieldT _ = []
 #endif
@@ -581,7 +582,7 @@ initRdrNameMap tm = r
     namesIeParsed = Map.fromList $ SYB.everything (++) ([] `SYB.mkQ` ieThingWith) (GHC.hsmodExports $ GHC.unLoc parsed)
 
 
-    ieThingWith :: GHC.IE GHC.RdrName -> [(GHC.SrcSpan, [GHC.SrcSpan])]
+    ieThingWith :: GHC.IE GhcPs -> [(GHC.SrcSpan, [GHC.SrcSpan])]
     ieThingWith (GHC.IEThingWith l _ sub_rdrs _) = [(GHC.getLoc l,map GHC.getLoc sub_rdrs)]
     ieThingWith _ = []
 
@@ -590,7 +591,7 @@ initRdrNameMap tm = r
                        Just (_,_,es,_) -> es
     namesIeRenamed = SYB.everything (++) ([] `SYB.mkQ` ieThingWithNames) renamedExports
 
-    ieThingWithNames :: GHC.IE GHC.Name -> [GHC.Located GHC.Name]
+    ieThingWithNames :: GHC.IE GhcRn -> [GHC.Located GHC.Name]
     ieThingWithNames (GHC.IEThingWith l _ sub_rdrs _) = (GHC.ieLWrappedName l:nameSubs)
       where
         rdrSubLocs = gfromJust "ieThingWithNames" $ Map.lookup (GHC.getLoc l) namesIeParsed
@@ -722,7 +723,7 @@ nameSybQuery checker = q
 
 -- ---------------------------------------------------------------------
 
-parseDeclWithAnns :: String -> RefactGhc (GHC.LHsDecl GHC.RdrName)
+parseDeclWithAnns :: String -> RefactGhc (GHC.LHsDecl GhcPs)
 parseDeclWithAnns src = do
   u <- gets rsUniqState
   putUnique (u+1)
@@ -738,4 +739,4 @@ parseDeclWithAnns src = do
 -- EOF
 
 showOutputable :: (Outputable o) => o -> String
-showOutputable = SYB.showSDoc_ . ppr
+showOutputable = showSDoc_ . ppr

@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 module Language.Haskell.Refact.Utils.Transform
   (
     addSimpleImportDecl
@@ -63,7 +64,7 @@ locWithAnnVal a = do
 -- |Takes in a lhs pattern and a rhs. Wraps those in a lambda and adds the
 --annotations associated with the lambda. Returns the new located lambda
 --expression
-wrapInLambda :: GHC.LPat GHC.RdrName -> ParsedGRHSs -> RefactGhc (GHC.LHsExpr GHC.RdrName)
+wrapInLambda :: GHC.LPat GhcPs -> ParsedGRHSs -> RefactGhc (GHC.LHsExpr GhcPs)
 wrapInLambda varPat rhs = do
   match@(GHC.L l _match)  <- mkLamMatch varPat rhs
   --logm $ "Match: " ++ (SYB.showData SYB.Parser 3 match)
@@ -83,15 +84,17 @@ wrapInLambda varPat rhs = do
   return par_lam
 
 -- |This function makes a match suitable for use inside of a lambda expression.
-mkLamMatch :: GHC.LPat GHC.RdrName -> GHC.GRHSs GHC.RdrName (GHC.LHsExpr GHC.RdrName)
-           -> RefactGhc (GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+mkLamMatch :: GHC.LPat GhcPs -> GHC.GRHSs GhcPs (GHC.LHsExpr GhcPs)
+           -> RefactGhc (GHC.LMatch GhcPs (GHC.LHsExpr GhcPs))
 mkLamMatch varPat rhs = do
-#if __GLASGOW_HASKELL__ <= 710
-  lMatch <- locate (GHC.Match Nothing [varPat] Nothing rhs)
-#elif __GLASGOW_HASKELL__ <= 800
+#if __GLASGOW_HASKELL__ >= 804
+  lMatch <- locate (GHC.Match GHC.LambdaExpr [varPat]         rhs)
+#elif __GLASGOW_HASKELL__ > 800
+  lMatch <- locate (GHC.Match GHC.LambdaExpr [varPat] Nothing rhs)
+#elif __GLASGOW_HASKELL__ > 710
   lMatch <- locate (GHC.Match GHC.NonFunBindMatch [varPat] Nothing rhs)
 #else
-  lMatch <- locate (GHC.Match GHC.LambdaExpr [varPat] Nothing rhs)
+  lMatch <- locate (GHC.Match Nothing [varPat] Nothing rhs)
 #endif
   let dp = [(G GHC.AnnRarrow, DP (0,1)),(G GHC.AnnLam, DP (0,0))]
       newAnn = annNone {annsDP = dp, annEntryDelta = DP (0,0)}
@@ -99,7 +102,7 @@ mkLamMatch varPat rhs = do
   liftT $ addAnn lMatch newAnn
   return lMatch
 
-wrapInParsWithDPs :: DeltaPos -> DeltaPos -> GHC.LHsExpr GHC.RdrName -> RefactGhc (GHC.LHsExpr GHC.RdrName)
+wrapInParsWithDPs :: DeltaPos -> DeltaPos -> GHC.LHsExpr GhcPs -> RefactGhc (GHC.LHsExpr GhcPs)
 wrapInParsWithDPs openDP closeDP expr = do
   newAst <- locate (GHC.HsPar expr)
   let dp = [(G GHC.AnnOpenP, openDP), (G GHC.AnnCloseP, closeDP)]
@@ -109,7 +112,7 @@ wrapInParsWithDPs openDP closeDP expr = do
 
 
 --Wraps a given expression in parenthesis and add the appropriate annotations, returns the modified ast chunk.
-wrapInPars :: GHC.LHsExpr GHC.RdrName -> RefactGhc (GHC.LHsExpr GHC.RdrName)
+wrapInPars :: GHC.LHsExpr GhcPs -> RefactGhc (GHC.LHsExpr GhcPs)
 wrapInPars = wrapInParsWithDPs (DP (0,1)) (DP (0,0))
 
 --Does the opposite of wrapInPars
@@ -136,13 +139,13 @@ addNewLines n ast = do
 
 
 --This function replaces the type signature of the function that is defined at the simple position
-replaceTypeSig :: SimpPos -> GHC.Sig GHC.RdrName -> RefactGhc ()
+replaceTypeSig :: SimpPos -> GHC.Sig GhcPs -> RefactGhc ()
 replaceTypeSig pos sig = do
   parsed <- getRefactParsed
   let (Just (GHC.L _ rdrNm)) = locToRdrName pos parsed
   newParsed <- SYB.everywhereM (SYB.mkM (comp rdrNm)) parsed
   putRefactParsed newParsed emptyAnns
-    where comp :: GHC.RdrName -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
+    where comp :: GHC.RdrName -> GHC.Sig GhcPs -> RefactGhc (GHC.Sig GhcPs)
 #if __GLASGOW_HASKELL__ <= 710
           comp nm oldTy@(GHC.TypeSig [(GHC.L _ oldNm)]  _ _)
 #else
@@ -159,7 +162,7 @@ replaceFunBind pos bnd = do
   let (Just (GHC.L _ rdrNm)) = locToRdrName pos parsed
   newParsed <- SYB.everywhereM (SYB.mkM (comp rdrNm)) parsed
   putRefactParsed newParsed emptyAnns
-    where comp :: GHC.RdrName -> GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
+    where comp :: GHC.RdrName -> GHC.HsBind GhcPs -> RefactGhc (GHC.HsBind GhcPs)
 #if __GLASGOW_HASKELL__ <= 710
           comp nm b@(GHC.FunBind (GHC.L _ n) _ _ _ _ _)
 #else
@@ -198,7 +201,7 @@ constructHsVar nm = do
   addAnnVal newVar
   return newVar
 
-constructLHsTy :: GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
+constructLHsTy :: GHC.RdrName -> RefactGhc (GHC.LHsType GhcPs)
 constructLHsTy nm = do
 #if __GLASGOW_HASKELL__ >= 802
   lNm <- locate nm
@@ -246,7 +249,7 @@ rmFun nm = do
   parsed <- getRefactParsed
   let newP = SYB.everywhere (SYB.mkT filterDeclLst) parsed
   putRefactParsed newP mempty
-    where filterDeclLst :: [GHC.LHsDecl GHC.RdrName] -> [GHC.LHsDecl GHC.RdrName]
+    where filterDeclLst :: [GHC.LHsDecl GhcPs] -> [GHC.LHsDecl GhcPs]
           filterDeclLst = filter (\dec -> not $ isFun dec)
 #if __GLASGOW_HASKELL__ <= 710
           isFun (GHC.L _ (GHC.ValD (GHC.FunBind lNm _ _ _ _ _))) = (GHC.unLoc lNm) == nm
@@ -303,8 +306,8 @@ replaceFunRhs pos newRhs = do
 --Is applied to the signature "f :: Int -> (Int -> String) -> String"
 --g will be applied to "(Int -> String)"
 --You also need to handle spacing before the type signature element
-traverseTypeSig :: Int -> (GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName))
-                -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
+traverseTypeSig :: Int -> (GHC.LHsType GhcPs -> RefactGhc (GHC.LHsType GhcPs))
+                -> GHC.Sig GhcPs -> RefactGhc (GHC.Sig GhcPs)
 #if __GLASGOW_HASKELL__ >= 802
 traverseTypeSig argNum f (GHC.TypeSig lst (GHC.HsWC wcs (GHC.HsIB v ty' c))) = do
   newTy <- comp argNum ty'
@@ -331,13 +334,13 @@ traverseTypeSig argNum f (GHC.TypeSig lst (GHC.HsIB vs (GHC.HsWC ns mc ty) )) = 
   newTy <- comp argNum ty
   return (GHC.TypeSig lst (GHC.HsIB vs (GHC.HsWC ns mc newTy) ))
   where
-    comp :: Int -> GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
+    comp :: Int -> GHC.LHsType GhcPs -> RefactGhc (GHC.LHsType GhcPs)
     comp argNum (GHC.L l (GHC.HsForAllTy bndrs ty)) =
       case ty of
         (GHC.L _ (GHC.HsFunTy _ _)) -> comp' argNum ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy bndrs res)))
         _                           -> f ty            >>= (\res -> return (GHC.L l (GHC.HsForAllTy bndrs res)))
 
-    comp' :: Int -> GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
+    comp' :: Int -> GHC.LHsType GhcPs -> RefactGhc (GHC.LHsType GhcPs)
     comp' 1 (GHC.L l (GHC.HsFunTy lhs rhs)) = do
       resLHS <- f lhs
       let funTy = (GHC.L l (GHC.HsFunTy resLHS rhs))

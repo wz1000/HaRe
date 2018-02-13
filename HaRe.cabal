@@ -46,7 +46,7 @@ Category:                       Development, Refactoring
 Cabal-Version:                  >= 1.8
 Build-Type:                     Simple
 
-tested-with:                    GHC == 7.10.3, GHC == 8.0.2, GHC == 8.2.1
+tested-with:                    GHC == 7.10.3, GHC == 8.0.2, GHC == 8.2.2
 
 data-files:                     elisp/*.el
                                 elisp/tests/*.el
@@ -130,12 +130,14 @@ Library
                                , ghc
                                , ghc-exactprint >= 0.5.4
                                , ghc-mod-core == 5.9.0.*
-                               , ghc-syb-utils
+                               -- , ghc-syb-utils
                                , hslogger
                                , monad-control
                                , mtl
                                , syb
                                , syz
+        if impl (ghc < 8.4)
+          build-depends: ghc-syb-utils
 
         -- optimisation disabled otherwise the compile takes too long
         -- With normal optimisation, we get
@@ -171,7 +173,7 @@ Library
            , Language.Haskell.Refact.Refactoring.Sugar
            , Language.Haskell.Refact.Refactoring.GenApplicative
            , Language.Haskell.Refact.Refactoring.HughesList
-           , Language.Haskell.Refact.Utils.Isomorphic             
+           , Language.Haskell.Refact.Utils.Isomorphic
            , Language.Haskell.Refact.Utils.ExactPrint
            , Language.Haskell.Refact.Utils.GhcBugWorkArounds
            , Language.Haskell.Refact.Utils.GhcModuleGraph
@@ -284,7 +286,7 @@ test-suite spec
     , ghc
     , ghc-exactprint >= 0.5.4
     , ghc-mod-core == 5.9.0.*
-    , ghc-syb-utils
+    -- , ghc-syb-utils
     , hslogger
     , hspec
     , mtl
@@ -308,6 +310,8 @@ test-suite spec
   -- build-tools: hspec-discover >= 2.4.4 && < 2.5
     , dlist
     , case-insensitive
+  -- if impl (ghc < 8.4)
+  --   build-depends: ghc-syb-utils
   Extensions:      CPP
   if impl (ghc < 7.10.2)
     buildable: False

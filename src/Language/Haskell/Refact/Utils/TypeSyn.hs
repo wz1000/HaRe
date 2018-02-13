@@ -12,16 +12,20 @@ module Language.Haskell.Refact.Utils.TypeSyn where
 import qualified GHC        as GHC
 import qualified Name       as GHC
 import qualified Outputable as GHC
+import Language.Haskell.Refact.Utils.Types
+import Language.Haskell.GHC.ExactPrint.Types
 
-type HsExpP    = GHC.HsExpr GHC.RdrName
-type HsPatP    = GHC.Pat GHC.RdrName
-type HsDeclP   = GHC.LHsDecl GHC.RdrName
+-- ---------------------------------------------------------------------
+
+type HsExpP    = GHC.HsExpr GhcPs
+type HsPatP    = GHC.Pat GhcPs
+type HsDeclP   = GHC.LHsDecl GhcPs
 
 type HsDeclsP = GHC.HsGroup GHC.Name
 
 type InScopes = [GHC.Name]
 
-type Export = GHC.LIE GHC.RdrName
+type Export = GHC.LIE GhcPs
 
 -- ---------------------------------------------------------------------
 -- From old/tools/base/defs/PNT.hs
@@ -52,32 +56,32 @@ instance GHC.Outputable GHC.NameSpace where
 
 
 #if __GLASGOW_HASKELL__ <= 800
-instance GHC.Outputable (GHC.MatchGroup GHC.Name (GHC.LHsExpr GHC.Name)) where
+instance GHC.Outputable (GHC.MatchGroup GhcRn (GHC.LHsExpr GhcRn)) where
   ppr (GHC.MG ms _ _ _) = GHC.text "MatchGroup" GHC.<+> GHC.ppr ms
 
-instance GHC.Outputable (GHC.Match GHC.Name (GHC.LHsExpr GHC.Name)) where
+instance GHC.Outputable (GHC.Match GhcRn (GHC.LHsExpr GhcRn)) where
   ppr (GHC.Match _fn pats mtyp grhs) = GHC.text "Match" GHC.<+> GHC.ppr pats
                                                     GHC.<+> GHC.ppr mtyp
                                                     GHC.<+> GHC.ppr grhs
 #endif
 
-instance GHC.Outputable (GHC.GRHSs GHC.Name (GHC.LHsExpr GHC.Name)) where
+instance GHC.Outputable (GHC.GRHSs GhcRn (GHC.LHsExpr GhcRn)) where
   ppr (GHC.GRHSs grhss binds) = GHC.text "GRHSs" GHC.<+> GHC.ppr grhss
                                                  GHC.<+> GHC.ppr binds
 
 
-instance GHC.Outputable (GHC.GRHS GHC.Name (GHC.LHsExpr GHC.Name)) where
+instance GHC.Outputable (GHC.GRHS GhcRn (GHC.LHsExpr GhcRn)) where
   ppr (GHC.GRHS guards rhs) = GHC.text "GRHS" GHC.<+> GHC.ppr guards
                                               GHC.<+> GHC.ppr rhs
 
 
-instance GHC.Outputable (GHC.HsTupArg GHC.Name) where
+instance GHC.Outputable (GHC.HsTupArg GhcRn) where
   ppr (GHC.Present e)    = GHC.text "Present" GHC.<+> GHC.ppr e
   ppr (GHC.Missing _typ) = GHC.text "Missing"
 
 
 #if !(defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,0,1,1)))
-instance GHC.Outputable (GHC.ConDeclField GHC.Name) where
+instance GHC.Outputable (GHC.ConDeclField GhcRn) where
   ppr (GHC.ConDeclField name typ doc) = GHC.text "ConDeclField"
                                           GHC.<+> GHC.ppr name
                                           GHC.<+> GHC.ppr typ
@@ -85,7 +89,7 @@ instance GHC.Outputable (GHC.ConDeclField GHC.Name) where
 #endif
 
 #if __GLASGOW_HASKELL__ <= 710
-instance GHC.Outputable (GHC.TyFamEqn GHC.Name (GHC.LHsTyVarBndrs GHC.Name)) where
+instance GHC.Outputable (GHC.TyFamEqn GhcRn (GHC.LHsTyVarBndrs GhcRn)) where
   ppr (GHC.TyFamEqn name pats rhs) = GHC.text "TyFamEqn"
                                           GHC.<+> GHC.ppr name
                                           GHC.<+> GHC.ppr pats

@@ -38,7 +38,11 @@ getRichTokenStreamWA modu = do
   let startLoc = GHC.mkRealSrcLoc (GHC.mkFastString sourceFile) 1 1
   case GHC.lexTokenStream source startLoc flags of
     GHC.POk _ ts -> return $ GHC.addSourceToTokens startLoc source ts
+#if __GLASGOW_HASKELL__ >= 804
+    GHC.PFailed _ _span _err ->
+#else
     GHC.PFailed _span _err ->
+#endif
         do
            strSrcBuf <- getPreprocessedSrc sourceFile
            case GHC.lexTokenStream strSrcBuf startLoc flags of
@@ -50,7 +54,11 @@ getRichTokenStreamWA modu = do
                   -- return directiveToks
                   -- return nonDirectiveToks
                   -- return toks
+#if __GLASGOW_HASKELL__ >= 804
+             GHC.PFailed _ sspan err -> parseError flags sspan err
+#else
              GHC.PFailed sspan err -> parseError flags sspan err
+#endif
 
 -- ---------------------------------------------------------------------
 
@@ -101,7 +109,11 @@ tokeniseOriginalSrc startLoc flags buf = do
   let src = stripPreprocessorDirectives buf
   case GHC.lexTokenStream src startLoc flags of
     GHC.POk _ ts -> return $ GHC.addSourceToTokens startLoc src ts
+#if __GLASGOW_HASKELL__ >= 804
+    GHC.PFailed _ sspan err -> parseError flags sspan err
+#else
     GHC.PFailed sspan err -> parseError flags sspan err
+#endif
 
 -- ---------------------------------------------------------------------
 
