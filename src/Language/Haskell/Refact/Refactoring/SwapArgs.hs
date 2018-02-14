@@ -3,7 +3,6 @@
 module Language.Haskell.Refact.Refactoring.SwapArgs (swapArgs) where
 
 import qualified Data.Generics.Aliases as SYB
-import qualified GHC.SYB.Utils         as SYB
 
 import qualified Name                  as GHC
 import qualified GHC
@@ -14,6 +13,7 @@ import Language.Haskell.Refact.API
 import Data.Generics.Schemes
 
 import Language.Haskell.GHC.ExactPrint.Types
+import Language.Haskell.GHC.ExactPrint.Utils
 import System.Directory
 
 
@@ -53,14 +53,14 @@ comp fileName (row, col) = do
 
        -- putStrLn (showToks t)
        -- writeRefactoredFiles False [refactoredMod]
-       -- putStrLn ("here" ++ (SYB.showData SYB.Parser 0 mod))  -- $ show [fileName, beginPos, endPos]
+       -- putStrLn ("here" ++ (showAnnData mempty 0 mod))  -- $ show [fileName, beginPos, endPos]
        -- putStrLn "Completd"
 
 
 doSwap :: GHC.Name -> RefactGhc ()
 doSwap n1 = do
     parsed <- getRefactParsed
-    logm $ "doSwap:parsed=" ++ SYB.showData SYB.Parser 0 parsed
+    logm $ "doSwap:parsed=" ++ showAnnData mempty 0 parsed
     nm <- getRefactNameMap
     parsed' <- everywhereM (SYB.mkM (inMod nm)
                            `SYB.extM` (inExp nm)
@@ -74,12 +74,12 @@ doSwap n1 = do
     where
          -- 1. The definition is at top level...
 #if __GLASGOW_HASKELL__ <= 710
-         inMod nm ((GHC.FunBind ln2 infixity (GHC.MG matches p m1 m2) a locals tick)::GHC.HsBind GHC.RdrName)
+         inMod nm ((GHC.FunBind ln2 infixity (GHC.MG matches p m1 m2) a locals tick)::GHC.HsBind GhcPs)
 #else
-         inMod nm ((GHC.FunBind ln2 (GHC.MG (GHC.L lm matches) p m1 m2) a locals tick)::GHC.HsBind GHC.RdrName)
+         inMod nm ((GHC.FunBind ln2 (GHC.MG (GHC.L lm matches) p m1 m2) a locals tick)::GHC.HsBind GhcPs)
 #endif
             | GHC.nameUnique n1 == GHC.nameUnique (rdrName2NamePure nm ln2)
-                    = do logm ("inMatch>" ++ SYB.showData SYB.Parser 0 ln2 ++ "<")
+                    = do logm ("inMatch>" ++ showAnnData mempty 0 ln2 ++ "<")
                          newMatches <- updateMatches matches
 #if __GLASGOW_HASKELL__ <= 710
                          return (GHC.FunBind ln2 infixity (GHC.MG newMatches p m1 m2) a locals tick)
@@ -89,7 +89,7 @@ doSwap n1 = do
          inMod _ func = return func
 
          -- 2. All call sites of the function...
-         inExp nm ((GHC.L l (GHC.HsApp (GHC.L e0 (GHC.HsApp e e1)) e2))::GHC.LHsExpr GHC.RdrName)
+         inExp nm ((GHC.L l (GHC.HsApp (GHC.L e0 (GHC.HsApp e e1)) e2))::GHC.LHsExpr GhcPs)
             | cond
                    -- =  update e2 e1 =<< update e1 e2 expr
                    = do
@@ -105,11 +105,11 @@ doSwap n1 = do
 
          -- 3. Type signature...
 #if __GLASGOW_HASKELL__ <= 710
-         inType nm (GHC.L x (GHC.TypeSig [lname] types pns)::GHC.LSig GHC.RdrName)
+         inType nm (GHC.L x (GHC.TypeSig [lname] types pns)::GHC.LSig GhcPs)
 #elif __GLASGOW_HASKELL__ <= 800
-         inType nm (GHC.L x (GHC.TypeSig [lname] (GHC.HsIB ivs (GHC.HsWC wcs mwc types)))::GHC.LSig GHC.RdrName)
+         inType nm (GHC.L x (GHC.TypeSig [lname] (GHC.HsIB ivs (GHC.HsWC wcs mwc types)))::GHC.LSig GhcPs)
 #else
-         inType nm (GHC.L x (GHC.TypeSig [lname] (GHC.HsWC wcs (GHC.HsIB vars types cl)))::GHC.LSig GHC.RdrName)
+         inType nm (GHC.L x (GHC.TypeSig [lname] (GHC.HsWC wcs (GHC.HsIB vars types cl)))::GHC.LSig GhcPs)
 #endif
            | GHC.nameUnique (rdrName2NamePure nm lname) == GHC.nameUnique n1
                 = do
@@ -126,9 +126,9 @@ doSwap n1 = do
 #endif
 
 #if __GLASGOW_HASKELL__ <= 710
-         inType nm (GHC.L _x (GHC.TypeSig (n:ns) _types _)::GHC.LSig GHC.RdrName)
+         inType nm (GHC.L _x (GHC.TypeSig (n:ns) _types _)::GHC.LSig GhcPs)
 #else
-         inType nm (GHC.L _x (GHC.TypeSig (n:ns) _types )::GHC.LSig GHC.RdrName)
+         inType nm (GHC.L _x (GHC.TypeSig (n:ns) _types )::GHC.LSig GhcPs)
 #endif
            | GHC.nameUnique n1 `elem` (map (\n' -> GHC.nameUnique (rdrName2NamePure nm n')) (n:ns))
             = error "Error in swapping arguments in type signature: signature bound to muliple entities!"
@@ -153,7 +153,11 @@ doSwap n1 = do
          tyListToFun (t1:ts) = GHC.noLoc (GHC.HsFunTy t1 (tyListToFun ts))
 
          updateMatches [] = return []
-         updateMatches ((GHC.L x (GHC.Match mfn pats nothing rhs)::GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName)):matches)
+#if __GLASGOW_HASKELL__ >= 804
+         updateMatches ((GHC.L x (GHC.Match mfn pats         rhs)::GHC.LMatch GhcPs (GHC.LHsExpr GhcPs)):matches)
+#else
+         updateMatches ((GHC.L x (GHC.Match mfn pats nothing rhs)::GHC.LMatch GhcPs (GHC.LHsExpr GhcPs)):matches)
+#endif
            = case pats of
                (p1:p2:ps) -> do
                                 -- p1' <- update p1 p2 p1
@@ -161,8 +165,14 @@ doSwap n1 = do
                                 let p1' = p2
                                 let p2' = p1
                                 matches' <- updateMatches matches
+#if __GLASGOW_HASKELL__ >= 804
+                                return ((GHC.L x (GHC.Match mfn (p1':p2':ps) rhs)):matches')
+               [p] -> return [GHC.L x (GHC.Match mfn [p] rhs)]
+               []  -> return [GHC.L x (GHC.Match mfn [] rhs)]
+#else
                                 return ((GHC.L x (GHC.Match mfn (p1':p2':ps) nothing rhs)):matches')
                [p] -> return [GHC.L x (GHC.Match mfn [p] nothing rhs)]
                []  -> return [GHC.L x (GHC.Match mfn [] nothing rhs)]
+#endif
 
 

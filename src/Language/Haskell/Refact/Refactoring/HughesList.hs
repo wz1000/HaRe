@@ -10,31 +10,18 @@ import Data.Generics.Strafunski.StrategyLib.StrategyLib
 -- import qualified Data.Map as M
 -- import Data.Maybe (fromMaybe)
 -- import Exception
-import qualified GHC.SYB.Utils as SYB
 import qualified GhcModCore as GM (Options(..))
 import Language.Haskell.GHC.ExactPrint.Parsers
 import Language.Haskell.GHC.ExactPrint.Types
+import Language.Haskell.GHC.ExactPrint.Utils
 import Language.Haskell.Refact.API
--- import Language.Haskell.Refact.Utils.Types
 import System.Directory
 
--- import qualified Bag        as GHC
--- import qualified ErrUtils   as GHC
 import qualified FastString as GHC
 import qualified GHC        as GHC
--- import qualified HscMain    as GHC
--- import qualified HscTypes   as GHC
--- import qualified Id         as GHC
--- import qualified Module     as GHC
 import qualified Name       as GHC
--- import qualified OccName    as GHC
 import qualified RdrName    as GHC
--- import qualified RnExpr     as GHC
--- import qualified TcRnDriver as GHC
--- import qualified TyCon      as GHC
--- import qualified Unique     as GHC
 
--- import Outputable
 #if __GLASGOW_HASKELL__ >= 800
 import qualified TyCoRep as GHC
 #else
@@ -142,10 +129,10 @@ loadHList = do
   return ()
 
 
-fixTypeSig :: Int -> GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
+fixTypeSig :: Int -> GHC.Sig GhcPs -> RefactGhc (GHC.Sig GhcPs)
 fixTypeSig argNum =  traverseTypeSig argNum replaceList
   where
-    replaceList :: GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
+    replaceList :: GHC.LHsType GhcPs -> RefactGhc (GHC.LHsType GhcPs)
     replaceList (GHC.L l (GHC.HsListTy innerTy)) = do
       let dlistFS = GHC.fsLit "DList"
           dlistUq = GHC.mkVarUnqual dlistFS
@@ -206,7 +193,7 @@ wrapCallsWithToList modNm name = applyAtCallPoint name comp
 #endif
           lLhs <- locate toListVar
           addAnnVal lLhs
-          logm $ "ToList being inserted: " ++ SYB.showData SYB.Parser 3 lLhs
+          logm $ "ToList being inserted: " ++ showAnnData mempty 3 lLhs
           locate $ (GHC.HsApp lLhs parE)
 #if __GLASGOW_HASKELL__ <= 710
         toListVar = GHC.HsVar (mkRdrName (modNm ++ "toList"))
@@ -226,7 +213,7 @@ applyAtCallPoint nm f = do
   parsed' <- applyTP (stop_tdTP (failTP `adhocTP` stopCon `adhocTP` comp)) parsed
   putRefactParsed parsed' emptyAnns
     where
-      stopCon :: GHC.HsBind GHC.RdrName -> RefactGhc ParsedBind
+      stopCon :: GHC.HsBind GhcPs -> RefactGhc ParsedBind
 #if __GLASGOW_HASKELL__ <= 710
       stopCon b@(GHC.FunBind (GHC.L _ id) _ _ _ _ _) = if id == nm
 #else

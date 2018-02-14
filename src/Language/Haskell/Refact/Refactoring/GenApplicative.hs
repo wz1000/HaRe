@@ -10,14 +10,10 @@ import qualified GHC as GHC
 import qualified RdrName as GHC
 import System.Directory
 import FastString
--- import Data.Map as Map (union)
 import Data.Generics as SYB
-import GHC.SYB.Utils as SYB
 import Data.List
--- import Control.Monad
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
--- import Language.Haskell.GHC.ExactPrint.Print
 import Language.Haskell.GHC.ExactPrint.Parsers
 
 genApplicative :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> IO [FilePath]
@@ -57,7 +53,7 @@ doGenApplicative fileName pos = do
   replaceFunRhs pos appChain
 
 
-checkPreconditions :: ParsedExpr -> [GHC.ExprLStmt GHC.RdrName] -> [GHC.RdrName] -> RefactGhc ()
+checkPreconditions :: ParsedExpr -> [GHC.ExprLStmt GhcPs] -> [GHC.RdrName] -> RefactGhc ()
 checkPreconditions retRhs doStmts boundVars = do
   let boundVarsPrecon = checkBVars doStmts boundVars
       retVarsOrder = varOrdering boundVars retRhs
@@ -79,7 +75,7 @@ checkPreconditions retRhs doStmts boundVars = do
         lexprContainsVars vars = SYB.everything (||) (False `SYB.mkQ` (\nm -> elem nm vars))
         varOrdering :: [GHC.RdrName] -> ParsedExpr -> [GHC.RdrName]
         varOrdering boundVars = SYB.everything (++) ([] `SYB.mkQ` (\nm -> if (elem nm boundVars) then [nm] else []))
-        checkOrdering :: [GHC.RdrName] -> [GHC.ExprLStmt GHC.RdrName] -> Bool
+        checkOrdering :: [GHC.RdrName] -> [GHC.ExprLStmt GhcPs] -> Bool
         checkOrdering [] [] = True
         checkOrdering [] ((GHC.L _ (GHC.BodyStmt _ _ _ _)):stmts) = checkOrdering [] stmts
         checkOrdering vars ((GHC.L _ (GHC.BodyStmt _ _ _ _)):stmts) = checkOrdering vars stmts
@@ -140,9 +136,9 @@ isJustBoundVar (GHC.HsVar (GHC.L _ nm)) names = elem nm names
 #endif
 isJustBoundVar _ _ = False
 
-getDoStmts :: GHC.HsBind GHC.RdrName -> Maybe [GHC.ExprLStmt GHC.RdrName]
+getDoStmts :: GHC.HsBind GhcPs -> Maybe [GHC.ExprLStmt GhcPs]
 getDoStmts funBind = SYB.something (Nothing `SYB.mkQ` stmtLst) funBind
-  where stmtLst :: GHC.HsExpr GHC.RdrName -> Maybe [GHC.ExprLStmt GHC.RdrName]
+  where stmtLst :: GHC.HsExpr GhcPs -> Maybe [GHC.ExprLStmt GhcPs]
 #if __GLASGOW_HASKELL__ <= 710
         stmtLst (GHC.HsDo _ stmtLst _) = Just (init stmtLst)
 #else
@@ -150,9 +146,9 @@ getDoStmts funBind = SYB.something (Nothing `SYB.mkQ` stmtLst) funBind
 #endif
         stmtLst _ = Nothing
 
-findBoundVars :: [GHC.ExprLStmt GHC.RdrName] -> [GHC.RdrName]
+findBoundVars :: [GHC.ExprLStmt GhcPs] -> [GHC.RdrName]
 findBoundVars = SYB.everything (++) ([] `SYB.mkQ` findVarPats)
-  where findVarPats :: GHC.Pat GHC.RdrName -> [GHC.RdrName]
+  where findVarPats :: GHC.Pat GhcPs -> [GHC.RdrName]
 #if __GLASGOW_HASKELL__ <= 710
         findVarPats (GHC.VarPat rdr) = [rdr]
 #else
@@ -162,7 +158,7 @@ findBoundVars = SYB.everything (++) ([] `SYB.mkQ` findVarPats)
 
 getReturnRhs :: UnlocParsedHsBind -> Maybe ParsedExpr
 getReturnRhs funBind = SYB.something (Nothing `SYB.mkQ` retStmt `SYB.extQ` dollarRet) funBind
-  where retStmt :: GHC.ExprLStmt GHC.RdrName -> Maybe ParsedExpr
+  where retStmt :: GHC.ExprLStmt GhcPs -> Maybe ParsedExpr
         retStmt (GHC.L _ (GHC.BodyStmt (GHC.L _ body)  _ _ _)) = if isRet body
           then Just (retRHS body)
           else Nothing
@@ -178,7 +174,7 @@ getReturnRhs funBind = SYB.something (Nothing `SYB.mkQ` retStmt `SYB.extQ` dolla
         retRHS :: ParsedExpr -> ParsedExpr
         retRHS (GHC.HsApp _  (GHC.L _ rhs)) = rhs
 
-constructAppChain :: ParsedExpr -> [GHC.ExprLStmt GHC.RdrName] -> RefactGhc ParsedLExpr
+constructAppChain :: ParsedExpr -> [GHC.ExprLStmt GhcPs] -> RefactGhc ParsedLExpr
 constructAppChain retRhs lst = do
   let clusters = clusterStmts lst
       boundVars = findBoundVars lst
@@ -206,14 +202,14 @@ constructAppChain retRhs lst = do
       addAnnVal lOp
       let opApp = (GHC.OpApp e lOp GHC.PlaceHolder rhs)
       locate opApp
-    getStmtExpr :: GHC.ExprLStmt GHC.RdrName -> ParsedLExpr
+    getStmtExpr :: GHC.ExprLStmt GhcPs -> ParsedLExpr
     getStmtExpr (GHC.L _ (GHC.BodyStmt body _ _ _)) = body
 #if __GLASGOW_HASKELL__ <= 710
     getStmtExpr (GHC.L _ (GHC.BindStmt _ body _ _)) = body
 #else
     getStmtExpr (GHC.L _ (GHC.BindStmt _ body _ _ _)) = body
 #endif
-    buildSingleExpr :: [GHC.ExprLStmt GHC.RdrName] -> RefactGhc ParsedLExpr
+    buildSingleExpr :: [GHC.ExprLStmt GhcPs] -> RefactGhc ParsedLExpr
     buildSingleExpr [st] = return $ getStmtExpr st
     buildSingleExpr lst@(st:stmts) = do
       let (before,(bindSt:after)) = break isBindStmt lst
@@ -257,7 +253,7 @@ constructAppChain retRhs lst = do
           addAnnVal lOp
           lExpr <- locate (GHC.OpApp st lOp GHC.PlaceHolder rhs)
           return (Just lExpr)
-    clusterStmts :: [GHC.ExprLStmt GHC.RdrName] -> [[GHC.ExprLStmt GHC.RdrName]]
+    clusterStmts :: [GHC.ExprLStmt GhcPs] -> [[GHC.ExprLStmt GhcPs]]
     clusterStmts lst = let indices = findIndices isBindStmt lst
                            clusters = cluster indices (length lst) 0 in
                        map (\is -> map (\i -> lst !! i) is) clusters
@@ -267,13 +263,13 @@ constructAppChain retRhs lst = do
 
 {-
 --Checks if a name occurs in the given ast chunk
-nameOccurs :: Data a => GHC.RdrName -> a -> Bool
+nameOccurs :: Data a => GhcPs -> a -> Bool
 nameOccurs nm = SYB.everything (||) (False `SYB.mkQ` isName)
-  where isName :: GHC.RdrName -> Bool
+  where isName :: GhcPs -> Bool
         isName mName = nm == mName
 -}
 
-isBindStmt :: GHC.ExprLStmt GHC.RdrName -> Bool
+isBindStmt :: GHC.ExprLStmt GhcPs -> Bool
 #if __GLASGOW_HASKELL__ <= 710
 isBindStmt (GHC.L _ (GHC.BindStmt _ _ _ _)) = True
 #else

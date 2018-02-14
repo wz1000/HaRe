@@ -32,7 +32,8 @@ module Language.Haskell.Refact.Utils.GhcUtils (
     -- , transZ
     -- , transZM
     -- , zopenStaged'
-    -- , ztransformStagedM
+    , zopen'
+    , ztransformM
 
     -- ** SYZ utilities
     , upUntil
@@ -47,7 +48,7 @@ import qualified GHC.SYB.Utils as SYB
 
 -- import Control.Monad
 import Data.Data
--- import Data.Maybe
+import Data.Maybe
 -- import Language.Haskell.Refact.Utils.Monad
 -- import Language.Haskell.Refact.Utils.MonadFunctions
 
@@ -272,3 +273,33 @@ ztransformStagedM stage q z = do
            _        -> return z
     return z'
 -}
+
+-- | Open a zipper to the point where the Generic query passes,
+-- and apply the transformation returned from the specific part of the
+-- GenericQ that matched.
+ztransformM :: (Typeable a,Monad m)
+  => SYB.GenericQ (Maybe (Z.Zipper a -> m (Z.Zipper a)))
+  -> Z.Zipper a
+  -> m (Z.Zipper a)
+ztransformM q z = do
+    let zs = zopen' q z
+    z' <- case zs of
+           [(zz,t)] -> t zz
+           _        -> return z
+    return z'
+
+-- | Open a zipper to the point where the Generic query passes,
+-- returning the zipper and a value from the specific part of the
+-- GenericQ that matched. This allows the components of the query to
+-- return a specific transformation routine, to apply to the returned zipper
+zopen' :: (Typeable a)
+  => SYB.GenericQ (Maybe b)
+  -> Z.Zipper a
+  -> [(Z.Zipper a,b)]
+zopen' q z
+  | isJust zq = [(z,fromJust zq)]
+  | otherwise = reverse $ Z.downQ [] g z
+  where
+    g z' = (zopen' q z') ++ (Z.leftQ [] g z')
+
+    zq = Z.query q z

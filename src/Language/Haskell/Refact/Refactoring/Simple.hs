@@ -35,9 +35,9 @@ pattern HsPar l s = GHC.L l (GHC.HsPar s)
 removeBracketTransform  :: FilePath -> SimpPos -> SimpPos -> RefactGhc ()
 removeBracketTransform fileName beginPos endPos = do
        parsed <- getRefactParsed
-       let expr :: GHC.Located (GHC.HsExpr GHC.RdrName)
+       let expr :: GHC.Located (GHC.HsExpr GhcPs)
            expr = fromJust $ locToExp beginPos endPos parsed
-           removePar :: HsExpr GHC.RdrName -> RefactGhc (HsExpr GHC.RdrName)
+           removePar :: HsExpr GhcPs -> RefactGhc (HsExpr GhcPs)
            removePar e@(HsPar _ s)
             | sameOccurrence e expr = do
               startAnns <- liftT $ getAnnsT

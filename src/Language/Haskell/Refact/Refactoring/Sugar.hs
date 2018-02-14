@@ -3,7 +3,6 @@ module Language.Haskell.Refact.Refactoring.Sugar (sugar, compSugar) where
 import Language.Haskell.Refact.API
 import qualified GhcModCore as GM (Options(..))
 import System.Directory (canonicalizePath)
-import qualified GHC.SYB.Utils as SYB
 import qualified Data.Generics as SYB
 import qualified GHC as GHC
 

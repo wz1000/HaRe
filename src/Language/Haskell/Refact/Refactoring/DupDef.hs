@@ -9,7 +9,6 @@ module Language.Haskell.Refact.Refactoring.DupDef
   , compDuplicateDef ) where
 
 import qualified Data.Generics as SYB
-import qualified GHC.SYB.Utils as SYB
 
 import qualified GHC
 import qualified RdrName       as GHC
@@ -23,6 +22,7 @@ import Language.Haskell.Refact.API
 
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Transform
+import Language.Haskell.GHC.ExactPrint.Utils
 
 import System.Directory
 
@@ -54,7 +54,7 @@ compDuplicateDef fileName newName (row, col) = do
           Just lr@(GHC.L l _) ->
             do
               let pn = GHC.L l (rdrName2NamePure nm lr)
-              logm $ "DupDef.compDuplicateDef:about to applyRefac for:pn=" ++ SYB.showData SYB.Parser 0 pn
+              logm $ "DupDef.compDuplicateDef:about to applyRefac for:pn=" ++ showAnnData mempty 0 pn
               (refactoredMod,(isDone,nn)) <- applyRefac (doDuplicating pn newName) RSAlreadyLoaded
               logm $ "DupDef.com:isDone=" ++ show isDone
               case isDone of
@@ -103,12 +103,12 @@ reallyDoDuplicating pn newName _inscopes = do
        putRefactParsed parsed2 emptyAnns
        return (DupDefTopLevel,newNameGhc)
      else do
-       parsed' <- SYB.everywhereMStaged SYB.Parser (
-                                      SYB.mkM    (dupInMatch   newNameGhc)
-                                      `SYB.extM` (dupInPat     newNameGhc)
-                                      `SYB.extM` (dupInLet     newNameGhc)
-                                      `SYB.extM` (dupInLetStmt newNameGhc)
-                                     ) parsed2
+       parsed' <- SYB.everywhereM (
+                                   SYB.mkM    (dupInMatch   newNameGhc)
+                                   `SYB.extM` (dupInPat     newNameGhc)
+                                   `SYB.extM` (dupInLet     newNameGhc)
+                                   `SYB.extM` (dupInLetStmt newNameGhc)
+                                  ) parsed2
        putRefactParsed parsed' emptyAnns
        done <- getRefactDone
        if done then return (DupDefLowerLevel,newNameGhc)
@@ -126,7 +126,7 @@ reallyDoDuplicating pn newName _inscopes = do
                 else return p
 
         --2. The definition to be duplicated is a local declaration in a match
-        dupInMatch newNameGhc (match::GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+        dupInMatch newNameGhc (match::GHC.LMatch GhcPs (GHC.LHsExpr GhcPs))
           = do
               nm <- getRefactNameMap
               declsp <- liftT $ hsDecls match
@@ -136,14 +136,14 @@ reallyDoDuplicating pn newName _inscopes = do
                 else return match
 
         --3. The definition to be duplicated is a local declaration in a pattern binding
-        dupInPat newNameGhc (pat@(GHC.L _ (GHC.ValD (GHC.PatBind _p _rhs _typ _fvs _))) :: GHC.LHsDecl GHC.RdrName)
+        dupInPat newNameGhc (pat@(GHC.L _ (GHC.ValD (GHC.PatBind _p _rhs _typ _fvs _))) :: GHC.LHsDecl GhcPs)
           = do
             logm $ "dupInPat hit"
             doDuplicating' newNameGhc pat pn
         dupInPat _ pat = return pat
 
         --4: The defintion to be duplicated is a local decl in a Let expression
-        dupInLet newNameGhc (letExp@(GHC.L _ (GHC.HsLet _ds _e)):: GHC.LHsExpr GHC.RdrName)
+        dupInLet newNameGhc (letExp@(GHC.L _ (GHC.HsLet _ds _e)):: GHC.LHsExpr GhcPs)
           = doDuplicating' newNameGhc letExp pn
         dupInLet _ letExp = return letExp
 
@@ -151,7 +151,7 @@ reallyDoDuplicating pn newName _inscopes = do
         -- Note: The local declarations in a case alternative are covered in #2 above.
 
         --6.The definition to be duplicated is a local decl in a Let statement.
-        dupInLetStmt newNameGhc (letStmt@(GHC.L _ (GHC.LetStmt _ds)):: GHC.LStmt GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+        dupInLetStmt newNameGhc (letStmt@(GHC.L _ (GHC.LetStmt _ds)):: GHC.LStmt GhcPs (GHC.LHsExpr GhcPs))
           = doDuplicating' newNameGhc letStmt pn
         dupInLetStmt _ letStmt = return letStmt
 
@@ -163,7 +163,7 @@ reallyDoDuplicating pn newName _inscopes = do
         doDuplicating' :: (SYB.Data t) => GHC.Name -> t -> GHC.Located GHC.Name -> RefactGhc t
         doDuplicating' newNameGhc t _ln = do
           logm $ "doDuplicating' entered"
-          -- logm $ "doDuplicating' entered:t=" ++ SYB.showData SYB.Parser 0 t
+          -- logm $ "doDuplicating' entered:t=" ++ showAnnData mempty 0 t
           -- declsp <- liftT $ hsDecls t
           declsp <- liftT $ hsDeclsGeneric t
           nm <- getRefactNameMap
@@ -175,7 +175,7 @@ reallyDoDuplicating pn newName _inscopes = do
         doDuplicating'' :: (SYB.Data t) => GHC.Name -> t -> GHC.Located GHC.Name
                        -> RefactGhc t
         doDuplicating'' newNameGhc parentr ln = do
-          -- logm $ "doDuplicating'':parentr=" ++ SYB.showData SYB.Parser 0 parentr
+          -- logm $ "doDuplicating'':parentr=" ++ showAnnData mempty 0 parentr
           r <- hasDeclsSybTransform workerHsDecls workerBind parentr
           logm $ "doDuplicating'':done"
           return r
@@ -187,7 +187,7 @@ reallyDoDuplicating pn newName _inscopes = do
                 ds' <- doDuplicating3 newNameGhc parentr ln ds
                 liftT $ replaceDecls t ds'
 
-              workerBind :: (GHC.LHsBind GHC.RdrName -> RefactGhc (GHC.LHsBind GHC.RdrName))
+              workerBind :: (GHC.LHsBind GhcPs -> RefactGhc (GHC.LHsBind GhcPs))
               workerBind t@(GHC.L _ (GHC.PatBind{})) = do
                 logm $ "workerBind hit"
                 ds <- liftT $ hsDeclsPatBind t
@@ -196,8 +196,8 @@ reallyDoDuplicating pn newName _inscopes = do
               workerBind x = error $ "DupDef.doDuplicating'':workerBind got:" ++ showGhc x
 
         doDuplicating3 :: (SYB.Data t) => GHC.Name -> t -> GHC.Located GHC.Name
-                       -> [GHC.LHsDecl GHC.RdrName]
-                       -> RefactGhc [GHC.LHsDecl GHC.RdrName]
+                       -> [GHC.LHsDecl GhcPs]
+                       -> RefactGhc [GHC.LHsDecl GhcPs]
         doDuplicating3 newNameGhc parentr ln@(GHC.L _ n) declsp
            = do
                 logm $ "doDuplicating'' entered:ln" ++ showGhc ln

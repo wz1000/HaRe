@@ -6,7 +6,6 @@ module Language.Haskell.Refact.Refactoring.Case
   ) where
 
 import qualified Data.Generics         as SYB
-import qualified GHC.SYB.Utils         as SYB
 
 import qualified BasicTypes    as GHC
 import qualified GHC           as GHC
@@ -42,26 +41,26 @@ compIfToCase fileName beginPos endPos = do
          Just exp1@(GHC.L _ (GHC.HsIf _ _ _ _))
                 -> do (refactoredMod,_) <- applyRefac (doIfToCaseInternal exp1) RSAlreadyLoaded
                       return [refactoredMod]
-         _      -> error $ "You haven't selected an if-then-else  expression!" -- (show (beginPos,endPos,fileName)) ++ "]:" ++ (SYB.showData SYB.Parser 0 $ ast)
+         _      -> error $ "You haven't selected an if-then-else  expression!" -- (show (beginPos,endPos,fileName)) ++ "]:" ++ (showAnnData mempty 0 $ ast)
 
 doIfToCaseInternal ::
-  GHC.Located (GHC.HsExpr GHC.RdrName)
+  GHC.Located (GHC.HsExpr GhcPs)
   -> RefactGhc ()
 doIfToCaseInternal expr = do
   rs <- getRefactParsed
   reallyDoIfToCase expr rs
 
 reallyDoIfToCase ::
-  GHC.Located (GHC.HsExpr GHC.RdrName)
+  GHC.Located (GHC.HsExpr GhcPs)
   -> GHC.ParsedSource
   -> RefactGhc ()
 reallyDoIfToCase expr p = do
 
-   p2 <- SYB.everywhereMStaged SYB.Parser (SYB.mkM inExp) p
+   p2 <- SYB.everywhereM (SYB.mkM inExp) p
    putRefactParsed p2 mempty
    return ()
        where
-         inExp :: (GHC.Located (GHC.HsExpr GHC.RdrName)) -> RefactGhc (GHC.Located (GHC.HsExpr GHC.RdrName))
+         inExp :: (GHC.Located (GHC.HsExpr GhcPs)) -> RefactGhc (GHC.Located (GHC.HsExpr GhcPs))
          inExp exp1@(GHC.L _ (GHC.HsIf _se (GHC.L _ _) (GHC.L _ _) (GHC.L _ _)))
            | sameOccurrence expr exp1
            = do
@@ -71,8 +70,8 @@ reallyDoIfToCase expr p = do
          inExp e = return e
 
 -- |Actually do the transformation
-ifToCaseTransform :: GHC.Located (GHC.HsExpr GHC.RdrName)
-                  -> RefactGhc (GHC.Located (GHC.HsExpr GHC.RdrName))
+ifToCaseTransform :: GHC.Located (GHC.HsExpr GhcPs)
+                  -> RefactGhc (GHC.Located (GHC.HsExpr GhcPs))
 ifToCaseTransform li@(GHC.L _ (GHC.HsIf _se e1 e2 e3)) = do
   caseLoc        <- liftT uniqueSrcSpanT -- HaRe:-1:1
   trueMatchLoc   <- liftT uniqueSrcSpanT -- HaRe:-1:2
@@ -108,7 +107,10 @@ ifToCaseTransform li@(GHC.L _ (GHC.HsIf _se e1 e2 e3)) = do
                  [
                    GHC.L trueLoc1 $ GHC.ConPatIn (GHC.L trueLoc trueName) (GHC.PrefixCon [])
                  ]
+#if __GLASGOW_HASKELL__ >= 804
+#else
                  Nothing
+#endif
                  (GHC.GRHSs
                    [
                      GHC.L trueRhsLoc $ GHC.GRHS [] e2
@@ -130,7 +132,10 @@ ifToCaseTransform li@(GHC.L _ (GHC.HsIf _se e1 e2 e3)) = do
                  [
                    GHC.L falseLoc1 $ GHC.ConPatIn (GHC.L falseLoc falseName) (GHC.PrefixCon [])
                  ]
+#if __GLASGOW_HASKELL__ >= 804
+#else
                  Nothing
+#endif
                  (GHC.GRHSs
                    [
                      GHC.L falseRhsLoc $ GHC.GRHS [] e3

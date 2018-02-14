@@ -6,7 +6,6 @@ module Language.Haskell.Refact.Refactoring.AddRmParam
        ) where
 
 import qualified Data.Generics as SYB
-import qualified GHC.SYB.Utils as SYB
 
 import qualified GHC
 import qualified Name                  as GHC
@@ -61,7 +60,7 @@ compAddOneParameter fileName paramName (row, col) = do
         case maybePn of
           Just pn ->
             do
-              logm $ "AddRmParam.compAdd:about to applyRefac for:pn=" ++ SYB.showData SYB.Parser 0 pn
+              logm $ "AddRmParam.compAdd:about to applyRefac for:pn=" ++ showAnnData mempty 0 pn
               -- make sure this name is defined in this module
               if isFunOrPatName nm pn parsed
                then do
@@ -123,8 +122,8 @@ doAddingParam pn newParam defaultArg isExported' = do
                 else mzero
 
              --2. pn is declared locally in the where clause of a match.
-             inMatch ::GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName)
-                     -> RefactGhc (GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+             inMatch ::GHC.LMatch GhcPs (GHC.LHsExpr GhcPs)
+                     -> RefactGhc (GHC.LMatch GhcPs (GHC.LHsExpr GhcPs))
              inMatch match
                = do
                    nm <- getRefactNameMap
@@ -142,7 +141,7 @@ doAddingParam pn newParam defaultArg isExported' = do
 -}
 
              --4: pn is declared locally in a  Let expression
-             inLet (letExp@(GHC.L _ (GHC.HsLet _ds _e)) :: GHC.LHsExpr GHC.RdrName)
+             inLet (letExp@(GHC.L _ (GHC.HsLet _ds _e)) :: GHC.LHsExpr GhcPs)
                = do
                    nm <- getRefactNameMap
                    decls <- liftT $ hsDecls letExp
@@ -151,9 +150,9 @@ doAddingParam pn newParam defaultArg isExported' = do
                       then doAdding letExp decls
                       else mzero
 #if __GLASGOW_HASKELL__ <= 710
-             inLet ((GHC.L l (GHC.HsDo ctx stmts ptt)) :: GHC.LHsExpr GHC.RdrName)
+             inLet ((GHC.L l (GHC.HsDo ctx stmts ptt)) :: GHC.LHsExpr GhcPs)
 #else
-             inLet ((GHC.L l (GHC.HsDo ctx (GHC.L ls stmts) ptt)) :: GHC.LHsExpr GHC.RdrName)
+             inLet ((GHC.L l (GHC.HsDo ctx (GHC.L ls stmts) ptt)) :: GHC.LHsExpr GhcPs)
 #endif
                = do
                    nm <- getRefactNameMap
@@ -186,7 +185,7 @@ doAddingParam pn newParam defaultArg isExported' = do
 -}
 
              --6.pn is declared locally in a let statement.
-             inLetStmt (letStmt@(GHC.L _ (GHC.LetStmt _stmts)):: GHC.ExprLStmt GHC.RdrName)
+             inLetStmt (letStmt@(GHC.L _ (GHC.LetStmt _stmts)):: GHC.ExprLStmt GhcPs)
                = do
                    nm <- getRefactNameMap
                    decls <- liftT $ hsDecls letStmt
@@ -199,7 +198,7 @@ doAddingParam pn newParam defaultArg isExported' = do
                where modu (_::GHC.ParsedSource) = error "Refactoring failed"
 
 
-             doAdding :: (HasDecls t) => t -> [GHC.LHsDecl GHC.RdrName] -> RefactGhc t
+             doAdding :: (HasDecls t) => t -> [GHC.LHsDecl GhcPs] -> RefactGhc t
              doAdding parent ds = do
                nm <- getRefactNameMap
                if paramNameOk nm pn newParam ds
@@ -217,7 +216,7 @@ doAddingParam pn newParam defaultArg isExported' = do
                        return parent3
                    else error " Refactoring failed."
 
-             doAddingStmts :: [GHC.ExprLStmt GHC.RdrName] -> RefactGhc [GHC.ExprLStmt GHC.RdrName]
+             doAddingStmts :: [GHC.ExprLStmt GhcPs] -> RefactGhc [GHC.ExprLStmt GhcPs]
              doAddingStmts stmts = do
                logDataWithAnns "doAddingStmts:stmts:" stmts
                nm <- getRefactNameMap
@@ -238,11 +237,11 @@ paramNameOk nm pn newParam t
   = (fromMaybe True) (applyTU (once_tdTU (failTU `adhocTU` decl
                                                  `adhocTU` bind)) t)
   where
-   decl :: GHC.LHsDecl GHC.RdrName -> Maybe Bool
+   decl :: GHC.LHsDecl GhcPs -> Maybe Bool
    decl (GHC.L l (GHC.ValD d)) = bind (GHC.L l d)
    decl _ = mzero
 
-   bind :: GHC.LHsBind GHC.RdrName -> Maybe Bool
+   bind :: GHC.LHsBind GhcPs -> Maybe Bool
 #if __GLASGOW_HASKELL__ <= 710
    bind (GHC.L _ (GHC.FunBind n _i (GHC.MG matches _a _ptt _o) _co _fvs _))
 #else
@@ -323,7 +322,7 @@ addDefaultActualArg recursion pn argPName t = do
                else (applyTP (stop_tdTP (failTP `adhocTP` (inDecl nm)
                                                 `adhocTP` (funApp nm)))) t
        where
-         inDecl :: NameMap -> GHC.LHsDecl GHC.RdrName -> RefactGhc (GHC.LHsDecl GHC.RdrName)
+         inDecl :: NameMap -> GHC.LHsDecl GhcPs -> RefactGhc (GHC.LHsDecl GhcPs)
 #if __GLASGOW_HASKELL__ <= 710
          inDecl nm fun@(GHC.L _ (GHC.ValD (GHC.FunBind n _i _ _co _fvs _)))
 #else
@@ -337,11 +336,11 @@ addDefaultActualArg recursion pn argPName t = do
          --   = return pat
          inDecl _ _ = mzero
 
-         funApp :: NameMap -> GHC.LHsExpr GHC.RdrName -> RefactGhc (GHC.LHsExpr GHC.RdrName)
+         funApp :: NameMap -> GHC.LHsExpr GhcPs -> RefactGhc (GHC.LHsExpr GhcPs)
 #if __GLASGOW_HASKELL__ <= 710
-         funApp nm (expr@(GHC.L l (GHC.HsVar n))::GHC.LHsExpr GHC.RdrName)
+         funApp nm (expr@(GHC.L l (GHC.HsVar n))::GHC.LHsExpr GhcPs)
 #else
-         funApp nm (expr@(GHC.L l (GHC.HsVar (GHC.L _ n)))::GHC.LHsExpr GHC.RdrName)
+         funApp nm (expr@(GHC.L l (GHC.HsVar (GHC.L _ n)))::GHC.LHsExpr GhcPs)
 #endif
           | rdrName2NamePure nm (GHC.L l n) == pn = do
             logm $ "addDefaultActualArg.funApp:expr=" ++ showGhc expr
@@ -353,8 +352,8 @@ addDefaultActualArg recursion pn argPName t = do
 -- ---------------------------------------------------------------------
 
 -- | Add a parameter to a 'GHC.HsVar' expression
-addParamToExp :: GHC.LHsExpr GHC.RdrName -> GHC.RdrName
-              -> RefactGhc (GHC.LHsExpr GHC.RdrName)
+addParamToExp :: GHC.LHsExpr GhcPs -> GHC.RdrName
+              -> RefactGhc (GHC.LHsExpr GhcPs)
 addParamToExp (expr@(GHC.L _ (GHC.HsVar _))) argPName = do
   lp <- liftT uniqueSrcSpanT
   la <- liftT uniqueSrcSpanT
@@ -378,7 +377,7 @@ addParamToExp x _
 -- ---------------------------------------------------------------------
 
 -- |Add type arg to type siginature
-addArgToSig :: GHC.Name -> [GHC.LHsDecl GHC.RdrName] -> RefactGhc [GHC.LHsDecl GHC.RdrName]
+addArgToSig :: GHC.Name -> [GHC.LHsDecl GhcPs] -> RefactGhc [GHC.LHsDecl GhcPs]
 addArgToSig pn decls = do
    nm <- getRefactNameMap
    let (before,after) = break (\d -> definesSigDRdr nm pn d) decls
@@ -388,7 +387,7 @@ addArgToSig pn decls = do
                 return (before++newSig++(tail after))
 
     where
-       addArgToSig' :: [GHC.LHsDecl GHC.RdrName] -> RefactGhc [GHC.LHsDecl GHC.RdrName]
+       addArgToSig' :: [GHC.LHsDecl GhcPs] -> RefactGhc [GHC.LHsDecl GhcPs]
 #if __GLASGOW_HASKELL__ <= 710
        addArgToSig' sig@[(GHC.L l (GHC.SigD (GHC.TypeSig is tp pr)))] = do
 #elif __GLASGOW_HASKELL__ <= 800
@@ -428,7 +427,7 @@ addArgToSig pn decls = do
 
 
        -- compose a type application using type expressions tv and tp
-       newTypeVar :: String -> GHC.LHsType GHC.RdrName -> RefactGhc (GHC.LHsType GHC.RdrName)
+       newTypeVar :: String -> GHC.LHsType GhcPs -> RefactGhc (GHC.LHsType GhcPs)
        newTypeVar tVar tp = do
          ls <- liftT uniqueSrcSpanT
          lv <- liftT uniqueSrcSpanT
@@ -450,7 +449,7 @@ addArgToSig pn decls = do
 
        -- make a fresh type variable name. the new name is the first letter in
        -- the alphabet which is not used in the type signature.
-       mkNewTypeVarName :: [GHC.LHsDecl GHC.RdrName] -> String
+       mkNewTypeVarName :: [GHC.LHsDecl GhcPs] -> String
        mkNewTypeVarName sig
           =mkANewName "a" $ map showGhc $ (snd.hsTypeVbls) sig
              where mkANewName initName v
@@ -494,9 +493,9 @@ addDefaultActualArgInClientMod pn argPName t = do
   return r
   where
 #if __GLASGOW_HASKELL__ <= 710
-    funApp nm (expr@((GHC.L l (GHC.HsVar pname )))::GHC.LHsExpr GHC.RdrName)
+    funApp nm (expr@((GHC.L l (GHC.HsVar pname )))::GHC.LHsExpr GhcPs)
 #else
-    funApp nm (expr@((GHC.L l (GHC.HsVar (GHC.L _ pname) )))::GHC.LHsExpr GHC.RdrName)
+    funApp nm (expr@((GHC.L l (GHC.HsVar (GHC.L _ pname) )))::GHC.LHsExpr GhcPs)
 #endif
       | GHC.nameUnique (rdrName2NamePure nm (GHC.L l pname)) == GHC.nameUnique pn
        = do
@@ -581,14 +580,17 @@ doRmParam pn nTh = do
              inMod modu = doRemoving' modu
 
              -- --2. pn is declared locally in the where clause of a match.
-             inMatch :: GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> RefactGhc (GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName))
-#if __GLASGOW_HASKELL__ <= 710
-             inMatch match@(GHC.L _ (GHC.Match (Just (_fun,_)) _pats _mtyp (GHC.GRHSs _rhs _ds)))
-#elif __GLASGOW_HASKELL__ <= 800
+             inMatch :: GHC.LMatch GhcPs (GHC.LHsExpr GhcPs) -> RefactGhc (GHC.LMatch GhcPs (GHC.LHsExpr GhcPs))
+#if __GLASGOW_HASKELL__ >= 804
+             inMatch match@(GHC.L _ (GHC.Match (GHC.FunRhs _fun _ _) _pats (GHC.GRHSs _rhs _ds)))
+#elif __GLASGOW_HASKELL__ > 800
+             inMatch match@(GHC.L _ (GHC.Match (GHC.FunRhs _fun _ _) _pats _mtyp (GHC.GRHSs _rhs _ds)))
+#elif __GLASGOW_HASKELL__ > 710
              inMatch match@(GHC.L _ (GHC.Match (GHC.FunBindMatch _fun _) _pats _mtyp (GHC.GRHSs _rhs _ds)))
 #else
-             inMatch match@(GHC.L _ (GHC.Match (GHC.FunRhs _fun _ _) _pats _mtyp (GHC.GRHSs _rhs _ds)))
+             inMatch match@(GHC.L _ (GHC.Match (Just (_fun,_)) _pats _mtyp (GHC.GRHSs _rhs _ds)))
 #endif
+
                = doRemoving' match
              inMatch _ = mzero
 
@@ -598,7 +600,7 @@ doRmParam pn nTh = do
              -- inPat _=mzero
 
              -- --4: pn is declared locally in a  Let expression
-             inLet :: GHC.LHsExpr GHC.RdrName -> RefactGhc (GHC.LHsExpr GHC.RdrName)
+             inLet :: GHC.LHsExpr GhcPs -> RefactGhc (GHC.LHsExpr GhcPs)
              inLet letExp@(GHC.L _ (GHC.HsLet _bs _e))
                = doRemoving' letExp
 #if __GLASGOW_HASKELL__ <= 710
@@ -625,7 +627,7 @@ doRmParam pn nTh = do
              -- inAlt _=mzero
 
              -- --6.pn is declared locally in a let statement.
-             inLetStmt :: GHC.ExprLStmt GHC.RdrName -> RefactGhc (GHC.ExprLStmt GHC.RdrName)
+             inLetStmt :: GHC.ExprLStmt GhcPs -> RefactGhc (GHC.ExprLStmt GhcPs)
              inLetStmt letStmt@(GHC.L _ (GHC.LetStmt _))
                = doRemoving' letStmt
              inLetStmt _ = mzero
@@ -642,7 +644,7 @@ doRmParam pn nTh = do
                   then doRemoving parent decls
                   else mzero
 
-             doRemoving :: (HasDecls t) => t -> [GHC.LHsDecl GHC.RdrName] -> RefactGhc t
+             doRemoving :: (HasDecls t) => t -> [GHC.LHsDecl GhcPs] -> RefactGhc t
              doRemoving parent ds  --PROBLEM: How about doRemoving fails?
                 =do
                     -- Check the preconditions, will error on failure
@@ -653,7 +655,7 @@ doRmParam pn nTh = do
                     ds'' <- liftT $ replaceDecls parent ds'
                     rmNthArgInFunCall pn nTh ds''
 
-             doRemovingStmts :: [GHC.ExprLStmt GHC.RdrName] -> RefactGhc [GHC.ExprLStmt GHC.RdrName]
+             doRemovingStmts :: [GHC.ExprLStmt GhcPs] -> RefactGhc [GHC.ExprLStmt GhcPs]
              doRemovingStmts stmts
                 =do
                     -- Check the preconditions, will error on failure
@@ -673,12 +675,14 @@ doRmParam pn nTh = do
 
                where
                  -- a formal parameter only exists in a match
-#if __GLASGOW_HASKELL__ <= 710
-                 rmInMatch nm (match@(GHC.L l (GHC.Match (Just (fun,b)) pats typ (GHC.GRHSs rhs decls)))::GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName))
-#elif __GLASGOW_HASKELL__ <= 800
-                 rmInMatch nm (match@(GHC.L l (GHC.Match (GHC.FunBindMatch fun b) pats typ (GHC.GRHSs rhs decls)))::GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+#if __GLASGOW_HASKELL__ >= 804
+                 rmInMatch nm (match@(GHC.L l (GHC.Match (GHC.FunRhs fun b s) pats (GHC.GRHSs rhs decls)))::GHC.LMatch GhcPs (GHC.LHsExpr GhcPs))
+#elif __GLASGOW_HASKELL__ > 800
+                 rmInMatch nm (match@(GHC.L l (GHC.Match (GHC.FunRhs fun b s) pats typ (GHC.GRHSs rhs decls)))::GHC.LMatch GhcPs (GHC.LHsExpr GhcPs))
+#elif __GLASGOW_HASKELL__ > 710
+                 rmInMatch nm (match@(GHC.L l (GHC.Match (GHC.FunBindMatch fun b) pats typ (GHC.GRHSs rhs decls)))::GHC.LMatch GhcPs (GHC.LHsExpr GhcPs))
 #else
-                 rmInMatch nm (match@(GHC.L l (GHC.Match (GHC.FunRhs fun b s) pats typ (GHC.GRHSs rhs decls)))::GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+                 rmInMatch nm (match@(GHC.L l (GHC.Match (Just (fun,b)) pats typ (GHC.GRHSs rhs decls)))::GHC.LMatch GhcPs (GHC.LHsExpr GhcPs))
 #endif
                    | rdrName2NamePure nm fun == pn' =
                        let  pat = pats!!nTh'     --get the nth formal parameter
@@ -695,12 +699,14 @@ doRmParam pn nTh = do
                                 dp <- liftT $ getEntryDPT (ghead "rmFormalArg" pats)
                                 logm $ "rmFormalArg.rmInMatch:dp=" ++ show dp
                                 liftT $ setAnnKeywordDP match (G GHC.AnnEqual) dp
-#if __GLASGOW_HASKELL__ <= 710
-                              return (GHC.L l (GHC.Match (Just (fun,b)) pats' typ (GHC.GRHSs rhs decls)))
-#elif __GLASGOW_HASKELL__ <= 800
+#if __GLASGOW_HASKELL__ >= 804
+                              return (GHC.L l (GHC.Match (GHC.FunRhs fun b s) pats' (GHC.GRHSs rhs decls)))
+#elif __GLASGOW_HASKELL__ > 800
+                              return (GHC.L l (GHC.Match (GHC.FunRhs fun b s) pats' typ (GHC.GRHSs rhs decls)))
+#elif __GLASGOW_HASKELL__ > 710
                               return (GHC.L l (GHC.Match (GHC.FunBindMatch fun b) pats' typ (GHC.GRHSs rhs decls)))
 #else
-                              return (GHC.L l (GHC.Match (GHC.FunRhs fun b s) pats' typ (GHC.GRHSs rhs decls)))
+                              return (GHC.L l (GHC.Match (Just (fun,b)) pats' typ (GHC.GRHSs rhs decls)))
 #endif
                  rmInMatch _ _ = mzero
 
@@ -713,7 +719,7 @@ rmNthArgInFunCall pn nTh t = do
   nm <- getRefactNameMap
   applyTP (stop_tdTP (failTP `adhocTP` (funApp nm))) t
    where
-         funApp nm (expr@(GHC.L _ (GHC.HsPar (GHC.L _ (GHC.HsApp e1 _e2))))::GHC.LHsExpr GHC.RdrName)
+         funApp nm (expr@(GHC.L _ (GHC.HsPar (GHC.L _ (GHC.HsApp e1 _e2))))::GHC.LHsExpr GhcPs)
               | nTh == 0 && Just pn == expToNameRdr nm e1
              = do
                  liftT $ transferEntryDPT expr e1
@@ -733,21 +739,21 @@ rmNthArgInFunCall pn nTh t = do
          funApp _ _ = mzero
 
          -- |deconstruct a function application into a list of expressions.
-         unfoldHsApp :: GHC.LHsExpr GHC.RdrName -> [(GHC.SrcSpan, GHC.LHsExpr GHC.RdrName)]
+         unfoldHsApp :: GHC.LHsExpr GhcPs -> [(GHC.SrcSpan, GHC.LHsExpr GhcPs)]
          unfoldHsApp expr =
               case expr of
                   (GHC.L l (GHC.HsApp e1 e2)) -> unfoldHsApp e1 ++ [(l,e2)]
                   _                           -> [(GHC.noSrcSpan,expr)]
 
          -- |reconstruct  a function application by a list of expressions.
-         foldHsApp :: [(GHC.SrcSpan, GHC.LHsExpr GHC.RdrName)] -> GHC.LHsExpr GHC.RdrName
+         foldHsApp :: [(GHC.SrcSpan, GHC.LHsExpr GhcPs)] -> GHC.LHsExpr GhcPs
          foldHsApp [] = error "foldHsApp:empty list"
          foldHsApp exps = snd $ foldl1 (\(_l1,e1) (l2,e2) -> (l2,GHC.L l2 (GHC.HsApp e1 e2))) exps
 
 
 -- ---------------------------------------------------------------------
 
-rmNthArgInSig :: GHC.Name -> Int -> [GHC.LHsDecl GHC.RdrName] -> RefactGhc [GHC.LHsDecl GHC.RdrName]
+rmNthArgInSig :: GHC.Name -> Int -> [GHC.LHsDecl GhcPs] -> RefactGhc [GHC.LHsDecl GhcPs]
 rmNthArgInSig pn nTh decls = do
   nm <- getRefactNameMap
   let (before,after)=break (\d ->definesSigDRdr nm pn d) decls
@@ -808,13 +814,13 @@ rmNthArgInSig pn nTh decls = do
                     in  (foldHsTypApp (before ++ tail after))
 
          --deconstruct a type application into a list of types
-         unfoldHsTypApp :: GHC.LHsType GHC.RdrName -> [(GHC.SrcSpan,GHC.LHsType GHC.RdrName)]
+         unfoldHsTypApp :: GHC.LHsType GhcPs -> [(GHC.SrcSpan,GHC.LHsType GhcPs)]
          unfoldHsTypApp typ =
                case typ of (GHC.L l (GHC.HsFunTy t1 t2)) ->(l,t1):unfoldHsTypApp t2
                            _ ->[(GHC.noSrcSpan,typ)]
 
          --reconstruct a type application by a list of type expression.
-         foldHsTypApp :: [(GHC.SrcSpan,GHC.LHsType GHC.RdrName)] -> GHC.LHsType GHC.RdrName
+         foldHsTypApp :: [(GHC.SrcSpan,GHC.LHsType GhcPs)] -> GHC.LHsType GhcPs
          foldHsTypApp [] = error "foldHsTypApp:empty list"
          foldHsTypApp ts=snd $ foldr1 (\(l1,t1) (_l2,t2)->(l1,GHC.L l1 (GHC.HsFunTy t1 t2))) ts
 
@@ -831,12 +837,14 @@ getParam pos = do
     Nothing     -> return Nothing
     Just (ln,i) -> return $ Just (rdrName2NamePure nm ln,i)
     where
-#if __GLASGOW_HASKELL__ <= 710
-       inMatch ((GHC.Match (Just (fun,_)) pats _mtyp _grhs)::GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName))
-#elif __GLASGOW_HASKELL__ <= 800
-       inMatch ((GHC.Match (GHC.FunBindMatch fun _) pats _mtyp _grhs)::GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+#if __GLASGOW_HASKELL__ >= 804
+       inMatch ((GHC.Match (GHC.FunRhs fun _ _) pats _grhs)::GHC.Match GhcPs (GHC.LHsExpr GhcPs))
+#elif __GLASGOW_HASKELL__ > 800
+       inMatch ((GHC.Match (GHC.FunRhs fun _ _) pats _mtyp _grhs)::GHC.Match GhcPs (GHC.LHsExpr GhcPs))
+#elif __GLASGOW_HASKELL__ > 710
+       inMatch ((GHC.Match (GHC.FunBindMatch fun _) pats _mtyp _grhs)::GHC.Match GhcPs (GHC.LHsExpr GhcPs))
 #else
-       inMatch ((GHC.Match (GHC.FunRhs fun _ _) pats _mtyp _grhs)::GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+       inMatch ((GHC.Match (Just (fun,_)) pats _mtyp _grhs)::GHC.Match GhcPs (GHC.LHsExpr GhcPs))
 #endif
          = case locToRdrName pos pats of
              Nothing  -> Nothing

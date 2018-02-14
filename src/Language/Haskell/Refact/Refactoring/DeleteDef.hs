@@ -67,9 +67,9 @@ pnUsedInScope pn t' = do
   return $ (length res) > 0
     where
 #if __GLASGOW_HASKELL__ <= 710
-      bind ((GHC.FunBind (GHC.L l name) _ match _ _ _) :: GHC.HsBindLR GHC.Name GHC.Name)
+      bind ((GHC.FunBind (GHC.L l name) _ match _ _ _) :: GHC.HsBindLR GhcRn GhcRn)
 #else
-      bind ((GHC.FunBind (GHC.L l name)  match _ _ _) :: GHC.HsBindLR GHC.Name GHC.Name)
+      bind ((GHC.FunBind (GHC.L l name)  match _ _ _) :: GHC.HsBindLR GhcRn GhcRn)
 #endif
         | name == pn = do
             logm $ "Found Binding at: " ++ (showGhc l)
@@ -77,9 +77,9 @@ pnUsedInScope pn t' = do
       bind other = do
         mzero
 #if __GLASGOW_HASKELL__ <= 710
-      var ((GHC.HsVar name) :: GHC.HsExpr GHC.Name)
+      var ((GHC.HsVar name) :: GHC.HsExpr GhcRn)
 #else
-      var ((GHC.HsVar (GHC.L _ name)) :: GHC.HsExpr GHC.Name)
+      var ((GHC.HsVar (GHC.L _ name)) :: GHC.HsExpr GhcRn)
 #endif
         | name == pn = do
             logm $ "Found var"

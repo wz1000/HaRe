@@ -205,8 +205,12 @@ module Language.Haskell.Refact.API
 
  -- ** from `Language.Haskell.Refact.Utils.GhcUtils`
     -- ** SYB versions
+    , everywhereM'
     , everywhereButM
 
+    -- * Scrap Your Zipper versions
+    , zopen'
+    , ztransformM
     -- *** SYZ utilities
     , upUntil
     , findAbove

@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 module Language.Haskell.Refact.Refactoring.MaybeToMonadPlus
   (
     maybeToMonadPlus
@@ -14,7 +15,6 @@ import qualified RdrName    as GHC
 import qualified Type       as GHC
 
 import           Data.Generics as SYB
-import           GHC.SYB.Utils as SYB
 
 import           Control.Applicative
 import           Data.Generics.Strafunski.StrategyLib.StrategyLib
@@ -89,7 +89,7 @@ doMaybeToPlus pos argNum = do
 -- true then the refactoring will just consist of replacing all RHS calls to the
 -- Maybe type with their MPlus equivalents. I need some way of checking if the
 -- type
-isOutputType :: Int -> SimpPos -> GHC.HsBind GHC.RdrName -> RefactGhc Bool
+isOutputType :: Int -> SimpPos -> GHC.HsBind GhcPs -> RefactGhc Bool
 isOutputType argNum pos funBind = do
   parsed <- getRefactParsed
   (Just name) <- locToName pos parsed
@@ -113,7 +113,7 @@ replaceConstructors pos funNm argNum = do
   newBind <- applyInGRHSs bind replaceNothingAndJust
   replaceBind pos newBind
   fixType' funNm argNum
-    where applyInGRHSs :: (Data a) => GHC.HsBind GHC.RdrName -> (a -> RefactGhc a) -> RefactGhc (GHC.HsBind GHC.RdrName)
+    where applyInGRHSs :: (Data a) => GHC.HsBind GhcPs -> (a -> RefactGhc a) -> RefactGhc (GHC.HsBind GhcPs)
           applyInGRHSs bind fun = applyTP (stop_tdTP (failTP `adhocTP` (runGRHSFun fun))) bind
 
           runGRHSFun :: (Data a) => (a -> RefactGhc a) -> ParsedGRHSs -> RefactGhc ParsedGRHSs
@@ -132,7 +132,7 @@ replaceConstructors pos funNm argNum = do
                 return returnOcc
             | otherwise = return nm
 
-replaceBind :: SimpPos -> GHC.HsBind GHC.RdrName -> RefactGhc ()
+replaceBind :: SimpPos -> GHC.HsBind GhcPs -> RefactGhc ()
 replaceBind pos newBind = do
   oldParsed <- getRefactParsed
   let rdrNm = locToRdrName pos oldParsed
@@ -144,9 +144,9 @@ replaceBind pos newBind = do
       putRefactParsed newParsed mempty
       addMonadImport
 #if __GLASGOW_HASKELL__ >= 800
-  where worker rNm (funBnd@(GHC.FunBind (GHC.L _ name) _matches _ _ _) :: GHC.HsBind GHC.RdrName)
+  where worker rNm (funBnd@(GHC.FunBind (GHC.L _ name) _matches _ _ _) :: GHC.HsBind GhcPs)
 #else
-  where worker rNm (funBnd@(GHC.FunBind (GHC.L _ name) _ _matches _ _ _) :: GHC.HsBind GHC.RdrName)
+  where worker rNm (funBnd@(GHC.FunBind (GHC.L _ name) _ _matches _ _ _) :: GHC.HsBind GhcPs)
 #endif
           | name == rNm = return newBind
           | otherwise   = return funBnd
@@ -154,8 +154,8 @@ replaceBind pos newBind = do
 
 -- | Handles the case where the function can be rewritten with 'bind'.
 -- i.e. Conversion to a fully general Monad
-doRewriteAsBind :: GHC.HsBind GHC.RdrName -> GHC.Name -> RefactGhc ()
--- doRewriteAsBind :: GHC.HsBind GHC.RdrName -> String -> RefactGhc (GHC.HsBind GHC.RdrName)
+doRewriteAsBind :: GHC.HsBind GhcPs -> GHC.Name -> RefactGhc ()
+-- doRewriteAsBind :: GHC.HsBind GhcPs -> String -> RefactGhc (GHC.HsBind GhcPs)
 doRewriteAsBind bind funNm = do
 #if __GLASGOW_HASKELL__ >= 800
   let matches = GHC.unLoc . GHC.mg_alts . GHC.fun_matches $ bind
@@ -198,7 +198,7 @@ addMonadImport = addSimpleImportDecl "Control.Monad" Nothing
 -- Asumptions made:
 --  Only one LMatch in the match group
 --  Only one variable in LHS
-replaceGRHS :: GHC.Name -> GHC.GRHSs GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> GHC.RdrName -> RefactGhc ()
+replaceGRHS :: GHC.Name -> GHC.GRHSs GhcPs (GHC.LHsExpr GhcPs) -> GHC.RdrName -> RefactGhc ()
 replaceGRHS funNm new_rhs lhs_name = do
   nm <- getRefactNameMap
   parsed <- getRefactParsed
@@ -209,7 +209,7 @@ replaceGRHS funNm new_rhs lhs_name = do
  -- return ()
     where
           -- rdrName = GHC.Unqual $ GHC.mkDataOcc funNm
-          worker :: NameMap ->  GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
+          worker :: NameMap ->  GHC.HsBind GhcPs -> RefactGhc (GHC.HsBind GhcPs)
 #if __GLASGOW_HASKELL__ >= 800
           worker nm fb@(GHC.FunBind ln _ _ _ _)
 #else
@@ -251,7 +251,7 @@ replaceGRHS funNm new_rhs lhs_name = do
 #endif
 
 -- | This creates a GRHS of the form "name >>= expr" and adds the appropriate annotations, returns the GRHSs.
-createBindGRHS :: GHC.RdrName -> GHC.LHsExpr GHC.RdrName -> RefactGhc (GHC.GRHSs GHC.RdrName (GHC.LHsExpr GHC.RdrName))
+createBindGRHS :: GHC.RdrName -> GHC.LHsExpr GhcPs -> RefactGhc (GHC.GRHSs GhcPs (GHC.LHsExpr GhcPs))
 createBindGRHS name lam_par = do
 #if __GLASGOW_HASKELL__ >= 800
   bindL <- locate (GHC.Unqual (GHC.mkDataOcc ">>="))
@@ -297,7 +297,7 @@ justToReturn ast = SYB.everywhere (SYB.mkT worker) ast
 --Takes a single match and returns a tuple containing the grhs and the pattern
 --Assumptions:
   -- Only a single pattern will be returned. Which pattern is returned depends on the behaviour of SYB.something.
-getVarAndRHS :: GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName) -> RefactGhc (GHC.LPat GHC.RdrName, ParsedGRHSs)
+getVarAndRHS :: GHC.Match GhcPs (GHC.LHsExpr GhcPs) -> RefactGhc (GHC.LPat GhcPs, ParsedGRHSs)
 getVarAndRHS match = do
   let (Just pat) = SYB.something (Nothing `SYB.mkQ` varPat) (GHC.m_pats match)
   return (pat , GHC.m_grhss match)
@@ -306,13 +306,13 @@ getVarAndRHS match = do
 
 
 --Looks up the function binding at the given position. Returns nothing if the position does not contain a binding.
-getHsBind :: (Data a) => SimpPos -> String -> a -> Maybe (GHC.HsBind GHC.RdrName)
+getHsBind :: (Data a) => SimpPos -> String -> a -> Maybe (GHC.HsBind GhcPs)
 getHsBind pos funNm a =
   let rdrNm = locToRdrName pos a in
   case rdrNm of
   Nothing -> Nothing
   (Just (GHC.L _ rNm)) -> SYB.everythingStaged SYB.Parser (<|>) Nothing (Nothing `SYB.mkQ` isBind) a
-    where isBind (bnd@(GHC.FunBind (GHC.L _ name) _ _ _ _ _) :: GHC.HsBind GHC.RdrName)
+    where isBind (bnd@(GHC.FunBind (GHC.L _ name) _ _ _ _ _) :: GHC.HsBind GhcPs)
             | name == rNm = (Just bnd)
           isBind _ = Nothing
 -}
@@ -322,8 +322,8 @@ getHsBind pos funNm a =
 -- | This function takes in the name of a function and determines if the binding
 -- contains the case "Nothing = Nothing" If the Nothing to Nothing case is found
 -- then it is removed from the parsed source.
-containsNothingToNothing :: Int -> SimpPos -> GHC.HsBind GHC.RdrName
-                         -> RefactGhc (Maybe (GHC.HsBind GHC.RdrName))
+containsNothingToNothing :: Int -> SimpPos -> GHC.HsBind GhcPs
+                         -> RefactGhc (Maybe (GHC.HsBind GhcPs))
 containsNothingToNothing argNum pos bind = do
   let
       -- bind = gfromJust "containsNothingToNothing" $ getHsBind pos parsed
@@ -356,7 +356,7 @@ containsNothingToNothing argNum pos bind = do
     checkGRHS (GHC.GRHSs [(GHC.L _ (GHC.GRHS _ (GHC.L _ body)))] _)  = isNothingVar body
     checkGRHS _ = False
 
-    checkPats :: [GHC.LPat GHC.RdrName] -> Bool
+    checkPats :: [GHC.LPat GhcPs] -> Bool
     checkPats patLst =
       if argNum <= length patLst
       then let (GHC.L _ pat) = patLst !! (argNum - 1) in
@@ -371,7 +371,7 @@ containsNothingToNothing argNum pos bind = do
     getNewMs (m:ms) lst = let newLst = filterMatch m lst in
       getNewMs ms newLst
 
-    isNothingPat :: GHC.Pat GHC.RdrName -> Bool
+    isNothingPat :: GHC.Pat GhcPs -> Bool
 #if __GLASGOW_HASKELL__ >= 800
     isNothingPat (GHC.VarPat (GHC.L _ nm)) = ((GHC.occNameString . GHC.rdrNameOcc) nm) == "Nothing"
 #else
@@ -379,7 +379,7 @@ containsNothingToNothing argNum pos bind = do
 #endif
     isNothingPat (GHC.ConPatIn (GHC.L _ nm) _) = ((GHC.occNameString . GHC.rdrNameOcc) nm) == "Nothing"
     isNothingPat _ = False
-    isNothingVar :: GHC.HsExpr GHC.RdrName -> Bool
+    isNothingVar :: GHC.HsExpr GhcPs -> Bool
 #if __GLASGOW_HASKELL__ >= 800
     isNothingVar (GHC.HsVar (GHC.L _ nm)) = ((GHC.occNameString . GHC.rdrNameOcc) nm) == "Nothing"
 #else
@@ -388,20 +388,20 @@ containsNothingToNothing argNum pos bind = do
     isNothingVar _ = False
 
 -- Removes the given matches from the given binding. Uses the position to retrieve the rdrName.
-removeMatches :: SimpPos -> GHC.HsBind GHC.RdrName -> [GHC.LMatch GHC.RdrName (GHC.LHsExpr GHC.RdrName)]
+removeMatches :: SimpPos -> GHC.HsBind GhcPs -> [GHC.LMatch GhcPs (GHC.LHsExpr GhcPs)]
               -> RefactGhc ()
 removeMatches pos newBind matches = do
   parsed <- getRefactParsed
   let rdrNm = gfromJust "Couldn't get rdrName in removeMatch" $ locToRdrName pos parsed
-  newParsed <- SYB.everywhereMStaged SYB.Parser (SYB.mkM (replaceBind rdrNm)) parsed
+  newParsed <- SYB.everywhereM (SYB.mkM (replaceBind rdrNm)) parsed
   mapM_ removeAnns matches
   putRefactParsed newParsed mempty
   return ()
-    where replaceBind :: GHC.Located GHC.RdrName -> GHC.HsBind GHC.RdrName -> RefactGhc (GHC.HsBind GHC.RdrName)
+    where replaceBind :: GHC.Located GHC.RdrName -> GHC.HsBind GhcPs -> RefactGhc (GHC.HsBind GhcPs)
 #if __GLASGOW_HASKELL__ >= 800
-          replaceBind rdrNm ((GHC.FunBind name _ _ _ _) :: GHC.HsBind GHC.RdrName)
+          replaceBind rdrNm ((GHC.FunBind name _ _ _ _) :: GHC.HsBind GhcPs)
 #else
-          replaceBind rdrNm ((GHC.FunBind name _ _ _ _ _) :: GHC.HsBind GHC.RdrName)
+          replaceBind rdrNm ((GHC.FunBind name _ _ _ _ _) :: GHC.HsBind GhcPs)
 #endif
             | name == rdrNm = return newBind
           replaceBind _ a = return a
@@ -434,26 +434,28 @@ fixType' funNm argPos = do
   newParsed <- replaceAtLocation sigL newSig
   -- logDataWithAnns "fixType':newParsed" newParsed
   putRefactParsed newParsed mempty
-    where replaceMaybeWithVariable :: GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
+    where replaceMaybeWithVariable :: GHC.Sig GhcPs -> RefactGhc (GHC.Sig GhcPs)
           replaceMaybeWithVariable sig = SYB.everywhereM (SYB.mkM worker) sig
+            where
+                  worker :: GHC.HsType GhcPs -> RefactGhc (GHC.HsType GhcPs)
 #if __GLASGOW_HASKELL__ >= 802
-            where worker tyVar@(GHC.HsTyVar p (GHC.L lv rdrName))
+                  worker tyVar@(GHC.HsTyVar p (GHC.L lv rdrName))
                     | compNames "Maybe" rdrName = let newRdr = (GHC.mkVarUnqual . GHC.fsLit) "m" in
                         return (GHC.HsTyVar p (GHC.L lv newRdr))
                     | otherwise = return tyVar
 #elif __GLASGOW_HASKELL__ >= 800
-            where worker tyVar@(GHC.HsTyVar (GHC.L lv rdrName))
+                  worker tyVar@(GHC.HsTyVar (GHC.L lv rdrName))
                     | compNames "Maybe" rdrName = let newRdr = (GHC.mkVarUnqual . GHC.fsLit) "m" in
                         return (GHC.HsTyVar (GHC.L lv newRdr))
                     | otherwise = return tyVar
 #else
-            where worker tyVar@(GHC.HsTyVar rdrName)
+                  worker tyVar@(GHC.HsTyVar rdrName)
                     | compNames "Maybe" rdrName = let newRdr = (GHC.mkVarUnqual . GHC.fsLit) "m" in
                         return (GHC.HsTyVar newRdr)
                     | otherwise = return tyVar
 #endif
                   worker var = return var
-          fixTypeClass :: GHC.Sig GHC.RdrName -> RefactGhc (GHC.Sig GHC.RdrName)
+          fixTypeClass :: GHC.Sig GhcPs -> RefactGhc (GHC.Sig GhcPs)
 #if __GLASGOW_HASKELL__ >= 802
           fixTypeClass sig@(GHC.TypeSig names (GHC.HsWC wcs (GHC.HsIB a (GHC.L lt hsType) b))) =
             case hsType of
@@ -590,7 +592,7 @@ fixType' funNm argPos = do
                 return (GHC.TypeSig names newForAll p)
 #endif
 
-          genMonadPlusClass :: RefactGhc (GHC.LHsType GHC.RdrName)
+          genMonadPlusClass :: RefactGhc (GHC.LHsType GhcPs)
           genMonadPlusClass = do
             -- let mPlusNm = GHC.mkVarUnqual (GHC.fsLit "MonadPlus")
             --     mNm     = GHC.mkVarUnqual (GHC.fsLit "m")
@@ -649,16 +651,16 @@ fixType funNm = do
   putRefactParsed newParsed anns
   addNewLines 2 newSig
 
-getSigD :: (Data a) => NameMap -> GHC.Name -> a -> Maybe (GHC.LHsDecl GHC.RdrName)
+getSigD :: (Data a) => NameMap -> GHC.Name -> a -> Maybe (GHC.LHsDecl GhcPs)
 getSigD nm funNm = SYB.something (Nothing `SYB.mkQ` isSigD)
   where
-    isSigD :: GHC.LHsDecl GHC.RdrName -> Maybe (GHC.LHsDecl GHC.RdrName)
+    isSigD :: GHC.LHsDecl GhcPs -> Maybe (GHC.LHsDecl GhcPs)
     isSigD s@(GHC.L _ (GHC.SigD sig)) = if isSig sig
                                         then Just s
                                         else Nothing
     isSigD _ = Nothing
 
-    isSig :: GHC.Sig GHC.RdrName -> Bool
+    isSig :: GHC.Sig GhcPs -> Bool
     -- TODO:AZ: what about a shared signature, where the one we care about is not the first one?
 #if __GLASGOW_HASKELL__ >= 800
     isSig sig@(GHC.TypeSig [ln] _) = (sameName nm ln funNm)
@@ -678,38 +680,38 @@ compNames s rdr = let sRdr = (GHC.occNameString . GHC.rdrNameOcc) rdr in
 -- TODO:AZ this should make use of argNum, to make sure it only processes the
 --      param to be refactored.
 -- | Get the type inside the first Maybe the traversal finds.
-getInnerType :: GHC.Sig GHC.RdrName -> Maybe (GHC.LHsType GHC.RdrName)
+getInnerType :: GHC.Sig GhcPs -> Maybe (GHC.LHsType GhcPs)
 getInnerType = SYB.everything (<|>) (Nothing `SYB.mkQ` getTy)
 #if __GLASGOW_HASKELL__ >= 802
-  where getTy :: GHC.HsType GHC.RdrName -> Maybe (GHC.LHsType GHC.RdrName)
+  where getTy :: GHC.HsType GhcPs -> Maybe (GHC.LHsType GhcPs)
         getTy (GHC.HsAppsTy [GHC.L _ (GHC.HsAppPrefix mCon), GHC.L _ (GHC.HsAppPrefix otherTy)])
           = if isMaybeTy mCon
               then Just otherTy
               else Nothing
         getTy _ = Nothing
 
-        isMaybeTy :: GHC.LHsType GHC.RdrName -> Bool
+        isMaybeTy :: GHC.LHsType GhcPs -> Bool
         isMaybeTy (GHC.L _ (GHC.HsTyVar _ (GHC.L _ (GHC.Unqual occNm)))) = (GHC.occNameString occNm) == "Maybe"
         isMaybeTy _ = False
 #elif __GLASGOW_HASKELL__ >= 800
-  where getTy :: GHC.HsType GHC.RdrName -> Maybe (GHC.LHsType GHC.RdrName)
+  where getTy :: GHC.HsType GhcPs -> Maybe (GHC.LHsType GhcPs)
         getTy (GHC.HsAppsTy [GHC.L _ (GHC.HsAppPrefix mCon), GHC.L _ (GHC.HsAppPrefix otherTy)])
           = if isMaybeTy mCon
                                              then Just otherTy
                                              else Nothing
         getTy _ = Nothing
 
-        isMaybeTy :: GHC.LHsType GHC.RdrName -> Bool
+        isMaybeTy :: GHC.LHsType GhcPs -> Bool
         isMaybeTy (GHC.L _ (GHC.HsTyVar (GHC.L _ (GHC.Unqual occNm)))) = (GHC.occNameString occNm) == "Maybe"
         isMaybeTy _ = False
 #else
-  where getTy :: GHC.HsType GHC.RdrName -> Maybe (GHC.LHsType GHC.RdrName)
+  where getTy :: GHC.HsType GhcPs -> Maybe (GHC.LHsType GhcPs)
         getTy (GHC.HsAppTy mCon otherTy) = if isMaybeTy mCon
                                              then Just otherTy
                                              else Nothing
         getTy _ = Nothing
 
-        isMaybeTy :: GHC.LHsType GHC.RdrName -> Bool
+        isMaybeTy :: GHC.LHsType GhcPs -> Bool
         isMaybeTy (GHC.L _ (GHC.HsTyVar (GHC.Unqual occNm))) = (GHC.occNameString occNm) == "Maybe"
         isMaybeTy _ = False
 #endif

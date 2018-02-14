@@ -18,6 +18,7 @@ import Control.Monad
 import Data.Generics.Strafunski.StrategyLib.StrategyLib hiding (liftIO,MonadPlus,mzero)
 import Data.List
 import Language.Haskell.GHC.ExactPrint
+import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Utils
 import Language.Haskell.Refact.API
 import System.Directory
@@ -237,34 +238,45 @@ condChecking2 nm oldPN newName ast = do
            else mzero
 
     -- The name is declared in a function definition.
-#if __GLASGOW_HASKELL__ <= 710
-    inMatch (GHC.Match f@(Just (ln,_)) pats  mtype (GHC.GRHSs rhs ds)
-             ::GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName)) = do
-#elif __GLASGOW_HASKELL__ <= 800
-    inMatch (GHC.Match f@(GHC.FunBindMatch _ln _isInfix) pats  mtype (GHC.GRHSs rhs ds)
-             ::GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName)) = do
-#else
+
+#if __GLASGOW_HASKELL__ >= 804
+    inMatch (GHC.Match f@(GHC.FunRhs _ln _isInfix _s) pats (GHC.GRHSs rhs ds)
+             ::GHC.Match GhcPs (GHC.LHsExpr GhcPs)) = do
+#elif __GLASGOW_HASKELL__ > 800
     inMatch (GHC.Match f@(GHC.FunRhs _ln _isInfix _s) pats  mtype (GHC.GRHSs rhs ds)
-             ::GHC.Match GHC.RdrName (GHC.LHsExpr GHC.RdrName)) = do
+             ::GHC.Match GhcPs (GHC.LHsExpr GhcPs)) = do
+#elif __GLASGOW_HASKELL__ > 710
+    inMatch (GHC.Match f@(GHC.FunBindMatch _ln _isInfix) pats  mtype (GHC.GRHSs rhs ds)
+             ::GHC.Match GhcPs (GHC.LHsExpr GhcPs)) = do
+#else
+    inMatch (GHC.Match f@(Just (ln,_)) pats  mtype (GHC.GRHSs rhs ds)
+             ::GHC.Match GhcPs (GHC.LHsExpr GhcPs)) = do
 #endif
       isDeclaredPats <- isDeclaredBy pats
       isDeclaredDs   <- isDeclaredBy ds
       logm $ "Renaming.condChecking2.inMatch:isDeclared=" ++ show (isDeclaredPats,isDeclaredDs)
       if isDeclaredPats
+#if __GLASGOW_HASKELL__ >= 804
+        then condChecking' (GHC.Match f pats (GHC.GRHSs rhs ds))
+        else if isDeclaredDs
+          then condChecking' (GHC.Match f [] (GHC.GRHSs rhs ds))
+          else mzero
+#else
         then condChecking' (GHC.Match f pats mtype (GHC.GRHSs rhs ds))
         else if isDeclaredDs
           then condChecking' (GHC.Match f []  mtype (GHC.GRHSs rhs ds))
           else mzero
+#endif
     inMatch _ = mzero
 
     -- The name is declared in a expression.
-    inExp expr@((GHC.L _ (GHC.HsLet ds _e)):: GHC.LHsExpr GHC.RdrName) = do
+    inExp expr@((GHC.L _ (GHC.HsLet ds _e)):: GHC.LHsExpr GhcPs) = do
       isDeclaredDs   <- isDeclaredBy ds
       -- logm $ "inExp.HsLet:isDeclaredDs=" ++ show isDeclaredDs
       if isDeclaredDs
         then condChecking' expr
         else mzero
-    inExp expr@((GHC.L _ (GHC.HsDo _ ds _e)):: GHC.LHsExpr GHC.RdrName) = do
+    inExp expr@((GHC.L _ (GHC.HsDo _ ds _e)):: GHC.LHsExpr GhcPs) = do
       isDeclared   <- isDeclaredBy ds
       -- logDataWithAnns "inExp.HsDo:expr" expr
       logm $ "inExp.HsDo:isDeclared=" ++ show isDeclared
@@ -292,14 +304,14 @@ condChecking2 nm oldPN newName ast = do
 
 -}
 
-    inStmts (stmt@(GHC.L _ (GHC.LetStmt binds)) :: GHC.LStmt GHC.RdrName (GHC.LHsExpr GHC.RdrName)) = do
+    inStmts (stmt@(GHC.L _ (GHC.LetStmt binds)) :: GHC.LStmt GhcPs (GHC.LHsExpr GhcPs)) = do
       isDeclared   <- isDeclaredBy binds
       if isDeclared
         then condChecking' stmt
         else mzero
     inStmts _ = mzero
 
-    inDataDefn dd@(GHC.HsDataDefn _ _ctxt _mctype _mkindsig cons _derivs :: GHC.HsDataDefn GHC.RdrName) = do
+    inDataDefn dd@(GHC.HsDataDefn _ _ctxt _mctype _mkindsig cons _derivs :: GHC.HsDataDefn GhcPs) = do
       declared <- isDeclaredBy cons
       if declared
         then condChecking' dd
@@ -308,7 +320,7 @@ condChecking2 nm oldPN newName ast = do
     -- The name is declared in a ConDecl
 #if __GLASGOW_HASKELL__ <= 710
     inConDecl (cd@(GHC.ConDecl ns _expr (GHC.HsQTvs _ns bndrs) ctxt
-                               dets res _ depc_syntax) :: GHC.ConDecl GHC.RdrName ) =
+                               dets res _ depc_syntax) :: GHC.ConDecl GhcPs ) =
       case res of
         GHC.ResTyGADT ls typ -> do
           declared <- isDeclaredBy ns
@@ -322,7 +334,7 @@ condChecking2 nm oldPN newName ast = do
             then condChecking' cd
             else mzero
 #else
-    inConDecl cd@(GHC.ConDeclGADT ns _ _ :: GHC.ConDecl GHC.RdrName) = do
+    inConDecl cd@(GHC.ConDeclGADT ns _ _ :: GHC.ConDecl GhcPs) = do
       declared <- isDeclaredBy ns
       -- TODO: what about condChecking' ?
       if declared
@@ -338,11 +350,11 @@ condChecking2 nm oldPN newName ast = do
 
 
 #if __GLASGOW_HASKELL__ <= 710
-    inTyClDecl dd@(GHC.DataDecl ln (GHC.HsQTvs _ns tyvars) defn _ :: GHC.TyClDecl GHC.RdrName) = do
+    inTyClDecl dd@(GHC.DataDecl ln (GHC.HsQTvs _ns tyvars) defn _ :: GHC.TyClDecl GhcPs) = do
 #elif __GLASGOW_HASKELL__ <= 800
-    inTyClDecl dd@(GHC.DataDecl _ln tyvars _defn _ _ :: GHC.TyClDecl GHC.RdrName) = do
+    inTyClDecl dd@(GHC.DataDecl _ln tyvars _defn _ _ :: GHC.TyClDecl GhcPs) = do
 #else
-    inTyClDecl dd@(GHC.DataDecl _ln tyvars _fixity _defn _ _ :: GHC.TyClDecl GHC.RdrName) = do
+    inTyClDecl dd@(GHC.DataDecl _ln tyvars _fixity _defn _ _ :: GHC.TyClDecl GhcPs) = do
 #endif
       declared <- isDeclaredBy dd
       declaredtv <- isDeclaredBy tyvars
