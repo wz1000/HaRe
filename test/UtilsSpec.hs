@@ -655,7 +655,11 @@ spec = do
         parseSourceFileGhc "./TypeUtils/B.hs"
 
         g <- GHC.getModuleGraph
+#if __GLASGOW_HASKELL__ >= 804
+        gs <- mapM GHC.showModule $ GHC.mgModSummaries g
+#else
         gs <- mapM GHC.showModule g
+#endif
 
         put (s {rsUniqState = 100})
         return (show gs)
@@ -672,7 +676,11 @@ spec = do
         parseSourceFileGhc "./TypeUtils/B.hs"
 
         g <- GHC.getModuleGraph
+#if __GLASGOW_HASKELL__ >= 804
+        gs <- mapM GHC.showModule $ GHC.mgModSummaries g
+#else
         gs <- mapM GHC.showModule g
+#endif
 
         put (s {rsUniqState = 100})
         return (gs)

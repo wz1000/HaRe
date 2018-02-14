@@ -377,7 +377,7 @@ parseDeclToAnnotated ::
                  -> FilePath
                  -- -> (GHC.DynFlags -> FilePath -> String -> Either a (Anns, GHC.Located ast))
                  -> String
-                 -> (GHC.LHsDecl GHC.RdrName, Anns)
+                 -> (GHC.LHsDecl GhcPs, Anns)
 parseDeclToAnnotated df fp src = (ast,anns)
   where
     (anns, ast) = case (parseDecl df fp src) of
@@ -392,7 +392,7 @@ ss2span ss = (ss2pos ss,ss2posEnd ss)
 -- ---------------------------------------------------------------------
 
 -- | call ghc-excactprint hsDecls in a Transform context
-getHsDecls :: (HasDecls t) => t -> [GHC.LHsDecl GHC.RdrName]
+getHsDecls :: (HasDecls t) => t -> [GHC.LHsDecl GhcPs]
 getHsDecls t = decls
   where
     -- runTransform :: Anns -> Transform a -> (a, (Anns, Int), [String])

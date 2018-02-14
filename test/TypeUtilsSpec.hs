@@ -5,8 +5,6 @@ import           Test.Hspec
 
 import           TestUtils
 
-import qualified GHC.SYB.Utils         as SYB
-
 import qualified GHC        as GHC
 import qualified GhcMonad   as GHC
 import qualified Name       as GHC
@@ -449,7 +447,7 @@ spec = do
       t <- ct $ parsedFileGhc "./TypeUtils/TyClDecls.hs"
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
-      -- putStrLn $ "parsed:" ++ SYB.showData SYB.Parser 0 parsed
+      -- putStrLn $ "parsed:" ++ showAnnData mempty 0 parsed
 
       let Just n = locToNamePure nm (7,14) parsed
       let res = definingTyClDeclsNames nm [n] parsed
@@ -546,7 +544,7 @@ spec = do
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
-      -- putStrLn $ "parsed:\n" ++ SYB.showData SYB.Parser 0 parsed
+      -- putStrLn $ "parsed:\n" ++ showAnnData mempty 0 parsed
       let Just tup = getName "DupDef.Dd1.tup" renamed
       (showGhcQual tup) `shouldBe` "DupDef.Dd1.tup"
       isFunOrPatName nm tup parsed  `shouldBe` True
@@ -646,7 +644,7 @@ spec = do
 
     it "finds free and declared in a single bind PrefixCon" $ do
       t <- ct $ parsedFileGhc "./FreeAndDeclared/Declare.hs"
-      -- (SYB.showData SYB.Renamer 0 renamed) `shouldBe` ""
+      -- (showAnnData mempty 0 renamed) `shouldBe` ""
 
       let
         comp = do
@@ -659,7 +657,7 @@ spec = do
 
 
       (showGhcQual bb) `shouldBe` "unD (B y) = y"
-      -- (SYB.showData SYB.Renamer 0 bb) `shouldBe` ""
+      -- (showAnnData mempty 0 bb) `shouldBe` ""
 
       -- Free Vars
       (showGhcQual $ map (\n -> (n, getGhcLoc $ GHC.nameSrcSpan n)) (fst resg)) `shouldBe`
@@ -684,7 +682,7 @@ spec = do
       ((bb,resg),_s) <- runRefactGhc comp (initialState { rsModule = initRefactModule [] t }) testOptions
 
       (showGhcQual bb) `shouldBe` "unF (a :| b) = (a, b)"
-      -- (SYB.showData SYB.Renamer 0 bb) `shouldBe` ""
+      -- (showAnnData mempty 0 bb) `shouldBe` ""
 
       -- Free Vars
       (showGhcQual $ map (\n -> (n, getGhcLoc $ GHC.nameSrcSpan n)) (fst resg)) `shouldBe`
@@ -710,7 +708,7 @@ spec = do
 
 
       (showGhcQual bb) `shouldBe` "unR2 (RCon {r1 = a}) = a"
-      -- (SYB.showData SYB.Renamer 0 bb) `shouldBe` ""
+      -- (showAnnData mempty 0 bb) `shouldBe` ""
 
       -- Free Vars
       (showGhcQual $ map (\n -> (n, getGhcLoc $ GHC.nameSrcSpan n)) (fst resg)) `shouldBe`
@@ -742,7 +740,7 @@ spec = do
       (showGhcQual bb) `shouldBe` "data Point\n  = Pt {pointx, pointy :: Float}\n  deriving (Show)"
 #endif
 
-      -- (SYB.showData SYB.Renamer 0 bb) `shouldBe` ""
+      -- (showAnnData mempty 0 bb) `shouldBe` ""
 
       -- Free Vars
       (showGhcQual $ map (\n -> (n, getGhcLoc $ GHC.nameSrcSpan n)) (fst resg)) `shouldBe`
@@ -774,7 +772,7 @@ spec = do
 
       (showGhcQual bb) `shouldBe` "data Tree a = Leaf a | Branch (Tree a) (Tree a)"
 
-      -- (SYB.showData SYB.Renamer 0 bb) `shouldBe` ""
+      -- (showAnnData mempty 0 bb) `shouldBe` ""
 
       -- Free Vars
       (showGhcQual $ map (\n -> (n, getGhcLoc $ GHC.nameSrcSpan n)) (fst resg)) `shouldBe`
@@ -805,7 +803,7 @@ spec = do
 
       (showGhcQual bb) `shouldBe` "class SameOrNot c where\n  isSame :: c -> c -> Bool\n  isNotSame :: c -> c -> Bool"
 
-      -- (SYB.showData SYB.Renamer 0 bb) `shouldBe` ""
+      -- (showAnnData mempty 0 bb) `shouldBe` ""
 
       -- Free Vars
       (showGhcQual $ map (\n -> (n, getGhcLoc $ GHC.nameSrcSpan n)) (fst resg)) `shouldBe`
@@ -854,7 +852,7 @@ spec = do
       ((res,d),_s) <- runRefactGhc comp (initialState { rsModule = initRefactModule [] t }) testOptions
 
       (showGhcQual d) `shouldBe` "ff y\n  = y + zz\n  where\n      zz = 1"
-      -- (SYB.showData SYB.Renamer 0 d) `shouldBe` ""
+      -- (showAnnData mempty 0 d) `shouldBe` ""
 
       -- Free Vars
       (showGhcQual $ map (\n -> (n, getGhcLoc $ GHC.nameSrcSpan n)) (fst res)) `shouldBe`
@@ -927,7 +925,11 @@ spec = do
 #else
           let (GHC.L _ (GHC.ValD (GHC.FunBind _ (GHC.MG (GHC.L _ [match]) _ _ _) _ _ _))) = decl
 #endif
+#if __GLASGOW_HASKELL__ >= 804
+          let (GHC.L _ (GHC.Match _ _pat grhss)) = match
+#else
           let (GHC.L _ (GHC.Match _ _pat _ grhss)) = match
+#endif
 
           r <- hsFreeAndDeclaredPNs grhss
           return r
@@ -980,7 +982,7 @@ spec = do
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
-      let Just tl1  = locToExp (4,13) (4,40) parsed :: (Maybe (GHC.Located (GHC.HsExpr GHC.RdrName)))
+      let Just tl1  = locToExp (4,13) (4,40) parsed :: (Maybe (GHC.Located (GHC.HsExpr GhcPs)))
       let Just tup = getName "DupDef.Dd1.tup" renamed
       let
         comp = do
@@ -1000,7 +1002,7 @@ spec = do
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
-      let Just tl1  = locToExp (28,4) (28,12) parsed :: (Maybe (GHC.LHsExpr GHC.RdrName))
+      let Just tl1  = locToExp (28,4) (28,12) parsed :: (Maybe (GHC.LHsExpr GhcPs))
       (showGhcQual tl1) `shouldBe` "ll + z"
 
       let Just tup = getName "DupDef.Dd1.l" renamed
@@ -1026,10 +1028,10 @@ spec = do
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
-      let Just tl1  = locToExp (28,4) (28,12) parsed :: (Maybe (GHC.LHsExpr GHC.RdrName))
+      let Just tl1  = locToExp (28,4) (28,12) parsed :: (Maybe (GHC.LHsExpr GhcPs))
       (showGhcQual tl1) `shouldBe` "ll + z"
 
-      let Just rhs  = locToExp (26,1) (28,12) parsed :: (Maybe (GHC.LHsExpr GHC.RdrName))
+      let Just rhs  = locToExp (26,1) (28,12) parsed :: (Maybe (GHC.LHsExpr GhcPs))
       (showGhcQual rhs) `shouldBe` "let ll = 34 in ll + z"
 
       let
@@ -1049,7 +1051,7 @@ spec = do
       let renamed = tmRenamedSource t
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
-      let Just e  = locToExp (5,11) (5,19) parsed :: (Maybe (GHC.LHsExpr GHC.RdrName))
+      let Just e  = locToExp (5,11) (5,19) parsed :: (Maybe (GHC.LHsExpr GhcPs))
       (showGhcQual e) `shouldBe` "a + b"
 
       let Just n = getName "Visible.Simple.params" renamed
@@ -1074,9 +1076,9 @@ spec = do
       t <- ct $ parsedFileGhc "./Visible/Simple.hs"
       let renamed = tmRenamedSource t
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
-      -- (SYB.showData SYB.Renamer 0 renamed) `shouldBe` ""
+      -- (showAnnData mempty 0 renamed) `shouldBe` ""
 
-      let Just e   = locToExp (9,15) (9,17) parsed  :: (Maybe (GHC.LHsExpr GHC.RdrName))
+      let Just e   = locToExp (9,15) (9,17) parsed  :: (Maybe (GHC.LHsExpr GhcPs))
       (showGhcQual e) `shouldBe` "x"
 
       let Just n = getName "Visible.Simple.param2" renamed
@@ -1099,13 +1101,13 @@ spec = do
       t <- ct $ parsedFileGhc "./Renaming/IdIn5.hs"
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
-      let Just rhs  = locToExp (17,6) (18,14) parsed  :: (Maybe (GHC.LHsExpr GHC.RdrName))
+      let Just rhs  = locToExp (17,6) (18,14) parsed  :: (Maybe (GHC.LHsExpr GhcPs))
       (showGhcQual rhs) `shouldBe` "x + y + z"
 
       -- let Just er = getName "IdIn5.x" renamed
       let Just e  = locToRdrName (17,7) parsed
       (showGhcQual e) `shouldBe` "x"
-      (SYB.showData SYB.Parser 0 e) `shouldBe` "\n(L {Renaming/IdIn5.hs:17:7} \n (Unqual {OccName: x}))"
+      (showAnnData mempty 0 e) `shouldBe` "\n(L {Renaming/IdIn5.hs:17:7} \n (Unqual {OccName: x}))"
 
       let
         comp = do
@@ -1127,7 +1129,7 @@ spec = do
 
       let Just ln = locToRdrName (6, 6) parsed
       (showGhcQual ln) `shouldBe` "Tree"
-      (SYB.showData SYB.Parser 0 ln) `shouldBe` "\n(L {Renaming/D1.hs:6:6-9} \n (Unqual {OccName: Tree}))"
+      (showAnnData mempty 0 ln) `shouldBe` "\n(L {Renaming/D1.hs:6:6-9} \n (Unqual {OccName: Tree}))"
 
       let
         comp = do
@@ -1167,7 +1169,7 @@ spec = do
 
       let Just ln = locToRdrName (13, 1) parsed
       (showGhcQual ln) `shouldBe` "x"
-      (SYB.showData SYB.Parser 0 ln) `shouldBe` "\n(L {Renaming/IdIn5.hs:13:1} \n (Unqual {OccName: x}))"
+      (showAnnData mempty 0 ln) `shouldBe` "\n(L {Renaming/IdIn5.hs:13:1} \n (Unqual {OccName: x}))"
 
       let
         comp = do
@@ -1194,7 +1196,7 @@ spec = do
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
-      let Just e  = locToExp (5,11) (5,19) parsed :: (Maybe (GHC.Located (GHC.HsExpr GHC.RdrName)))
+      let Just e  = locToExp (5,11) (5,19) parsed :: (Maybe (GHC.Located (GHC.HsExpr GhcPs)))
       (showGhcQual e) `shouldBe` "a + b"
 
       let Just n = getName "Visible.Simple.params" renamed
@@ -1218,7 +1220,7 @@ spec = do
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
 
-      let Just e  = locToExp (9,15) (9,17) parsed :: Maybe (GHC.LHsExpr GHC.RdrName)
+      let Just e  = locToExp (9,15) (9,17) parsed :: Maybe (GHC.LHsExpr GhcPs)
       (showGhcQual e) `shouldBe` "x"
 
       let Just n = getName "Visible.Simple.param2" renamed
@@ -1232,7 +1234,11 @@ spec = do
 #else
           let (GHC.L _ (GHC.ValD (GHC.FunBind _ (GHC.MG (GHC.L _ matches) _ _ _) _ _ _))) = decl
 #endif
+#if __GLASGOW_HASKELL__ >= 804
+          let [(GHC.L _ (GHC.Match _ pats _))] = matches
+#else
           let [(GHC.L _ (GHC.Match _ pats _ _))] = matches
+#endif
           let lpat = head pats
           logDataWithAnns "lpat" lpat
 
@@ -1285,7 +1291,11 @@ spec = do
 #else
           let (GHC.L _ (GHC.ValD (GHC.FunBind _ (GHC.MG (GHC.L _ [match]) _ _ _) _ _ _))) = decl
 #endif
+#if __GLASGOW_HASKELL__ >= 804
+          let (GHC.L _ (GHC.Match _ _pats binds)) = match
+#else
           let (GHC.L _ (GHC.Match _ _pats _rhs binds)) = match
+#endif
 
           logDataWithAnns "binds" binds
           let fds' = hsFreeAndDeclaredRdr nm binds
@@ -1462,7 +1472,7 @@ spec = do
          parsed <- getRefactParsed
          nm <- getRefactNameMap
 
-         logm $ "renamed=" ++ (SYB.showData SYB.Renamer 0 renamed) -- ++AZ++
+         logm $ "renamed=" ++ (showAnnData mempty 0 renamed) -- ++AZ++
 
          ctx <- GHC.getContext
 
@@ -1509,7 +1519,7 @@ spec = do
 #else
       (showGhcQual $ GHC.nameModule n3) `shouldBe` "main@main:DupDef.Dd1"
 #endif
-      (SYB.showData SYB.Renamer 0 n3) `shouldBe` "{Name: baz}"
+      (showAnnData mempty 0 n3) `shouldBe` "{Name: baz}"
       GHC.getOccString n3 `shouldBe` "baz"
       showGhcQual n3 `shouldBe` "DupDef.Dd1.baz"
       (showGhcQual $ GHC.nameUnique n1) `shouldBe` "H2"
@@ -1734,7 +1744,7 @@ spec = do
           nm = initRdrNameMap t
 
       let Just n = locToNamePure nm (5, 36) parsed
-      let Just e  = locToExp (5,23) (5,47) parsed :: Maybe (GHC.Located (GHC.HsExpr GHC.RdrName))
+      let Just e  = locToExp (5,23) (5,47) parsed :: Maybe (GHC.Located (GHC.HsExpr GhcPs))
       let
         comp = do
          let newName1 = mkRdrName "baz"
@@ -1877,7 +1887,7 @@ spec = do
       t <- ct $ parsedFileGhc "./RmDecl4.hs"
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
-      -- (SYB.showData SYB.Renamer 0 renamed) `shouldBe` ""
+      -- (showAnnData mempty 0 renamed) `shouldBe` ""
 
       let Just n = locToNamePure nm (7, 5) parsed
       let
@@ -1899,7 +1909,7 @@ spec = do
       t <- ct $ parsedFileGhc "./Demote/LetIn1.hs"
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
           nm = initRdrNameMap t
-      -- (SYB.showData SYB.Renamer 0 renamed) `shouldBe` ""
+      -- (showAnnData mempty 0 renamed) `shouldBe` ""
 
       let Just n = locToNamePure nm (12, 22) parsed
       let
@@ -2655,7 +2665,7 @@ spec = do
       let Just n = locToNamePure nm (20, 1) parsed
       let
         comp = do
-         -- logm $ "renamed:" ++ (SYB.showData SYB.Renamer 0 renamed)
+         -- logm $ "renamed:" ++ (showAnnData mempty 0 renamed)
          logDataWithAnns "parsed" parsed
          newName <- mkNewGhcName (Just modu) "newPoint"
          new <- renamePN n newName Qualify parsed
@@ -2786,7 +2796,7 @@ spec = do
       let Just n = locToNamePure nm (8, 7) parsed
       let
         comp = do
-         logm $ "renamed:" ++ (SYB.showData SYB.Renamer 0 renamed)
+         logm $ "renamed:" ++ (showAnnData mempty 0 renamed)
 
          newName <- mkNewGhcName Nothing "ls"
          new <- renamePN n newName PreserveQualify parsed
@@ -2819,7 +2829,7 @@ spec = do
       let Just n = locToNamePure nm (8, 7) parsed
       let
         comp = do
-         logm $ "renamed:" ++ (SYB.showData SYB.Renamer 0 renamed)
+         logm $ "renamed:" ++ (showAnnData mempty 0 renamed)
 
          newName <- mkNewGhcName Nothing "listlonger"
          new <- renamePN n newName PreserveQualify parsed
@@ -2850,7 +2860,7 @@ spec = do
       let Just n = locToNamePure nm (7, 8) parsed
       let
         comp = do
-         logm $ "renamed:" ++ (SYB.showData SYB.Renamer 0 renamed)
+         logm $ "renamed:" ++ (showAnnData mempty 0 renamed)
 
          newName <- mkNewGhcName Nothing "io"
          new <- renamePN n newName PreserveQualify parsed
@@ -2882,7 +2892,7 @@ spec = do
       let Just n = locToNamePure nm (7, 8) parsed
       let
         comp = do
-         logm $ "renamed:" ++ (SYB.showData SYB.Renamer 0 renamed)
+         logm $ "renamed:" ++ (showAnnData mempty 0 renamed)
 
          newName <- mkNewGhcName Nothing "ioFunLong"
          new <- renamePN n newName PreserveQualify parsed
@@ -2912,7 +2922,7 @@ spec = do
       let Just n = locToNamePure nm (7, 17) parsed
       let
         comp = do
-         logm $ "renamed:" ++ (SYB.showData SYB.Renamer 0 renamed)
+         logm $ "renamed:" ++ (showAnnData mempty 0 renamed)
 
          newName <- mkNewGhcName Nothing "q"
          new <- renamePN n newName PreserveQualify parsed
@@ -2939,7 +2949,7 @@ spec = do
       let Just n = locToNamePure nm (7, 17) parsed
       let
         comp = do
-         -- logm $ "renamed:" ++ (SYB.showData SYB.Renamer 0 renamed)
+         -- logm $ "renamed:" ++ (showAnnData mempty 0 renamed)
          logParsedSource "parsed"
 
          newName <- mkNewGhcName Nothing "square"
@@ -2967,7 +2977,7 @@ spec = do
       let Just n = locToNamePure nm (6, 6) parsed
       let
         comp = do
-         logm $ "renamed:" ++ (SYB.showData SYB.Renamer 0 renamed)
+         logm $ "renamed:" ++ (showAnnData mempty 0 renamed)
 
          newName <- mkNewGhcName Nothing "x"
          new <- renamePN n newName PreserveQualify parsed
@@ -2993,7 +3003,7 @@ spec = do
       let Just n = locToNamePure nm (6, 6) parsed
       let
         comp = do
-         logm $ "renamed:" ++ (SYB.showData SYB.Renamer 0 renamed)
+         logm $ "renamed:" ++ (showAnnData mempty 0 renamed)
 
          newName <- mkNewGhcName Nothing "xxxlong"
          -- new <- renamePN n newName False renamed
@@ -3022,7 +3032,7 @@ spec = do
       let Just n = locToNamePure nm (7, 6) parsed
       let
         comp = do
-         logm $ "renamed:" ++ (SYB.showData SYB.Renamer 0 renamed)
+         logm $ "renamed:" ++ (showAnnData mempty 0 renamed)
 
          newName <- mkNewGhcName Nothing "xxxlong"
          new <- renamePN n newName PreserveQualify parsed
@@ -3049,7 +3059,7 @@ spec = do
       let Just n = locToNamePure nm (6, 24) parsed
       let
         comp = do
-         logm $ "parsed:" ++ (SYB.showData SYB.Parser 0 parsed)
+         logm $ "parsed:" ++ (showAnnData mempty 0 parsed)
          renamed <- getRefactRenamed
          logDataWithAnns "renamed:\n" renamed
 
@@ -3059,7 +3069,7 @@ spec = do
 
          logm $ "nm:" ++ (showGhc nm)
          putRefactParsed new emptyAnns
-         logm $ "parsed:after" ++ (SYB.showData SYB.Parser 0 new)
+         logm $ "parsed:after" ++ (showAnnData mempty 0 new)
 
          return (new,newName)
 
@@ -3081,13 +3091,13 @@ spec = do
       let Just n = locToNamePure nm (10, 10) parsed
       let
         comp = do
-         logm $ "parsed:" ++ (SYB.showData SYB.Parser 0 parsed)
+         logm $ "parsed:" ++ (showAnnData mempty 0 parsed)
 
          newName <- mkNewGhcName Nothing "foo1"
          new <- renamePN n newName PreserveQualify parsed
 
          putRefactParsed new emptyAnns
-         logm $ "parsed:after" ++ (SYB.showData SYB.Parser 0 new)
+         logm $ "parsed:after" ++ (showAnnData mempty 0 new)
 
          return (new,newName)
 
@@ -3107,13 +3117,13 @@ spec = do
       let Just n = locToNamePure nm (13, 5) parsed
       let
         comp = do
-         logm $ "parsed:" ++ (SYB.showData SYB.Parser 0 parsed)
+         logm $ "parsed:" ++ (showAnnData mempty 0 parsed)
 
          newName <- mkNewGhcName Nothing "isSameOrNot"
          new <- renamePN n newName PreserveQualify parsed
 
          putRefactParsed new emptyAnns
-         logm $ "parsed:after" ++ (SYB.showData SYB.Parser 0 new)
+         logm $ "parsed:after" ++ (showAnnData mempty 0 new)
 
          return (new,newName)
 
