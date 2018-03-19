@@ -14,7 +14,7 @@ packages:
 - location:
     # ../cabal-helper
     # git: https://github.com/alanz/cabal-helper.git
-    git: https://gitlab.com/dxld/cabal-helper.git
+    git: https://gitlab.com/alanz/cabal-helper.git
     commit: e241fbb049c5e7ac9ab8402b3dfdd3fb5999eada
   extra-dep: true
 
