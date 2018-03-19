@@ -2,20 +2,20 @@ resolver: lts-10.2
 packages:
 - .
 - location:
-    # git: https://github.com/alanz/ghc-mod.git
+    git: https://github.com/alanz/ghc-mod.git
     # git: https://gitlab.com/alanz/ghc-mod.git
-    # commit: b4c3d814bd6902a7893ef399a800366a9fa5ef91
-    ../ghc-mod
+    commit: 9172e32fe85c5e8a2b77fd09f5df5f1c6432f39d
+    # ../ghc-mod
   extra-dep: true
   subdirs:
     # - .
     - core
 
 - location:
-    ../cabal-helper
+    # ../cabal-helper
     # git: https://github.com/alanz/cabal-helper.git
-    # git: https://gitlab.com/dxld/cabal-helper.git
-    # commit: 254539518d3950ed6be661dd65e7452f51021121
+    git: https://gitlab.com/dxld/cabal-helper.git
+    commit: e241fbb049c5e7ac9ab8402b3dfdd3fb5999eada
   extra-dep: true
 
 extra-deps:
