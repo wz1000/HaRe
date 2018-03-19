@@ -1,0 +1,30 @@
+resolver: lts-10.2
+packages:
+- .
+- location:
+    # git: https://github.com/alanz/ghc-mod.git
+    # git: https://gitlab.com/alanz/ghc-mod.git
+    # commit: b4c3d814bd6902a7893ef399a800366a9fa5ef91
+    ../ghc-mod
+  extra-dep: true
+  subdirs:
+    # - .
+    - core
+
+- location:
+    ../cabal-helper
+    # git: https://github.com/alanz/cabal-helper.git
+    # git: https://gitlab.com/dxld/cabal-helper.git
+    # commit: 254539518d3950ed6be661dd65e7452f51021121
+  extra-dep: true
+
+extra-deps:
+# - cabal-helper-0.8.0.0
+- syz-0.2.0.0
+- unix-compat-0.4.3.1
+# For the tests
+- conversion-1.2.1
+- conversion-bytestring-1.0.1
+- conversion-case-insensitive-1.0.0.0
+- conversion-text-1.0.1
+- syb-0.7
