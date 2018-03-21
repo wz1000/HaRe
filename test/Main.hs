@@ -44,7 +44,11 @@ stackFiles =
 -- not be able to load the files
 resolver :: String
 resolver =
-#if (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,2,2,0)))
+#if (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,4,1,0)))
+  "resolver: ghc-8.4.1\n" ++
+  "compiler: ghc-8.4.1\n" ++
+  "compiler-check: match-exact"
+#elif (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,2,2,0)))
   "resolver: lts-10.2"
 #elif __GLASGOW_HASKELL__ >= 802
   "resolver: nightly-2017-09-02"
@@ -68,6 +72,16 @@ stackFileContents = unlines
   , "- conversion-case-insensitive-1.0.0.0"
   , "- conversion-text-1.0.1"
   , "- syb-0.7"
+#if (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,4,1,0)))
+  , "- Cabal-2.2.0.0"
+  , "- attoparsec-0.13.2.2"
+  , "- base-prelude-1.2.0.1"
+  , "- case-insensitive-1.2.0.10"
+  , "- hashable-1.2.7.0"
+  , "- scientific-0.3.5.2"
+  , "- integer-logarithms-1.0.2.1"
+  , "- primitive-0.6.3.0"
+#endif
   ]
 {-
 stackFileContents :: String

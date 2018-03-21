@@ -58,7 +58,7 @@ module Language.Haskell.Refact.Utils.Variables
 import Control.Monad.State
 import Data.List
 import Data.Maybe
-import Data.Monoid
+-- import Data.Monoid
 
 import Language.Haskell.Refact.Utils.GhcVersionSpecific
 import Language.Haskell.Refact.Utils.LocUtils
@@ -1541,7 +1541,7 @@ hsVisibleDsRdr nm e t = do
       | findNameInRdr nm e dfaminsts  = hsVisibleDsRdr nm e dfaminsts
       | otherwise = return (DN [])
 #if __GLASGOW_HASKELL__ >= 804
-    instdecl (GHC.L _ (GHC.DataFamInstD (GHC.DataFamInstDecl (GHC.HsIB _ (GHC.FamEqn ln pats fixity defn ) _ ))))
+    instdecl (GHC.L _ (GHC.DataFamInstD (GHC.DataFamInstDecl (GHC.HsIB _ (GHC.FamEqn _ln pats _fixity defn ) _ ))))
 #elif __GLASGOW_HASKELL__ > 800
     instdecl (GHC.L _ (GHC.DataFamInstD (GHC.DataFamInstDecl _ln pats _fixity defn _)))
 #else

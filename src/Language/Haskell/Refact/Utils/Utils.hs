@@ -61,9 +61,6 @@ import Language.Haskell.Refact.Utils.Types
 import System.Directory
 import System.FilePath.Posix
 
-#if __GLASGOW_HASKELL__ >= 804
-import qualified GhcMake       as GHC
-#endif
 import qualified Digraph       as GHC
 import qualified GHC           as GHC
 

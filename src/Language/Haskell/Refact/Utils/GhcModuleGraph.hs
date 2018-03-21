@@ -83,10 +83,9 @@ getModulesAsGraph drop_hs_boot_nodes summaries mb_root_mod
 
 -- ---------------------------------------------------------------------
 
-summaryNodeKey :: SummaryNode -> Int
 #if __GLASGOW_HASKELL__ >= 804
-summaryNodeKey (DigraphNode _ k _) = k
 #else
+summaryNodeKey :: SummaryNode -> Int
 summaryNodeKey (_, k, _) = k
 #endif
 
@@ -97,6 +96,7 @@ summaryNodeSummary (DigraphNode s _ _) = s
 summaryNodeSummary (s, _, _) = s
 #endif
 
+#if 0
 -- This bit is from the GHC source >>>>>>>
 #if __GLASGOW_HASKELL__ >= 804
 #else
@@ -219,12 +219,6 @@ home_imps imps = [ ideclName i |  L _ i <- imps, isLocal (ideclPkgQual i) ]
   where isLocal Nothing = True
         isLocal (Just pkg) | pkg == fsLit "this" = True -- "this" is special
         isLocal _ = False
-#endif
-
-{-
-ms_home_allimps :: ModSummary -> [ModuleName]
-ms_home_allimps ms = map unLoc (ms_home_srcimps ms ++ ms_home_imps ms)
--}
 
 ms_home_srcimps :: ModSummary -> [Located ModuleName]
 #if __GLASGOW_HASKELL__ <= 710
@@ -240,6 +234,8 @@ ms_home_imps = home_imps . ms_imps
 ms_home_imps ms = map snd $ ms_imps ms
 #endif
 
+#endif
 -- GHC source end
 
+#endif
 #endif

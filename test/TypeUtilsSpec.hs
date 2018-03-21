@@ -1107,7 +1107,8 @@ spec = do
       -- let Just er = getName "IdIn5.x" renamed
       let Just e  = locToRdrName (17,7) parsed
       (showGhcQual e) `shouldBe` "x"
-      (showAnnData mempty 0 e) `shouldBe` "\n(L {Renaming/IdIn5.hs:17:7} \n (Unqual {OccName: x}))"
+      -- (showAnnData mempty 0 e) `shouldBe` "\n(L {Renaming/IdIn5.hs:17:7} \n (Unqual {OccName: x}))"
+      (showAnnData mempty 0 e) `shouldBe` "\n({ Renaming/IdIn5.hs:17:7 }\n Nothing\n (Unqual {OccName: x (v, Var Val )}))"
 
       let
         comp = do
@@ -1129,7 +1130,8 @@ spec = do
 
       let Just ln = locToRdrName (6, 6) parsed
       (showGhcQual ln) `shouldBe` "Tree"
-      (showAnnData mempty 0 ln) `shouldBe` "\n(L {Renaming/D1.hs:6:6-9} \n (Unqual {OccName: Tree}))"
+      -- (showAnnData mempty 0 ln) `shouldBe` "\n(L {Renaming/D1.hs:6:6-9} \n (Unqual {OccName: Tree}))"
+      (showAnnData mempty 0 ln) `shouldBe` "\n({ Renaming/D1.hs:6:6-9 }\n Nothing\n (Unqual {OccName: Tree (tc, Tc )}))"
 
       let
         comp = do
@@ -1169,7 +1171,8 @@ spec = do
 
       let Just ln = locToRdrName (13, 1) parsed
       (showGhcQual ln) `shouldBe` "x"
-      (showAnnData mempty 0 ln) `shouldBe` "\n(L {Renaming/IdIn5.hs:13:1} \n (Unqual {OccName: x}))"
+      -- (showAnnData mempty 0 ln) `shouldBe` "\n(L {Renaming/IdIn5.hs:13:1} \n (Unqual {OccName: x}))"
+      (showAnnData mempty 0 ln) `shouldBe` "\n({ Renaming/IdIn5.hs:13:1 }\n Nothing\n (Unqual {OccName: x (v, Var Val )}))"
 
       let
         comp = do
@@ -1519,7 +1522,8 @@ spec = do
 #else
       (showGhcQual $ GHC.nameModule n3) `shouldBe` "main@main:DupDef.Dd1"
 #endif
-      (showAnnData mempty 0 n3) `shouldBe` "{Name: baz}"
+      -- (showAnnData mempty 0 n3) `shouldBe` "{Name: baz}"
+      (showAnnData mempty 0 n3) `shouldBe` "{Name: main:DupDef.Dd1.baz{v H4}}"
       GHC.getOccString n3 `shouldBe` "baz"
       showGhcQual n3 `shouldBe` "DupDef.Dd1.baz"
       (showGhcQual $ GHC.nameUnique n1) `shouldBe` "H2"

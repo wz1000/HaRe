@@ -43,7 +43,7 @@ module Language.Haskell.Refact.Utils.GhcUtils (
 import qualified Data.Generics as SYB
 #if __GLASGOW_HASKELL__ >= 804
 #else
-import qualified GHC.SYB.Utils as SYB
+-- import qualified GHC.SYB.Utils as SYB
 #endif
 
 -- import Control.Monad

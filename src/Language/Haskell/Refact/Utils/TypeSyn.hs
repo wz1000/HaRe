@@ -12,7 +12,7 @@ module Language.Haskell.Refact.Utils.TypeSyn where
 import qualified GHC        as GHC
 import qualified Name       as GHC
 import qualified Outputable as GHC
-import Language.Haskell.Refact.Utils.Types
+-- import Language.Haskell.Refact.Utils.Types
 import Language.Haskell.GHC.ExactPrint.Types
 
 -- ---------------------------------------------------------------------
