@@ -15,7 +15,7 @@ packages:
     # ../cabal-helper
     # git: https://github.com/alanz/cabal-helper.git
     git: https://gitlab.com/alanz/cabal-helper.git
-    commit: e241fbb049c5e7ac9ab8402b3dfdd3fb5999eada
+    commit: f1014155e5c1bea8cb9d851e3545ecd71762fe31
   extra-dep: true
 
 extra-deps:

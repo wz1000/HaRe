@@ -96,10 +96,8 @@ summaryNodeSummary (DigraphNode s _ _) = s
 summaryNodeSummary (s, _, _) = s
 #endif
 
-#if 0
+#if !(defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,0,1,1)))
 -- This bit is from the GHC source >>>>>>>
-#if __GLASGOW_HASKELL__ >= 804
-#else
 type SummaryNode = (ModSummary, Int, [Int])
 
 {-
@@ -125,9 +123,7 @@ topSortModuleGraph drop_hs_boot_nodes summaries mb_root_mod
 
 moduleGraphNodes :: Bool -> [ModSummary]
   -> (Graph SummaryNode, HscSource -> ModuleName -> Maybe SummaryNode)
-#if __GLASGOW_HASKELL__ >= 804
-moduleGraphNodes drop_hs_boot_nodes summaries = (graphFromEdgedVerticesUniq nodes, lookup_node)
-#elif __GLASGOW_HASKELL__ > 800
+#if __GLASGOW_HASKELL__ > 800
 moduleGraphNodes drop_hs_boot_nodes summaries = (graphFromEdgedVerticesUniq nodes, lookup_node)
 #else
 moduleGraphNodes drop_hs_boot_nodes summaries = (graphFromEdgedVertices nodes, lookup_node)
@@ -237,5 +233,4 @@ ms_home_imps ms = map snd $ ms_imps ms
 #endif
 -- GHC source end
 
-#endif
 #endif

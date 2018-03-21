@@ -8,16 +8,28 @@ packages:
     # ../ghc-mod
   extra-dep: true
   subdirs:
-    # - .
     - core
 
 - location:
-    # ../cabal-helper
     git: https://gitlab.com/alanz/cabal-helper.git
-    commit: e241fbb049c5e7ac9ab8402b3dfdd3fb5999eada
+    commit: f1014155e5c1bea8cb9d851e3545ecd71762fe31
   extra-dep: true
 extra-deps:
 - ghc-exactprint-0.5.6.1
-- ghc-mod-5.6.0.0
-- cabal-helper-0.7.2.0
 
+- cabal-doctest-1.0.6
+- conversion-1.2.1
+- conversion-case-insensitive-1.0.0.0
+- conversion-text-1.0.1
+- conversion-bytestring-1.0.1
+- haskell-src-exts-1.20.2
+# - optparse-applicative-0.12.1.0
+- optparse-applicative-0.14.2.0
+- semigroupoids-5.2.2
+- semigroups-0.18.4
+- tagged-0.8.5
+- temporary-1.2.1.1
+- transformers-0.4.3.0
+- transformers-compat-0.5.1.4
+- unix-compat-0.5.0.1
+- turtle-1.5.7
