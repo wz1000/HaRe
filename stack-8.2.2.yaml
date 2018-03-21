@@ -2,9 +2,9 @@ resolver: lts-10.2
 packages:
 - .
 - location:
-    git: https://github.com/alanz/ghc-mod.git
-    # git: https://gitlab.com/alanz/ghc-mod.git
-    commit: 9172e32fe85c5e8a2b77fd09f5df5f1c6432f39d
+    # git: https://github.com/alanz/ghc-mod.git
+    git: https://gitlab.com/alanz/ghc-mod.git
+    commit: f2131653ce0fcbf46ec1992f6cef5d41befcff45
     # ../ghc-mod
   extra-dep: true
   subdirs:
@@ -13,13 +13,13 @@ packages:
 
 - location:
     # ../cabal-helper
-    # git: https://github.com/alanz/cabal-helper.git
     git: https://gitlab.com/alanz/cabal-helper.git
     commit: e241fbb049c5e7ac9ab8402b3dfdd3fb5999eada
   extra-dep: true
 
 extra-deps:
 # - cabal-helper-0.8.0.0
+- ghc-exactprint-0.5.6.1
 - syz-0.2.0.0
 - unix-compat-0.4.3.1
 # For the tests

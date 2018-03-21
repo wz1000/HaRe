@@ -21,6 +21,7 @@ packages:
   extra-dep: true
 
 extra-deps:
+- ghc-exactprint-0.5.6.1
 - syz-0.2.0.0
 # For the tests
 - conversion-1.2.1

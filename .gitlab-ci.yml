@@ -34,11 +34,8 @@ job-ghc-8.2.1:
       - stack --stack-yaml=stack-8.2.1.yaml setup
       - stack --stack-yaml=stack-8.2.1.yaml test
 
-# job-ghc-8.2.2:
-#   script:
-#       - ls -als
-#       - apt-get update
-#       - apt-get install -y libgmp-dev
-#       - curl -sSL https://get.haskellstack.org/ | sh
-#       - stack --stack-yaml=stack-8.2.2.yaml setup
-#       - stack --stack-yaml=stack-8.2.2.yaml test
+job-ghc-8.2.2:
+  script:
+      - stack --stack-yaml=stack-8.2.2.yaml setup
+      - stack --stack-yaml=stack-8.2.2.yaml test
+
