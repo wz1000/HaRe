@@ -2,12 +2,8 @@ version: 2
 jobs:
   build:
     docker:
-      - image: debian:stretch
+      - image: alanz/hare-ci
     steps:
       - checkout
-      - run:
-          name: Greeting
-          command: echo Hello, world.
-      - run:
-          name: Print the Current Time
-          command: date
+      - run: stack --stack-yaml=stack-8.2.2.yaml setup
+      - run: stack --stack-yaml=stack-8.2.2.yaml test
