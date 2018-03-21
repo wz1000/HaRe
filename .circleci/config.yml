@@ -6,4 +6,4 @@ jobs:
     steps:
       - checkout
       - run: stack -j 2 --stack-yaml=stack-8.2.2.yaml setup
-      - run: stack -j 2 --stack-yaml=stack-8.2.2.yaml setup
+      - run: stack -j 2 --stack-yaml=stack-8.2.2.yaml test
