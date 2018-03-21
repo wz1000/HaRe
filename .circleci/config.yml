@@ -1,5 +1,77 @@
 version: 2
 jobs:
+  ghc-7.10.3:
+    docker:
+      - image: alanz/hare-ci
+    steps:
+      - checkout
+      - restore_cache:
+          key: stack-cache
+          paths:
+            - .stack
+            - .cache
+      - run: stack -j 2 --stack-yaml=stack-7.10.3.yaml setup
+      - run: stack -j 2 --stack-yaml=stack-7.10.3.yaml test --no-run-tests
+      - save_cache:
+          key: stack-cache
+          paths:
+            - .stack
+            - .cache
+      - run: stack -j 2 --stack-yaml=stack-7.10.3.yaml test
+      - save_cache:
+          key: stack-cache
+          paths:
+            - .stack
+            - .cache
+
+  ghc-8.0.1:
+    docker:
+      - image: alanz/hare-ci
+    steps:
+      - checkout
+      - restore_cache:
+          key: stack-cache
+          paths:
+            - .stack
+            - .cache
+      - run: stack -j 2 --stack-yaml=stack-8.0.1.yaml setup
+      - run: stack -j 2 --stack-yaml=stack-8.0.1.yaml test --no-run-tests
+      - save_cache:
+          key: stack-cache
+          paths:
+            - .stack
+            - .cache
+      - run: stack -j 2 --stack-yaml=stack-8.0.1.yaml test
+      - save_cache:
+          key: stack-cache
+          paths:
+            - .stack
+            - .cache
+
+  ghc-8.0.2:
+    docker:
+      - image: alanz/hare-ci
+    steps:
+      - checkout
+      - restore_cache:
+          key: stack-cache
+          paths:
+            - .stack
+            - .cache
+      - run: stack -j 2 --stack-yaml=stack-8.0.2.yaml setup
+      - run: stack -j 2 --stack-yaml=stack-8.0.2.yaml test --no-run-tests
+      - save_cache:
+          key: stack-cache
+          paths:
+            - .stack
+            - .cache
+      - run: stack -j 2 --stack-yaml=stack-8.0.2.yaml test
+      - save_cache:
+          key: stack-cache
+          paths:
+            - .stack
+            - .cache
+
   ghc-8.2.1:
     docker:
       - image: alanz/hare-ci
@@ -52,5 +124,8 @@ workflows:
   version: 2
   multiple-ghcs:
     jobs:
+      - ghc-7.10.3
+      - ghc-8.0.1
+      - ghc-8.0.2
       - ghc-8.2.1
       - ghc-8.2.2
