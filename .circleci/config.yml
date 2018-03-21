@@ -5,5 +5,5 @@ jobs:
       - image: alanz/hare-ci
     steps:
       - checkout
-      - run: stack --stack-yaml=stack-8.2.2.yaml setup
-      - run: stack --stack-yaml=stack-8.2.2.yaml test
+      - run: stack -j 2 --stack-yaml=stack-8.2.2.yaml setup
+      - run: stack -j 2 --stack-yaml=stack-8.2.2.yaml setup
