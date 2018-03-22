@@ -21,4 +21,6 @@ rm -fr dist*
 
 
 # cabalm new-configure --with-compiler=/opt/ghc/8.4.0.20180204/bin/ghc --enable-tests
-cabalm new-configure --with-compiler=/opt/ghc/8.4.0.20180204/bin/ghc --allow-newer
+# cabalm new-configure --with-compiler=/opt/ghc/8.4.0.20180204/bin/ghc --allow-newer
+
+cabal-2.2 new-configure --with-compiler=/opt/ghc/8.4.0.20180204/bin/ghc --allow-newer
