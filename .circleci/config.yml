@@ -10,6 +10,7 @@ jobs:
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
       - run: stack -j 2 --stack-yaml=stack-7.10.3.yaml setup
       - run: stack -j 2 --stack-yaml=stack-7.10.3.yaml test --no-run-tests
       - save_cache:
@@ -17,12 +18,14 @@ jobs:
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
       - run: stack -j 2 --stack-yaml=stack-7.10.3.yaml test
       - save_cache:
           key: stack-cache
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
 
   ghc-8.0.1:
     docker:
@@ -34,6 +37,7 @@ jobs:
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
       - run: stack -j 2 --stack-yaml=stack-8.0.1.yaml setup
       - run: stack -j 2 --stack-yaml=stack-8.0.1.yaml test --no-run-tests
       - save_cache:
@@ -41,12 +45,14 @@ jobs:
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
       - run: stack -j 2 --stack-yaml=stack-8.0.1.yaml test
       - save_cache:
           key: stack-cache
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
 
   ghc-8.0.2:
     docker:
@@ -58,6 +64,7 @@ jobs:
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
       - run: stack -j 2 --stack-yaml=stack-8.0.2.yaml setup
       - run: stack -j 2 --stack-yaml=stack-8.0.2.yaml test --no-run-tests
       - save_cache:
@@ -65,12 +72,14 @@ jobs:
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
       - run: stack -j 2 --stack-yaml=stack-8.0.2.yaml test
       - save_cache:
           key: stack-cache
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
 
   ghc-8.2.1:
     docker:
@@ -82,6 +91,7 @@ jobs:
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
       - run: stack -j 2 --stack-yaml=stack-8.2.1.yaml setup
       - run: stack -j 2 --stack-yaml=stack-8.2.1.yaml test --no-run-tests
       - save_cache:
@@ -89,12 +99,14 @@ jobs:
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
       - run: stack -j 2 --stack-yaml=stack-8.2.1.yaml test
       - save_cache:
           key: stack-cache
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
 
   ghc-8.2.2:
     docker:
@@ -106,6 +118,7 @@ jobs:
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
       - run: stack -j 2 --stack-yaml=stack-8.2.2.yaml setup
       - run: stack -j 2 --stack-yaml=stack-8.2.2.yaml test --no-run-tests
       - save_cache:
@@ -113,12 +126,14 @@ jobs:
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
       - run: stack -j 2 --stack-yaml=stack-8.2.2.yaml test
       - save_cache:
           key: stack-cache
           paths:
             - .stack
             - .cache
+            - HaRe/.stack-work
 
 workflows:
   version: 2

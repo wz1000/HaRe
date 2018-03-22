@@ -152,7 +152,6 @@ import qualified BasicTypes    as GHC
 import qualified Unique        as GHC
 import qualified Var           as GHC
 import qualified TcRnMonad     as GHC
-
 import qualified Var           as Var
 
 import qualified Data.Generics as SYB
@@ -2409,14 +2408,16 @@ renamePN oldPN newName useQual t = do
 #endif
        else return x
 
-    renameLIE useQual' x@(GHC.L l (GHC.IEThingAll old)) = do
-     nm <- getRefactNameMap
 #if __GLASGOW_HASKELL__ <= 800
+    renameLIE useQual' x@(GHC.L l (GHC.IEThingAll old@(GHC.L ln n))) = do
+     nm <- getRefactNameMap
      if cond nm (GHC.L ln n)
        then do
           new <- makeNewName old (newNameCalc useQual' n)
           return (GHC.L l (GHC.IEThingAll new))
 #else
+    renameLIE useQual' x@(GHC.L l (GHC.IEThingAll old)) = do
+     nm <- getRefactNameMap
      if cond nm (GHC.ieLWrappedName old)
        then do
           new <- makeNewNameIe useQual' old
@@ -2428,7 +2429,7 @@ renamePN oldPN newName useQual t = do
 #if __GLASGOW_HASKELL__ <= 710
     renameLIE useQual' (GHC.L l (GHC.IEThingWith old@(GHC.L ln n) ns))
 #else
-    renameLIE useQual' (GHC.L l (GHC.IEThingWith old wc ns fls))
+    renameLIE useQual' (GHC.L l (GHC.IEThingWith old@(GHC.L ln n) wc ns fls))
 #endif
      = do
          nm <- getRefactNameMap
