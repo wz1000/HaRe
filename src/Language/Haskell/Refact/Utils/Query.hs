@@ -6,7 +6,7 @@ module Language.Haskell.Refact.Utils.Query where
 --This module contains functions that retrieve sections of the ast. It is fairly high level.
 
 import qualified GHC as GHC
-import qualified SrcLoc as GHC
+-- import qualified SrcLoc as GHC
 import qualified Id as GHC
 import qualified OccName as GHC
 import qualified Name as GHC
@@ -67,7 +67,7 @@ getFunName str = SYB.something (Nothing `SYB.mkQ` comp)
     comp _ = Nothing
         --This seems pretty dangerous but it'll do in a pinch
     isNameString :: GHC.Name -> String -> Bool
-    isNameString nm str = (GHC.nameOccName nm) == (GHC.mkVarOcc str)
+    isNameString nm str' = (GHC.nameOccName nm) == (GHC.mkVarOcc str')
 
 
 -- TODO:AZ use a Name, not OccName, and compare properly
@@ -153,9 +153,9 @@ getIdFromVar v@(GHC.L l _var) = do
   where
     comp :: GHC.HsExpr GhcTc -> Maybe GHC.Id
 #if __GLASGOW_HASKELL__ <= 710
-    comp (GHC.HsVar id) = Just id
+    comp (GHC.HsVar n) = Just n
 #else
-    comp (GHC.HsVar id) = Just (GHC.unLoc id)
+    comp (GHC.HsVar n) = Just (GHC.unLoc n)
 #endif
     comp _ = Nothing
 
@@ -178,5 +178,5 @@ isWrappedInPars a = do
     Nothing -> return False
     (Just ann) -> return (containsPars ann)
       where containsPars :: Annotation -> Bool
-            containsPars ann = let keywords = map fst (annsDP ann) in
+            containsPars ann' = let keywords = map fst (annsDP ann') in
               (elem (G GHC.AnnCloseP) keywords) && (elem (G GHC.AnnOpenP) keywords)

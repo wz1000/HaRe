@@ -19,7 +19,9 @@ import Panic
 
 
 -- Other imports
+#if __GLASGOW_HASKELL__ < 802
 import qualified Data.Map as Map
+#endif
 
 {-
 
@@ -96,7 +98,8 @@ summaryNodeSummary (DigraphNode s _ _) = s
 summaryNodeSummary (s, _, _) = s
 #endif
 
-#if !(defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,0,1,1)))
+-- if !(defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,0,1,1)))
+#if __GLASGOW_HASKELL__ < 802
 -- This bit is from the GHC source >>>>>>>
 type SummaryNode = (ModSummary, Int, [Int])
 

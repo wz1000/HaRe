@@ -17,7 +17,7 @@ import Language.Haskell.Refact.Utils.Transform
 import Language.Haskell.Refact.Utils.ExactPrint
 import Language.Haskell.Refact.Utils.Synonyms
 import Language.Haskell.Refact.Utils.TypeUtils
-import Language.Haskell.Refact.Utils.Types
+-- import Language.Haskell.Refact.Utils.Types
 import Language.Haskell.Refact.Utils.Query
 import qualified GHC as GHC
 import qualified RdrName as GHC
@@ -110,7 +110,7 @@ doIsoRefact expr = do
           le' <- doIsoRefact le
           re' <- doIsoRefact re
           return (GHC.L l (GHC.OpApp le' op' rn re'))
-        doIsoRefact' lam@(GHC.L l (GHC.HsLam mg)) = do
+        doIsoRefact' lam@(GHC.L _ (GHC.HsLam _mg)) = do
           lift $ logm "Found lambda"
           lift $ logm (showAnnData mempty 3 lam)
           return lam
@@ -173,11 +173,11 @@ doIsoRefact expr = do
                 lift $ logm (showType 3 (getResultType goalType))
                 return var
 --- TODO: This case is still specific to the hughes list. Need to figure out how to extend this function dynamically.
-        doIsoRefact' eLst@(GHC.L l (GHC.ExplicitList ty mSyn lst)) = do
+        doIsoRefact' eLst@(GHC.L _ (GHC.ExplicitList _ty _mSyn lst)) = do
           if (length lst) == 1
             then do
-            st <- get
-            let fs = funcs st
+            -- st <- get
+            let -- fs = funcs st
                 singletonRdr = mkQualifiedRdrName (GHC.mkModuleName "DList") "singleton"
 #if __GLASGOW_HASKELL__ >= 800
             singletonRdrL <- lift $ locate singletonRdr
@@ -204,7 +204,7 @@ doIsoRefact expr = do
             lVar <- lift $ locate (GHC.HsVar absRdr)
 #endif
             lApp <- lift $ locate (GHC.HsApp lVar eLst)
-            lift $ wrapInPars lApp
+            _ <- lift $ wrapInPars lApp
             return lApp
         doIsoRefact' ex = gmapM (SYB.mkM doIsoRefact) ex
 
@@ -239,7 +239,7 @@ breakType ty = breakType' (consumeOuterForAlls ty)
 #else
     breakType' (GHC.FunTy lTy rTy) = breakType' lTy ++ breakType' rTy
 #endif
-    breakType' ty = [ty]
+    breakType' t = [t]
 
 {-
 NOTE: When do we catch if the goal type is nothing??? Does this happen when we find a var or when
@@ -252,7 +252,7 @@ from left to right those types are added to the type queue
 -}
 
 compType :: GHC.Type -> GHC.Type -> Bool
-compType (GHC.TyVarTy v1) (GHC.TyVarTy v2) = True --v1 == v2
+compType (GHC.TyVarTy _v1) (GHC.TyVarTy _v2) = True --v1 == v2
 compType (GHC.TyVarTy _) _ = True
 compType _ (GHC.TyVarTy _) = True --v1 == v2
 compType (GHC.AppTy l1 l2) (GHC.AppTy r1 r2) = compType l1 r1 && compType l2 r2
@@ -261,7 +261,7 @@ compType (GHC.TyConApp tc1 lst1) (GHC.TyConApp tc2 lst2) = tc1 == tc2 && (and (z
 #else
 compType (GHC.FunTy l1 l2) (GHC.FunTy r1 r2) = compType l1 r1 && compType l2 r2
 #endif
-compType (GHC.ForAllTy v1 lTy) (GHC.ForAllTy v2 rTy) = compType lTy rTy
+compType (GHC.ForAllTy _v1 lTy) (GHC.ForAllTy _v2 rTy) = compType lTy rTy
 compType (GHC.LitTy l) (GHC.LitTy r) = l == r
 compType _ _ = False
 
@@ -284,7 +284,7 @@ data IsoRefactState = IsoState {
   }
 
 instance Show IsoRefactState where
-  show (IsoState fs tq _) = "There are currently " ++ show (length tq) ++ " types in the queue"
+  show (IsoState _fs tq _) = "There are currently " ++ show (length tq) ++ " types in the queue"
 
 printQueue :: IsoRefact ()
 printQueue = do
@@ -345,7 +345,10 @@ printCon tc
   | GHC.isAlgTyCon tc = "AlgTyCon: " ++ shwTc tc
   | otherwise = "TyCon: " ++ (show $ toConstr tc) ++ "|" ++ shwTc tc
 
+shwTc :: GHC.TyCon -> String
 shwTc = showSDoc_ . ppr
+
+indent :: Int -> String
 indent i = "\n" ++ replicate i ' '
 
 --This takes in a type and returns its result type
@@ -381,19 +384,19 @@ getTypeFromRdr :: (Data a) => GHC.RdrName -> a -> Maybe GHC.Type
 getTypeFromRdr nm a = SYB.something (Nothing `SYB.mkQ` comp) a
   where comp :: GHC.HsBind GhcTc -> Maybe GHC.Type
 #if __GLASGOW_HASKELL__ >= 800
-        comp (GHC.FunBind (GHC.L _ id) _ _ _ _)
+        comp (GHC.FunBind (GHC.L _ n) _ _ _ _)
 #else
-        comp (GHC.FunBind (GHC.L _ id) _ _ _ _ _)
+        comp (GHC.FunBind (GHC.L _ n) _ _ _ _ _)
 #endif
-          | occNm == (GHC.occName (GHC.idName id)) = Just (GHC.idType id)
+          | occNm == (GHC.occName (GHC.idName n)) = Just (GHC.idType n)
           | otherwise = Nothing
         comp _ = Nothing
         occNm = (GHC.occName nm)
 
 getInitState :: ParsedLImportDecl -> IsoFuncStrings -> String -> String -> Maybe String -> GHC.Type -> RefactGhc IsoRefactState
 getInitState iDecl fStrs absStr projStr mqual fstResTy = do
-  funcs <- mkFuncs iDecl absStr projStr fStrs mqual
-  return $ IsoState funcs [Just fstResTy] False
+  fns <- mkFuncs iDecl absStr projStr fStrs mqual
+  return $ IsoState fns [Just fstResTy] False
 
 type IsoFuncStrings = [(String,String)]
 
@@ -424,7 +427,7 @@ mkFuncs iDecl projStr absStr fStrings mqual = do
 #else
       lExpr <- locate (GHC.HsVar rdr)
 #endif
-      ((wrns, errs), mty) <- tcExprInTargetMod iDecl lExpr
+      ((_wrns, errs), mty) <- tcExprInTargetMod iDecl lExpr
       case mty of
         Nothing -> error $ "TypeChecking failed: " ++ GHC.foldBag (++) (\e -> show e ++ "\n") "" errs
         (Just ty) -> return (s1,(rdr,ty))
@@ -432,11 +435,10 @@ mkFuncs iDecl projStr absStr fStrings mqual = do
 
 tcExprInTargetMod :: GHC.LImportDecl GhcPs -> ParsedLExpr -> RefactGhc (GHC.Messages, Maybe GHC.Type)
 tcExprInTargetMod idecl ex = do
-  pm <- getRefactParsedMod
+  -- pm <- getRefactParsedMod
   oldCntx <- GHC.getContext
   let
-    nm = GHC.unLoc . GHC.ideclName $ (GHC.unLoc idecl)
-    lst = (GHC.IIDecl (GHC.unLoc idecl)):oldCntx --(GHC.IIModule nm):oldCntx
+    lst = (GHC.IIDecl (GHC.unLoc idecl)):oldCntx
   GHC.setContext lst
   env <- GHC.getSession
 #if __GLASGOW_HASKELL__ >= 802
@@ -444,5 +446,5 @@ tcExprInTargetMod idecl ex = do
 #else
   liftIO $ GHC.tcRnExpr env ex
 #endif
-    where addImps decs ms = let old = GHC.ms_textual_imps ms in
-            ms {GHC.ms_textual_imps = old ++ [decs]}
+    -- where addImps decs ms = let old = GHC.ms_textual_imps ms in
+    --         ms {GHC.ms_textual_imps = old ++ [decs]}

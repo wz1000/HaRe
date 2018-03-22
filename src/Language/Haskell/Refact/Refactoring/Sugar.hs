@@ -3,8 +3,8 @@ module Language.Haskell.Refact.Refactoring.Sugar (sugar, compSugar) where
 import Language.Haskell.Refact.API
 import qualified GhcModCore as GM (Options(..))
 import System.Directory (canonicalizePath)
-import qualified Data.Generics as SYB
-import qualified GHC as GHC
+-- import qualified Data.Generics as SYB
+-- import qualified GHC as GHC
 
 sugar :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> IO [FilePath]
 sugar settings cradle fileName pos = do

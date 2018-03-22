@@ -259,7 +259,7 @@ equivalentNameInNewMod old = do
   -- So ignore the packagekey for now
   -- See https://github.com/DanielG/ghc-mod/issues/811
   -- TODO: revisit this
-  let eqModules (GHC.Module pk1 mn1) (GHC.Module pk2 mn2) = mn1 == mn2
+  let eqModules (GHC.Module _pk1 mn1) (GHC.Module _pk2 mn2) = mn1 == mn2
   -- let eqModules (GHC.Module pk1 mn1) (GHC.Module pk2 mn2) = mn1 == mn2 && pk1 == pk2
 
   gnames <- GHC.getNamesInScope
@@ -1553,7 +1553,7 @@ addItemsToExport modu@(GHC.L l (GHC.HsModule modName exps imps ds deps hs)) (Jus
                         else return modu
        Nothing   -> return modu
 
-addItemsToExport (GHC.L _ (GHC.HsModule _ (Just ents) _ _ _ _)) Nothing createExp ids
+addItemsToExport (GHC.L _ (GHC.HsModule _ (Just _ents) _ _ _ _)) Nothing _createExp _ids
   = assert False undefined
     -- = do ((toks,_),others)<-get
     --      let es = case ids of
@@ -1568,7 +1568,7 @@ addItemsToExport (GHC.L _ (GHC.HsModule _ (Just ents) _ _ _ _)) Nothing createEx
     --      return modu {hsModExports=Just (es++ ents)}
 
 -- addItemsToExport mod@(HsModule _  (SN modName (SrcLoc _ c row col))  Nothing _ _)  Nothing createExp ids
-addItemsToExport modu@(GHC.L l (GHC.HsModule modName Nothing _ _ _ _))  Nothing createExp ids
+addItemsToExport _modu@(GHC.L _ (GHC.HsModule _modName Nothing _ _ _ _))  Nothing _createExp _ids
   = assert False undefined
   -- =case createExp of
   --      True ->do ((toks,_),others)<-get
@@ -2409,7 +2409,7 @@ renamePN oldPN newName useQual t = do
 #endif
        else return x
 
-    renameLIE useQual' x@(GHC.L l (GHC.IEThingAll old@(GHC.L ln n))) = do
+    renameLIE useQual' x@(GHC.L l (GHC.IEThingAll old)) = do
      nm <- getRefactNameMap
 #if __GLASGOW_HASKELL__ <= 800
      if cond nm (GHC.L ln n)
@@ -2428,7 +2428,7 @@ renamePN oldPN newName useQual t = do
 #if __GLASGOW_HASKELL__ <= 710
     renameLIE useQual' (GHC.L l (GHC.IEThingWith old@(GHC.L ln n) ns))
 #else
-    renameLIE useQual' (GHC.L l (GHC.IEThingWith old@(GHC.L ln n) wc ns fls))
+    renameLIE useQual' (GHC.L l (GHC.IEThingWith old wc ns fls))
 #endif
      = do
          nm <- getRefactNameMap
