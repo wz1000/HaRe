@@ -1522,8 +1522,11 @@ spec = do
 #else
       (showGhcQual $ GHC.nameModule n3) `shouldBe` "main@main:DupDef.Dd1"
 #endif
-      -- (showAnnData mempty 0 n3) `shouldBe` "{Name: baz}"
+#if __GLASGOW_HASKELL__ > 800
       (showAnnData mempty 0 n3) `shouldBe` "{Name: main:DupDef.Dd1.baz{v H4}}"
+#else
+      (showAnnData mempty 0 n3) `shouldBe` "{Name: main@main:DupDef.Dd1.baz{v H4}}"
+#endif
       GHC.getOccString n3 `shouldBe` "baz"
       showGhcQual n3 `shouldBe` "DupDef.Dd1.baz"
       (showGhcQual $ GHC.nameUnique n1) `shouldBe` "H2"
