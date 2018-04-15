@@ -19,7 +19,7 @@ main :: IO ()
 main = do
   cleanupDirs (Tu.ends "/.stack-work")
   cleanupDirs (Tu.ends "/dist")
-  if False
+  if True
     then setupStackFiles
     else setupDistDirs
   hspec Spec.spec
