@@ -1,0 +1,19 @@
+resolver: nightly-2018-04-15
+
+packages:
+- .
+- location:
+    ./ext/ghc-mod
+  extra-dep: true
+  subdirs:
+    # - .
+    - core
+
+- location:
+    ./ext/cabal-helper
+  extra-dep: true
+
+extra-deps:
+- syz-0.2.0.0
+
+#----------------------------------------------------

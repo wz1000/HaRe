@@ -2,18 +2,16 @@ resolver: lts-6.13
 packages:
 - .
 - location:
-    # git: https://github.com/alanz/ghc-mod.git
-    git: https://gitlab.com/alanz/ghc-mod.git
-    commit: f2131653ce0fcbf46ec1992f6cef5d41befcff45
-    # ../ghc-mod
+    ./ext/ghc-mod
   extra-dep: true
   subdirs:
+    # - .
     - core
 
 - location:
-    git: https://gitlab.com/alanz/cabal-helper.git
-    commit: f1014155e5c1bea8cb9d851e3545ecd71762fe31
+    ./ext/cabal-helper
   extra-dep: true
+
 extra-deps:
 - ghc-exactprint-0.5.6.1
 
