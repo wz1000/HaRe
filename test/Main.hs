@@ -7,6 +7,8 @@ import Control.Monad
 -- import TestUtils
 import qualified Turtle as Tu
 import qualified Control.Foldl as Fold
+import System.Directory
+import System.Process (readProcess)
 
 import Test.Hspec.Runner
 import qualified Spec
@@ -17,7 +19,9 @@ main :: IO ()
 main = do
   cleanupDirs (Tu.ends "/.stack-work")
   cleanupDirs (Tu.ends "/dist")
-  setupStackFiles
+  if False
+    then setupStackFiles
+    else setupDistDirs
   hspec Spec.spec
 
 -- ---------------------------------------------------------------------
@@ -27,18 +31,35 @@ setupStackFiles =
   forM_ stackFiles $ \f ->
     writeFile f stackFileContents
 
+setupDistDirs :: IO ()
+setupDistDirs =
+  forM_ cabalDirs $ \d -> do
+    withCurrentDirectory d $ do
+      run "cabal" [ "install", "--dependencies-only" ]
+      run "cabal" [ "configure" ]
+
+-- This is shamelessly copied from cabal-helper GhcSession test.
+run :: String -> [String] -> IO ()
+run x xs = do
+  print $ x:xs
+  o <- readProcess x xs ""
+  putStrLn o
+  return ()
+
 -- ---------------------------------------------------------------------
 
-stackFiles :: [FilePath]
-stackFiles =
-  [  "./test/testdata/stack.yaml"
-   , "./test/testdata/cabal/cabal3/stack.yaml"
-   , "./test/testdata/cabal/foo/stack.yaml"
-   , "./test/testdata/cabal/cabal4/stack.yaml"
-   , "./test/testdata/cabal/cabal1/stack.yaml"
-   , "./test/testdata/cabal/cabal2/stack.yaml"
+cabalDirs :: [FilePath]
+cabalDirs =
+  [  "./test/testdata/"
+   , "./test/testdata/cabal/cabal3/"
+   , "./test/testdata/cabal/foo/"
+   , "./test/testdata/cabal/cabal4/"
+   , "./test/testdata/cabal/cabal1/"
+   , "./test/testdata/cabal/cabal2/"
   ]
 
+stackFiles :: [FilePath]
+stackFiles = map (++"stack.yaml") cabalDirs
 
 -- |Choose a resolver based on the current compiler, otherwise HaRe/ghc-mod will
 -- not be able to load the files

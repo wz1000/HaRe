@@ -2709,7 +2709,8 @@ locToExp beginPos endPos t = res
               (GHC.srcSpanEndLine ss,GHC.srcSpanEndCol ss))
            (GHC.UnhelpfulSpan _) -> ((0,0),(0,0))
        in
-        (startLoc>=beginPos) && (startLoc<= endPos) && (endLoc>= beginPos) && (endLoc<=endPos)
+        (startLoc >= beginPos) && (startLoc <= endPos) &&
+        (endLoc   >= beginPos) && (endLoc   <= endPos)
 
 --------------------------------------------------------------------------------
 

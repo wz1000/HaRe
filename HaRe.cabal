@@ -291,6 +291,7 @@ test-suite spec
     , hspec
     , mtl
     , turtle >= 1.3.0
+    , process
     , foldl
     -- , Paths_HaRe
     , attoparsec

@@ -1,3 +1,6 @@
 [submodule "ext/cabal-helper"]
 	path = ext/cabal-helper
 	url = git@github.com:alanz/cabal-helper.git
+[submodule "ext/ghc-mod"]
+	path = ext/ghc-mod
+	url = git@github.com:alanz/ghc-mod.git

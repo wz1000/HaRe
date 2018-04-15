@@ -30,3 +30,9 @@ job-ghc-8.2.2:
       - stack --stack-yaml=stack-8.2.2.yaml setup
       - stack --stack-yaml=stack-8.2.2.yaml test
 
+job-ghc-8.4.1:
+  script:
+      - export export cabal_helper_libexecdir=~/.local/bin
+      - stack --stack-yaml=stack-8.4.1.yaml setup
+      - stack --stack-yaml=stack-8.4.1.yaml test
+

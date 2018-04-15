@@ -15,6 +15,7 @@ import Data.List
 import qualified GhcMod.Types as GM (mpModule)
 
 import Language.Haskell.GHC.ExactPrint.Utils
+import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.Refact.Refactoring.Renaming
 import Language.Haskell.Refact.Utils.GhcVersionSpecific
 import Language.Haskell.Refact.Utils.LocUtils
@@ -43,7 +44,7 @@ spec = do
       t <- ct $ parsedFileGhc "./TypeUtils/B.hs"
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
-      let (Just expr) = locToExp (7,7) (7,43) parsed :: Maybe (GHC.Located (GHC.HsExpr GHC.RdrName))
+      let (Just expr) = locToExp (7,7) (7,43) parsed :: Maybe (GHC.Located (GHC.HsExpr GhcPs))
       getLocatedStart expr `shouldBe` (7,9)
       getLocatedEnd   expr `shouldBe` (7,42)
 
@@ -52,7 +53,7 @@ spec = do
       t <- ct $ parsedFileGhc "./TypeUtils/B.hs"
       let modu = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
-      let (Just expr) = locToExp (7,7) (7,41) modu :: Maybe (GHC.Located (GHC.HsExpr GHC.RdrName))
+      let (Just expr) = locToExp (7,7) (7,41) modu :: Maybe (GHC.Located (GHC.HsExpr GhcPs))
       getLocatedStart expr `shouldBe` (7,12)
       getLocatedEnd   expr `shouldBe` (7,19)
 
@@ -60,7 +61,7 @@ spec = do
       t <- ct $ parsedFileGhc "./TypeUtils/B.hs"
       let renamed = tmRenamedSource t
 
-      let (Just expr) = locToExp (7,7) (7,41) renamed :: Maybe (GHC.Located (GHC.HsExpr GHC.Name))
+      let (Just expr) = locToExp (7,7) (7,41) renamed :: Maybe (GHC.Located (GHC.HsExpr GhcRn))
       getLocatedStart expr `shouldBe` (7,12)
       getLocatedEnd   expr `shouldBe` (7,19)
 
@@ -70,7 +71,7 @@ spec = do
       t <- ct $ parsedFileGhc "./TypeUtils/B.hs"
       let renamed = tmRenamedSource t
 
-      let (Just expr) = locToExp (7,7) (7,43) renamed :: Maybe (GHC.Located (GHC.HsExpr GHC.Name))
+      let (Just expr) = locToExp (7,7) (7,43) renamed :: Maybe (GHC.Located (GHC.HsExpr GhcRn))
       getLocatedStart expr `shouldBe` (7,9)
       getLocatedEnd   expr `shouldBe` (7,42)
 
@@ -150,7 +151,7 @@ spec = do
       let dir = "./test/testdata/cabal/cabal1"
 
       let settings = defaultSettings { rsetEnabledTargets = (True,True,False,False)
-                                     , rsetVerboseLevel = Debug
+                                     -- , rsetVerboseLevel = Debug
                                      }
 
       r <-  cdAndDo dir $ rename settings testOptions "./src/Foo/Bar.hs" "baz1" (3, 1)

@@ -1,6 +1,7 @@
 packages: .
-          ../../alanz/ghc-mod/core
-          ../../alanz/cabal-helper
+          ./ext/ghc-mod/core
+          ./ext/cabal-helper
+
 -- repository head.hackage
 --   url: http://head.hackage.haskell.org/
 --   secure: True
