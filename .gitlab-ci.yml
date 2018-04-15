@@ -5,6 +5,10 @@ cache:
     - .cabal
     - .cache/cabal-helper
 
+before_script:
+  - git submodule sync --recursive
+  - git submodule update --init --recursive
+
 job-ghc-7.10.3:
   script:
       - stack --stack-yaml=stack-7.10.3.yaml setup
