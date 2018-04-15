@@ -1,0 +1,3 @@
+[submodule "ext/cabal-helper"]
+	path = ext/cabal-helper
+	url = git@github.com:alanz/cabal-helper.git
