@@ -2,7 +2,8 @@ Name: testdata
 Version: 0
 Author: Alan Zimmerman
 Maintainer: Alan Zimmerman
-Cabal-Version: >= 1.10
+-- cabal-helper for cabal 2.2/GHC 8.4 needs a cabal version >= 2
+Cabal-Version: >= 2.00
 Build-Type: Simple
 -- Other-Extensions: CPP
 

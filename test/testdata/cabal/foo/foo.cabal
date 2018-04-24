@@ -13,7 +13,8 @@ maintainer:          alan.zimm@gmail.com
 -- category:            
 build-type:          Simple
 -- extra-source-files:  
-cabal-version:       >=1.10
+-- cabal-helper for cabal 2.2/GHC 8.4 needs a cabal version >= 2
+cabal-version:       >=2.0
 
 Library
         Build-Depends:          base >= 4.0  && < 5

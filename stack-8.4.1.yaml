@@ -1,4 +1,4 @@
-resolver: nightly-2018-04-15
+resolver: nightly-2018-04-21 # Last one for GHC 8.4.1
 
 packages:
 - .

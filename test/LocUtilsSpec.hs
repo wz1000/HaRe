@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module LocUtilsSpec (main, spec) where
 
 import           Test.Hspec
