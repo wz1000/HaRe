@@ -68,6 +68,16 @@ defaults: &defaults
 
 version: 2
 jobs:
+  ghc-7.10.3:
+    environment:
+      - STACK_FILE: "stack-7.10.3.yaml"
+    <<: *defaults
+
+  ghc-8.0.1:
+    environment:
+      - STACK_FILE: "stack-8.0.1.yaml"
+    <<: *defaults
+
   ghc-8.0.2:
     environment:
       - STACK_FILE: "stack-8.0.2.yaml"
