@@ -1,9 +1,9 @@
 [submodule "ext/cabal-helper"]
-	path = ext/cabal-helper
+	path = submodules/cabal-helper
         #url = https://github.com/DanielG/cabal-helper.git
         url = https://github.com/alanz/cabal-helper.git
 	#url = git@github.com:alanz/cabal-helper.git
 [submodule "ext/ghc-mod"]
-	path = ext/ghc-mod
+	path = submodules/ghc-mod
         url = https://github.com/alanz/ghc-mod.git
 	#url = git@github.com:alanz/ghc-mod.git

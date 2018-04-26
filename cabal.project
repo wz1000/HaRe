@@ -1,6 +1,6 @@
 packages: .
-          ./ext/ghc-mod/core
-          ./ext/cabal-helper
+          ./submodules/ghc-mod/core
+          ./submodules/cabal-helper
 
 -- repository head.hackage
 --   url: http://head.hackage.haskell.org/

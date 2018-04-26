@@ -2,14 +2,14 @@ resolver: lts-6.13
 packages:
 - .
 - location:
-    ./ext/ghc-mod
+    ./submodules/ghc-mod
   extra-dep: true
   subdirs:
     # - .
     - core
 
 - location:
-    ./ext/cabal-helper
+    ./submodules/cabal-helper
   extra-dep: true
 
 extra-deps:
