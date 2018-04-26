@@ -65,12 +65,12 @@ stackFiles = map (++"stack.yaml") cabalDirs
 -- not be able to load the files
 resolver :: String
 resolver =
-#if (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,4,1,0)))
+#if (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,4,2,0)))
   "resolver: nightly-2018-04-24"
 #elif (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,4,1,0)))
   "resolver: nightly-2018-04-21" -- last one for GHC 8.4.1 
 #elif (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,2,2,0)))
-  "resolver: lts-10.2"
+  "resolver: lts-11.6"
 #elif __GLASGOW_HASKELL__ >= 802
   "resolver: nightly-2017-09-02"
 #elif __GLASGOW_HASKELL__ > 710
@@ -107,6 +107,19 @@ stackFileContents = unlines
   -- , "- scientific-0.3.5.2"
   -- , "- integer-logarithms-1.0.2.1"
   -- , "- primitive-0.6.3.0"
+#elif (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,2,2,0)))
+    , "- conversion-1.2.1"
+    , "- conversion-bytestring-1.0.1"
+    , "- conversion-case-insensitive-1.0.0.0"
+    , "- conversion-text-1.0.1"
+    , "- syb-0.7"
+#elif __GLASGOW_HASKELL__ >= 802
+    , "- conversion-1.2.1"
+    , "- conversion-bytestring-1.0.1"
+    , "- conversion-case-insensitive-1.0.0.0"
+    , "- conversion-text-1.0.1"
+    , "- syb-0.7"
+#elif __GLASGOW_HASKELL__ > 710
 #endif
   ]
 
