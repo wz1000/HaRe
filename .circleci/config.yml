@@ -1,146 +1,100 @@
+defaults: &defaults
+  working_directory: ~/build
+  docker:
+    - image: quay.io/haskell_works/stack-build-icu
+  steps:
+    - checkout
+    - run:
+        command: git submodule sync --recursive
+    - run:
+        command: git submodule update --recursive --init
+    - run:
+        name: Write provided stack.yaml with predictable name
+        command: cp ${STACK_FILE} stack-build.txt
+
+    - run:
+        name: Figure out resolver for better caching
+        command: grep '^resolver:' stack-build.txt > resolver.txt
+
+    - run:
+        name: Create a composite cabal file for changes detection
+        command: find . -name "*.cabal" | grep -v "stack-work" | xargs cat > all-cabal.txt
+
+    - restore_cache:
+        keys:
+          - stack-cache-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "stack-build.txt" }}-{{ checksum "all-cabal.txt" }}
+          - stack-cache-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "stack-build.txt" }}
+          - stack-cache-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "resolver.txt" }}
+
+    - run:
+        name: Stack setup
+        command: stack -j 2 --stack-yaml=${STACK_FILE} setup
+
+    - save_cache:
+        key: stack-cache-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "resolver.txt" }}
+        paths:
+          - ~/.stack
+          - ~/.cache
+          - ~/build/HaRe/.stack-work
+
+    - restore_cache:
+          key: stack-work-dirs-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "stack-build.txt" }}
+
+    - run:
+        name: Compile + Test
+        command: stack -j 2 --stack-yaml=${STACK_FILE} test --dump-logs
+        no_output_timeout: 120m
+
+    - save_cache:
+        key: stack-cache-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "stack-build.txt" }}
+        paths:
+          - ~/.stack
+          - ~/.cache
+          - ~/build/HaRe/.stack-work
+
+    - save_cache:
+        key: stack-cache-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "stack-build.txt" }}-{{ checksum "all-cabal.txt" }}
+        paths:
+          - ~/.stack
+          - ~/.cache
+          - ~/build/HaRe/.stack-work
+
+    - save_cache:
+        key: stack-work-dirs-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "stack-build.txt" }}
+        paths:
+          - ~/build/.stack-work
+          - ~/build/hie-plugin-api/.stack-work
+          - ~/build/HaRe/.stack-work
+
 version: 2
 jobs:
-  ghc-7.10.3:
-    docker:
-      - image: alanz/hare-ci
-    steps:
-      - checkout
-      - restore_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
-      - run: stack -j 2 --stack-yaml=stack-7.10.3.yaml setup
-      - run: stack -j 2 --stack-yaml=stack-7.10.3.yaml test --no-run-tests
-      - save_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
-      - run: stack -j 2 --stack-yaml=stack-7.10.3.yaml test
-      - save_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
-
-  ghc-8.0.1:
-    docker:
-      - image: alanz/hare-ci
-    steps:
-      - checkout
-      - restore_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
-      - run: stack -j 2 --stack-yaml=stack-8.0.1.yaml setup
-      - run: stack -j 2 --stack-yaml=stack-8.0.1.yaml test --no-run-tests
-      - save_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
-      - run: stack -j 2 --stack-yaml=stack-8.0.1.yaml test
-      - save_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
-
   ghc-8.0.2:
-    docker:
-      - image: alanz/hare-ci
-    steps:
-      - checkout
-      - restore_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
-      - run: stack -j 2 --stack-yaml=stack-8.0.2.yaml setup
-      - run: stack -j 2 --stack-yaml=stack-8.0.2.yaml test --no-run-tests
-      - save_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
-      - run: stack -j 2 --stack-yaml=stack-8.0.2.yaml test
-      - save_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
+    environment:
+      - STACK_FILE: "stack-8.0.2.yaml"
+    <<: *defaults
 
   ghc-8.2.1:
-    docker:
-      - image: alanz/hare-ci
-    steps:
-      - checkout
-      - restore_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
-      - run: stack -j 2 --stack-yaml=stack-8.2.1.yaml setup
-      - run: stack -j 2 --stack-yaml=stack-8.2.1.yaml test --no-run-tests
-      - save_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
-      - run: stack -j 2 --stack-yaml=stack-8.2.1.yaml test
-      - save_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
+    environment:
+      - STACK_FILE: "stack-8.2.1.yaml"
+    <<: *defaults
 
   ghc-8.2.2:
-    docker:
-      - image: alanz/hare-ci
-    steps:
-      - checkout
-      - restore_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
-      - run: stack -j 2 --stack-yaml=stack-8.2.2.yaml setup
-      - run: stack -j 2 --stack-yaml=stack-8.2.2.yaml test --no-run-tests
-      - save_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
-      - run: stack -j 2 --stack-yaml=stack-8.2.2.yaml test
-      - save_cache:
-          key: stack-cache
-          paths:
-            - .stack
-            - .cache
-            - HaRe/.stack-work
+    environment:
+      - STACK_FILE: "stack-8.2.2.yaml"
+    <<: *defaults
+
+  ghc-8.4.2:
+    environment:
+      - STACK_FILE: "stack.yaml"
+    <<: *defaults
 
 workflows:
   version: 2
   multiple-ghcs:
     jobs:
-      - ghc-7.10.3
-      - ghc-8.0.1
-      - ghc-8.0.2
-      - ghc-8.2.1
-      - ghc-8.2.2
+      # - ghc-7.10.3
+      # - ghc-8.0.1
+      # - ghc-8.0.2
+      # - ghc-8.2.1
+      # - ghc-8.2.2
+      - ghc-8.4.2
