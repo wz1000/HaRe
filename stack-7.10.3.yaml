@@ -1,16 +1,16 @@
 resolver: lts-6.13
 packages:
 - .
-# - location:
-#     ./submodules/ghc-mod
-#   extra-dep: true
-#   subdirs:
-#     # - .
-#     - core
-
 - location:
-    ./submodules/cabal-helper
+    ./submodules/ghc-mod
   extra-dep: true
+  subdirs:
+    # - .
+    - core
+
+# - location:
+#     ./submodules/cabal-helper
+#   extra-dep: true
 
 extra-deps:
 - cabal-helper-0.8.0.2
