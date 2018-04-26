@@ -85,7 +85,7 @@ jobs:
 
   ghc-8.4.2:
     environment:
-      - STACK_FILE: "stack.yaml"
+      - STACK_FILE: "stack-8.4.2.yaml"
     <<: *defaults
 
 workflows:
