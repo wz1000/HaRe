@@ -30,9 +30,16 @@ defaults: &defaults
         name: Stack setup
         command: stack -j 2 --stack-yaml=${STACK_FILE} setup
 
+        name: Install happy
+        command: stack -j 2 --stack-yaml=${STACK_FILE} install happy
+
+        name: Install alex
+        command: stack -j 2 --stack-yaml=${STACK_FILE} install alex
+
     - save_cache:
         key: stack-cache-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "resolver.txt" }}
         paths:
+          - ~/.local/bin
           - ~/.stack
           - ~/.cache
           - ~/build/HaRe/.stack-work
@@ -48,6 +55,7 @@ defaults: &defaults
     - save_cache:
         key: stack-cache-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "stack-build.txt" }}
         paths:
+          - ~/.local/bin
           - ~/.stack
           - ~/.cache
           - ~/build/HaRe/.stack-work
@@ -55,6 +63,7 @@ defaults: &defaults
     - save_cache:
         key: stack-cache-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "stack-build.txt" }}-{{ checksum "all-cabal.txt" }}
         paths:
+          - ~/.local/bin
           - ~/.stack
           - ~/.cache
           - ~/build/HaRe/.stack-work
