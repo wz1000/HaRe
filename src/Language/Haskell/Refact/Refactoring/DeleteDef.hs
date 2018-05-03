@@ -20,7 +20,7 @@ import Language.Haskell.GHC.ExactPrint.Types
 
 deleteDef :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> IO [FilePath]
 deleteDef settings cradle fileName (row,col) = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings cradle (compDeleteDef absFileName (row,col))
 
 compDeleteDef ::FilePath -> SimpPos -> RefactGhc [ApplyRefacResult]

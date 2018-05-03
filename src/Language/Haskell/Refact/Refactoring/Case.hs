@@ -27,7 +27,7 @@ import qualified Data.Map as Map
 -- | Convert an if expression to a case expression
 ifToCase :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> SimpPos -> IO [FilePath]
 ifToCase settings opts fileName beginPos endPos = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compIfToCase absFileName beginPos endPos)
 
 compIfToCase :: FilePath -> SimpPos -> SimpPos -> RefactGhc [ApplyRefacResult]

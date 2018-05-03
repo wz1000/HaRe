@@ -23,7 +23,7 @@ import System.Directory
 -- | Convert an if expression to a case expression
 removeBracket :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> SimpPos -> IO [FilePath]
 removeBracket settings opts fileName beginPos endPos = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   let applied = (:[]) . fst <$> applyRefac
                   (removeBracketTransform absFileName beginPos endPos)
                   (RSFile absFileName)

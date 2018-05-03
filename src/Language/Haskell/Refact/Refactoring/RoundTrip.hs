@@ -10,7 +10,7 @@ import System.Directory
 -- | Roundtrip the source code, to check that the infrastructure is solid
 roundTrip :: RefactSettings -> GM.Options -> FilePath -> IO [FilePath]
 roundTrip settings opts fileName = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (comp absFileName)
 
 comp :: FilePath -> RefactGhc [ApplyRefacResult]

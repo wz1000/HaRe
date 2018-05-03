@@ -30,7 +30,7 @@ import           System.Directory
 
 maybeToMonadPlus :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> Int -> IO [FilePath]
 maybeToMonadPlus settings cradle fileName pos argNum = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings cradle (compMaybeToMonadPlus absFileName pos argNum)
 
 compMaybeToMonadPlus :: FilePath -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]

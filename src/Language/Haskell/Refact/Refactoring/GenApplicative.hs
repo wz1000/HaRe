@@ -18,7 +18,7 @@ import Language.Haskell.GHC.ExactPrint.Parsers
 
 genApplicative :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> IO [FilePath]
 genApplicative settings cradle fileName pos = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings cradle (compGenApplicative absFileName pos)
 
 compGenApplicative :: FilePath -> SimpPos -> RefactGhc [ApplyRefacResult]

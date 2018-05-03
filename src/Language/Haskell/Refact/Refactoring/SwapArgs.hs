@@ -24,7 +24,7 @@ swapArgs settings opts args
   = do let fileName = args!!0
            row = (read (args!!1)::Int)
            col = (read (args!!2)::Int)
-       absFileName <- canonicalizePath fileName
+       absFileName <- normaliseFilePath fileName
        runRefacSession settings opts (comp absFileName (row,col))
 
 

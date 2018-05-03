@@ -83,7 +83,7 @@ the following six contexts:
 -- | Lift a definition to the top level
 liftToTopLevel :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> IO [FilePath]
 liftToTopLevel settings opts fileName (row,col) = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compLiftToTopLevel absFileName (row,col))
 
 compLiftToTopLevel :: FilePath -> SimpPos
@@ -227,7 +227,7 @@ isTupleDecl _ = False
 -- | Move a definition one level up from where it is now
 liftOneLevel :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> IO [FilePath]
 liftOneLevel settings opts fileName (row,col) = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compLiftOneLevel absFileName (row,col))
 
 compLiftOneLevel :: FilePath -> SimpPos
@@ -578,7 +578,7 @@ liftOneLevel' modName pn@(GHC.L _ n) = do
 -- | Move a definition one level down
 demote :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> IO [FilePath]
 demote settings opts fileName (row,col) = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compDemote absFileName (row,col))
 
 compDemote ::FilePath -> SimpPos

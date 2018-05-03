@@ -37,15 +37,14 @@ module Language.Haskell.Refact.Utils.Utils
 
        , stripCallStack
        , showOutputable
+
+       , normaliseFilePath
        ) where
 
--- import Control.Exception
 import Control.Monad.Identity
 import Control.Monad.State
 import Data.List
 
-
--- import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Preprocess
 import Language.Haskell.GHC.ExactPrint.Print
 import Language.Haskell.GHC.ExactPrint.Utils
@@ -520,3 +519,10 @@ stripCallStack str = str'
               then s1 ++ "\n"
               else s1
 
+-- ---------------------------------------------------------------------
+
+-- | Normalise a (possibly relative) file path.  This is a synonym for
+-- something appropriate on the underlying file system, and is on one
+-- place for easy experimentation.
+normaliseFilePath :: FilePath -> IO FilePath
+normaliseFilePath = makeAbsolute

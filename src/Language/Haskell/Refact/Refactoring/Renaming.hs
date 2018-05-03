@@ -64,7 +64,7 @@ rename :: RefactSettings
        -> SimpPos
        -> IO [FilePath]
 rename settings opts fileName newName (row,col) = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compRename absFileName newName (row,col))
 
 -- | Body of the refactoring

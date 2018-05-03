@@ -42,7 +42,7 @@ import Data.Generics.Strafunski.StrategyLib.StrategyLib
 
 addOneParameter :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> IO [FilePath]
 addOneParameter settings opts fileName paramName (row,col) = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compAddOneParameter absFileName paramName (row,col))
 
 compAddOneParameter :: FilePath -> String -> SimpPos -> RefactGhc [ApplyRefacResult]
@@ -524,7 +524,7 @@ addDefaultActualArgInClientMod pn argPName t = do
 -- The @SimpPos@ should be somwewhere inside the parameter to be removed
 rmOneParameter :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> IO [FilePath]
 rmOneParameter settings opts fileName (row,col) = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compRmOneParameter absFileName (row,col))
 
 compRmOneParameter :: FilePath -> SimpPos -> RefactGhc [ApplyRefacResult]

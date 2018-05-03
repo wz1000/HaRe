@@ -60,7 +60,7 @@ TODO: Figure out strategy for name conflicts. Probably need another optional arg
 
 hughesList :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> Int -> IO [FilePath]
 hughesList settings cradle fileName funNm pos argNum = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings cradle (compHughesList absFileName funNm pos argNum)
 
 compHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]
@@ -73,7 +73,7 @@ compHughesList fileName funNm pos argNum = do
 
 fastHughesList :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> Int -> IO [FilePath]
 fastHughesList settings cradle fileName funNm pos argNum = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings cradle (compFastHughesList absFileName funNm pos argNum)
 
 compFastHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]

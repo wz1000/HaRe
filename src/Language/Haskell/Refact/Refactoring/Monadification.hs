@@ -5,19 +5,16 @@ module Language.Haskell.Refact.Refactoring.Monadification
 
 import Language.Haskell.Refact.API
 import qualified GhcModCore as GM (Options(..))
-import System.Directory (canonicalizePath)
--- import qualified GHC.SYB.Utils as SYB
 import Data.Generics as SYB
 import qualified GHC as GHC
 import Control.Monad.State
 import Language.Haskell.GHC.ExactPrint.Types
--- import Language.Haskell.GHC.ExactPrint
 import qualified Bag as GHC
 import qualified BasicTypes as GHC (RecFlag)
 
 monadification :: RefactSettings -> GM.Options -> FilePath -> [SimpPos] -> IO [FilePath]
 monadification settings cradle fileName posLst = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings cradle (compMonadification absFileName posLst)
 
 

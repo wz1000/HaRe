@@ -32,7 +32,7 @@ import System.Directory
 -- the user. The new name should not cause name clash/capture.
 duplicateDef :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> IO [FilePath]
 duplicateDef settings opts fileName newName (row,col) = do
-  absFileName <- canonicalizePath fileName
+  absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compDuplicateDef absFileName newName (row,col))
 
 compDuplicateDef :: FilePath -> String -> SimpPos -> RefactGhc [ApplyRefacResult]

@@ -45,6 +45,7 @@ module Language.Haskell.Refact.API
        -- , lookupAnns
 
        , stripCallStack
+       , normaliseFilePath
 
  -- * from `Language.Haskell.Refact.Utils.MonadFunctions`
 
