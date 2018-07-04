@@ -287,7 +287,7 @@ rmFun nm = do
           isFun _ = False
 
 
-replaceFunRhs :: SimpPos -> GHC.LHsExpr GHC.GhcPs -> RefactGhc ()
+replaceFunRhs :: SimpPos -> GHC.LHsExpr GhcPs -> RefactGhc ()
 replaceFunRhs pos newRhs = do
   parsed <- getRefactParsed
   let rdrNm = locToRdrName pos parsed
@@ -311,8 +311,8 @@ replaceFunRhs pos newRhs = do
           | otherwise = return fBind
         worker _ bind = return bind
 
-        replaceMG :: GHC.MatchGroup GHC.GhcPs (GHC.LHsExpr GHC.GhcPs)
-                  -> RefactGhc (GHC.MatchGroup GHC.GhcPs (GHC.LHsExpr GHC.GhcPs))
+        replaceMG :: GHC.MatchGroup GhcPs (GHC.LHsExpr GhcPs)
+                  -> RefactGhc (GHC.MatchGroup GhcPs (GHC.LHsExpr GhcPs))
         replaceMG mg = do
 #if __GLASGOW_HASKELL__ <= 710
           let [(GHC.L l match)] = GHC.mg_alts mg

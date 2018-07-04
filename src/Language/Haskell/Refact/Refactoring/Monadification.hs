@@ -301,7 +301,7 @@ composeWithBinds e = do
     lOpApp <- lift $ locate opApp
     composeWithBinds lOpApp
 
-mkGRHSs :: GHC.LHsExpr GHC.GhcPs -> RefactGhc (GHC.GRHSs GHC.GhcPs (GHC.LHsExpr GHC.GhcPs))
+mkGRHSs :: GHC.LHsExpr GhcPs -> RefactGhc (GHC.GRHSs GhcPs (GHC.LHsExpr GhcPs))
 mkGRHSs rhsExpr = do
 #if __GLASGOW_HASKELL__ >= 806
   let grhs = (GHC.GRHS GHC.noExt [] rhsExpr)

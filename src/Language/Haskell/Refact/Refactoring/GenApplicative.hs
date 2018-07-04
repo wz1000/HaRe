@@ -176,7 +176,7 @@ findBoundVars = SYB.everything (++) ([] `SYB.mkQ` findVarPats)
   where findVarPats :: GHC.Pat GhcPs -> [GHC.RdrName]
 #if __GLASGOW_HASKELL__ >= 806
         findVarPats (GHC.VarPat _ (GHC.L _ rdr)) = [rdr]
-#elif __GLASGOW_HASKELL__ <= 710
+#elif __GLASGOW_HASKELL__ > 710
         findVarPats (GHC.VarPat (GHC.L _ rdr)) = [rdr]
 #else
         findVarPats (GHC.VarPat rdr) = [rdr]

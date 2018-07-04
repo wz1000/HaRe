@@ -521,7 +521,11 @@ spec = do
 
       let decls = getHsDecls parsed
       let Just tup = getName "DupDef.Dd1.tup" renamed
+#if __GLASGOW_HASKELL__ >= 806
+      let [GHC.L l (GHC.ValD _ decl)] = definingDeclsRdrNames nm [tup] decls False False
+#else
       let [GHC.L l (GHC.ValD decl)] = definingDeclsRdrNames nm [tup] decls False False
+#endif
       isFunBindR (GHC.L l decl)  `shouldBe` False
 
     it "Returns True if a function definition" $ do
@@ -532,7 +536,11 @@ spec = do
           nm = initRdrNameMap t
 
       let Just toplevel = getName "DupDef.Dd1.toplevel" renamed
+#if __GLASGOW_HASKELL__ >= 806
+      let [GHC.L l (GHC.ValD _ decl)] = definingDeclsRdrNames nm [toplevel] (getHsDecls parsed) False False
+#else
       let [GHC.L l (GHC.ValD decl)] = definingDeclsRdrNames nm [toplevel] (getHsDecls parsed) False False
+#endif
       isFunBindR (GHC.L l decl)  `shouldBe` True
 
   -- -------------------------------------------------------------------
@@ -920,16 +928,14 @@ spec = do
           decls <- liftT $ hsDecls parsed
           let [decl] = definingDeclsRdrNames nm [tup] decls False False
 
-#if __GLASGOW_HASKELL__ <= 710
-          let (GHC.L _ (GHC.ValD (GHC.FunBind _ _ (GHC.MG [match] _ _ _) _ _ _))) = decl
-#else
+#if __GLASGOW_HASKELL__ >= 806
+          let (GHC.L _ (GHC.ValD _ (GHC.FunBind _ _ (GHC.MG _ (GHC.L _ [match]) _) _ _))) = decl
+#elif __GLASGOW_HASKELL__ > 710
           let (GHC.L _ (GHC.ValD (GHC.FunBind _ (GHC.MG (GHC.L _ [match]) _ _ _) _ _ _))) = decl
-#endif
-#if __GLASGOW_HASKELL__ >= 804
-          let (GHC.L _ (GHC.Match _ _pat grhss)) = match
 #else
-          let (GHC.L _ (GHC.Match _ _pat _ grhss)) = match
+          let (GHC.L _ (GHC.ValD (GHC.FunBind _ _ (GHC.MG [match] _ _ _) _ _ _))) = decl
 #endif
+          let (GHC.L _ (GHC.Match { GHC.m_grhss = grhss})) = match
 
           r <- hsFreeAndDeclaredPNs grhss
           return r
@@ -1232,16 +1238,14 @@ spec = do
           decls <- liftT $ hsDecls parsed
           let [decl] = definingDeclsRdrNames nm [n] decls False False
 
-#if __GLASGOW_HASKELL__ <= 710
-          let (GHC.L _ (GHC.ValD (GHC.FunBind _ _ (GHC.MG matches _ _ _) _ _ _))) = decl
-#else
+#if __GLASGOW_HASKELL__ >= 806
+          let (GHC.L _ (GHC.ValD _ (GHC.FunBind _ _ (GHC.MG _ (GHC.L _ matches) _) _ _))) = decl
+#elif __GLASGOW_HASKELL__ > 710
           let (GHC.L _ (GHC.ValD (GHC.FunBind _ (GHC.MG (GHC.L _ matches) _ _ _) _ _ _))) = decl
-#endif
-#if __GLASGOW_HASKELL__ >= 804
-          let [(GHC.L _ (GHC.Match _ pats _))] = matches
 #else
-          let [(GHC.L _ (GHC.Match _ pats _ _))] = matches
+          let (GHC.L _ (GHC.ValD (GHC.FunBind _ _ (GHC.MG matches _ _ _) _ _ _))) = decl
 #endif
+          let [(GHC.L _ (GHC.Match { GHC.m_pats = pats }))] = matches
           let lpat = head pats
           logDataWithAnns "lpat" lpat
 
@@ -1289,16 +1293,14 @@ spec = do
           -- logDataWithAnns "parsed" parsed
           decls <- liftT $ hsDecls parsed
           let [decl] = definingDeclsRdrNames nm [n] decls False False
-#if __GLASGOW_HASKELL__ <= 710
-          let (GHC.L _ (GHC.ValD (GHC.FunBind _ _ (GHC.MG [match] _ _ _) _ _ _))) = decl
-#else
+#if __GLASGOW_HASKELL__ >= 806
+          let (GHC.L _ (GHC.ValD _ (GHC.FunBind _ _ (GHC.MG _ (GHC.L _ [match]) _) _ _))) = decl
+#elif __GLASGOW_HASKELL__ > 710
           let (GHC.L _ (GHC.ValD (GHC.FunBind _ (GHC.MG (GHC.L _ [match]) _ _ _) _ _ _))) = decl
-#endif
-#if __GLASGOW_HASKELL__ >= 804
-          let (GHC.L _ (GHC.Match _ _pats binds)) = match
 #else
-          let (GHC.L _ (GHC.Match _ _pats _rhs binds)) = match
+          let (GHC.L _ (GHC.ValD (GHC.FunBind _ _ (GHC.MG [match] _ _ _) _ _ _))) = decl
 #endif
+          let (GHC.L _ (GHC.Match { GHC.m_grhss = binds})) = match
 
           logDataWithAnns "binds" binds
           let fds' = hsFreeAndDeclaredRdr nm binds

@@ -65,7 +65,11 @@ stackFiles = map (++"stack.yaml") cabalDirs
 -- not be able to load the files
 resolver :: String
 resolver =
-#if (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,4,2,0)))
+#if (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,6,0,0)))
+  "resolver: nightly-2018-06-29"
+#elif (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,4,3,0)))
+  "resolver: nightly-2018-06-29"
+#elif (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,4,2,0)))
   "resolver: nightly-2018-04-24"
 #elif (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,4,1,0)))
   "resolver: nightly-2018-04-21" -- last one for GHC 8.4.1 

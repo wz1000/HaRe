@@ -345,7 +345,7 @@ condChecking2 nm oldPN newName ast = do
       if declared
         then condChecking' cd
         else mzero
-    inConDecl cd@(GHC.ConDeclH98 { GHC.con_name = n, GHC.con_args = dets }) = do
+    inConDecl cd@(GHC.ConDeclH98 { GHC.con_name = n, GHC.con_details = dets }) = do
       declaredn <- isDeclaredBy n
       declaredd <- isDeclaredBy dets
       if declaredn || declaredd

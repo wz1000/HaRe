@@ -146,7 +146,7 @@ getIdFromVar v@(GHC.L l _var) = do
     comp :: GHC.HsExpr GhcTc -> Maybe GHC.Id
 #if __GLASGOW_HASKELL__ >= 806
     comp (GHC.HsVar _ n) = Just (GHC.unLoc n)
-#elif __GLASGOW_HASKELL__ <= 710
+#elif __GLASGOW_HASKELL__ > 710
     comp (GHC.HsVar n) = Just (GHC.unLoc n)
 #else
     comp (GHC.HsVar n) = Just n

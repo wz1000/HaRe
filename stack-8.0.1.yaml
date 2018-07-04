@@ -14,9 +14,13 @@ packages:
 #     ./submodules/cabal-helper
 #   extra-dep: true
 
+- location:
+    ./submodules/ghc-exactprint
+  extra-dep: true
+
 extra-deps:
 - cabal-helper-0.8.0.2
-- ghc-exactprint-0.5.6.1
+# - ghc-exactprint-0.5.6.1
 
 - cabal-doctest-1.0.6
 - haskell-src-exts-1.20.2

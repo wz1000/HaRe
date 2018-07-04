@@ -1,7 +1,7 @@
-resolver: lts-11.6
+resolver: nightly-2018-06-29
+
 packages:
 - .
-
 - location:
     ./submodules/ghc-mod
   extra-dep: true
@@ -17,15 +17,16 @@ packages:
     ./submodules/ghc-exactprint
   extra-dep: true
 
-
 extra-deps:
-# - ghc-exactprint-0.5.6.1
 - syz-0.2.0.0
-- unix-compat-0.4.3.1
+
 - cabal-plan-0.3.0.0
-# For the tests
+- temporary-1.2.1.1
+- base-compat-0.9.3
+# Neded for the tests
 - conversion-1.2.1
-- conversion-bytestring-1.0.1
 - conversion-case-insensitive-1.0.0.0
 - conversion-text-1.0.1
-- syb-0.7
+- conversion-bytestring-1.0.1
+
+#----------------------------------------------------

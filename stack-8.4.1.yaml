@@ -13,8 +13,13 @@ packages:
     ./submodules/cabal-helper
   extra-dep: true
 
+- location:
+    ./submodules/ghc-exactprint
+  extra-dep: true
+
 extra-deps:
 - syz-0.2.0.0
+- cabal-plan-0.3.0.0
 # Neded for the tests
 - conversion-1.2.1
 - conversion-case-insensitive-1.0.0.0

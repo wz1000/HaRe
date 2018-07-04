@@ -13,6 +13,10 @@ packages:
 #     ./submodules/cabal-helper
 #   extra-dep: true
 
+# - location:
+#     ./submodules/ghc-exactprint
+#   extra-dep: true
+
 
 extra-deps:
 - cabal-helper-0.8.0.2
