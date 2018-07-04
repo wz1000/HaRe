@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 module Language.Haskell.Refact.Refactoring.Simple(removeBracket) where
@@ -29,16 +30,19 @@ removeBracket settings opts fileName beginPos endPos = do
                   (RSFile absFileName)
   runRefacSession settings opts applied
 
-type HsExpr a = GHC.Located (GHC.HsExpr a)
-pattern HsPar l s = GHC.L l (GHC.HsPar s)
+-- type HsExpr a = GHC.Located (GHC.HsExpr a)
 
 removeBracketTransform  :: FilePath -> SimpPos -> SimpPos -> RefactGhc ()
 removeBracketTransform fileName beginPos endPos = do
        parsed <- getRefactParsed
        let expr :: GHC.Located (GHC.HsExpr GhcPs)
            expr = fromJust $ locToExp beginPos endPos parsed
-           removePar :: HsExpr GhcPs -> RefactGhc (HsExpr GhcPs)
-           removePar e@(HsPar _ s)
+           removePar :: GHC.LHsExpr GhcPs -> RefactGhc (GHC.LHsExpr GhcPs)
+#if __GLASGOW_HASKELL__ >= 806
+           removePar e@(GHC.L _ (GHC.HsPar _ s))
+#else
+           removePar e@(GHC.L _ (GHC.HsPar s))
+#endif
             | sameOccurrence e expr = do
               startAnns <- liftT $ getAnnsT
               let oldkey = mkAnnKey e

@@ -14,13 +14,10 @@
 # (cd test/testdata/cabal/foo    && cabal clean && cabal configure)
 
 rm .ghc.environment.*
-rm cabal.project.local
-rm -fr dist*
-# cabalm new-configure --with-compiler=ghc-8.0.2 --enable-tests
-# cabalm new-configure --with-compiler=ghc-8.0.2 --enable-tests
+# rm cabal.project.local
+# rm -fr dist*
 
 
-# cabalm new-configure --with-compiler=/opt/ghc/8.4.0.20180204/bin/ghc --enable-tests
-# cabalm new-configure --with-compiler=/opt/ghc/8.4.0.20180204/bin/ghc --allow-newer
 
-cabal-2.2 new-configure --with-compiler=/opt/ghc/8.4.0.20180204/bin/ghc --allow-newer
+# cabal-2.2 new-configure --with-compiler=/opt/ghc/8.4.0.20180204/bin/ghc --allow-newer
+cabal new-configure --enable-tests --with-compiler=/opt/ghc/8.6.0.20180627/bin/ghc --allow-newer

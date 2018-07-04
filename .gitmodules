@@ -7,3 +7,6 @@
 	path = submodules/ghc-mod
         url = https://github.com/alanz/ghc-mod.git
 	#url = git@github.com:alanz/ghc-mod.git
+[submodule "submodules/ghc-exactprint"]
+	path = submodules/ghc-exactprint
+	url = https://github.com/alanz/ghc-exactprint.git

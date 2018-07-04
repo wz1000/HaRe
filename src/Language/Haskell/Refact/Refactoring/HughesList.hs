@@ -133,11 +133,19 @@ fixTypeSig :: Int -> GHC.Sig GhcPs -> RefactGhc (GHC.Sig GhcPs)
 fixTypeSig argNum =  traverseTypeSig argNum replaceList
   where
     replaceList :: GHC.LHsType GhcPs -> RefactGhc (GHC.LHsType GhcPs)
+#if __GLASGOW_HASKELL__ >= 806
+    replaceList (GHC.L l (GHC.HsListTy _ innerTy)) = do
+#else
     replaceList (GHC.L l (GHC.HsListTy innerTy)) = do
+#endif
       let dlistFS = GHC.fsLit "DList"
           dlistUq = GHC.mkVarUnqual dlistFS
       dlistTy <- constructLHsTy dlistUq
+#if __GLASGOW_HASKELL__ >= 806
+      lTy <- locate (GHC.HsAppTy GHC.noExt dlistTy innerTy)
+#else
       lTy <- locate (GHC.HsAppTy dlistTy innerTy)
+#endif
       setDP (DP (0,1)) innerTy
       setDP (DP (0,1)) lTy
       return lTy
@@ -194,13 +202,22 @@ wrapCallsWithToList modNm name = applyAtCallPoint name comp
           lLhs <- locate toListVar
           addAnnVal lLhs
           logm $ "ToList being inserted: " ++ showAnnData mempty 3 lLhs
-          locate $ (GHC.HsApp lLhs parE)
-#if __GLASGOW_HASKELL__ <= 710
-        toListVar = GHC.HsVar (mkRdrName (modNm ++ "toList"))
+#if __GLASGOW_HASKELL__ >= 806
+          locate $ (GHC.HsApp GHC.noExt lLhs parE)
 #else
+          locate $ (GHC.HsApp lLhs parE)
+#endif
+
+#if __GLASGOW_HASKELL__ >= 806
+        toListVar' = do
+           lNm <- locate (mkRdrName (modNm ++ "toList"))
+           return (GHC.HsVar GHC.noExt lNm)
+#elif __GLASGOW_HASKELL__ > 710
         toListVar' = do
            lNm <- locate (mkRdrName (modNm ++ "toList"))
            return (GHC.HsVar lNm)
+#else
+        toListVar = GHC.HsVar (mkRdrName (modNm ++ "toList"))
 #endif
 
 -- This function takes in a function that transforms the call points of the given identifier
@@ -214,11 +231,7 @@ applyAtCallPoint nm f = do
   putRefactParsed parsed' emptyAnns
     where
       stopCon :: GHC.HsBind GhcPs -> RefactGhc ParsedBind
-#if __GLASGOW_HASKELL__ <= 710
-      stopCon b@(GHC.FunBind (GHC.L _ id) _ _ _ _ _) = if id == nm
-#else
-      stopCon b@(GHC.FunBind (GHC.L _ id) _ _ _ _) = if id == nm
-#endif
+      stopCon b@(GHC.FunBind { GHC.fun_id = (GHC.L _ id) }) = if id == nm
 --If the bindings name is the function we are looking for then we succeed and the traversal should stop
                                                      then return b
                                                      else mzero
@@ -231,7 +244,12 @@ applyAtCallPoint nm f = do
                  else mzero
 
 searchExpr :: GHC.RdrName -> ParsedExpr -> Bool
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+searchExpr funNm (GHC.HsApp _ (GHC.L _ (GHC.HsVar _ (GHC.L _ rdr))) _) = rdr == funNm
+searchExpr funNm (GHC.HsApp _ lhs _) = searchExpr funNm (GHC.unLoc lhs)
+searchExpr funNm (GHC.OpApp _ _ (GHC.L _ (GHC.HsVar _ (GHC.L _ rdr))) _) = rdr == funNm
+searchExpr funNm (GHC.OpApp _ _ op _) = searchExpr funNm (GHC.unLoc op)
+#elif __GLASGOW_HASKELL__ >= 800
 searchExpr funNm (GHC.HsApp (GHC.L _ (GHC.HsVar (GHC.L _ rdr))) _) = rdr == funNm
 searchExpr funNm (GHC.HsApp lhs _) = searchExpr funNm (GHC.unLoc lhs)
 searchExpr funNm (GHC.OpApp _ (GHC.L _ (GHC.HsVar (GHC.L _ rdr))) _ _) = rdr == funNm
@@ -246,6 +264,15 @@ searchExpr _ _ = False
 
 modifyNthParam :: Int -> Int -> (ParsedLExpr -> RefactGhc ParsedLExpr) -> ParsedLExpr -> RefactGhc ParsedLExpr
 modifyNthParam paramNums argIndx f app = comp (paramNums - argIndx) app
+#if __GLASGOW_HASKELL__ >= 806
+  where comp i (GHC.L l (GHC.HsApp x lhs rhs))
+          | i == 1 = do
+              newRhs <- f rhs
+              return (GHC.L l (GHC.HsApp x lhs newRhs))
+          | otherwise = do
+              newLhs <- comp (i-1) lhs
+              return (GHC.L l (GHC.HsApp x newLhs rhs))
+#else
   where comp i (GHC.L l (GHC.HsApp lhs rhs))
           | i == 1 = do
               newRhs <- f rhs
@@ -253,10 +280,14 @@ modifyNthParam paramNums argIndx f app = comp (paramNums - argIndx) app
           | otherwise = do
               newLhs <- comp (i-1) lhs
               return (GHC.L l (GHC.HsApp newLhs rhs))
+#endif
 
 wrapExpr :: GHC.RdrName -> ParsedLExpr -> RefactGhc ParsedLExpr
 wrapExpr nm e = do
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+  nmL <- locate nm
+  let nmE = (GHC.HsVar GHC.noExt nmL)
+#elif __GLASGOW_HASKELL__ >= 800
   nmL <- locate nm
   let nmE = (GHC.HsVar nmL)
 #else
@@ -265,7 +296,11 @@ wrapExpr nm e = do
   lNmE <- locate nmE
   addAnnVal lNmE
   zeroDP lNmE
+#if __GLASGOW_HASKELL__ >= 806
+  let expr = (GHC.HsApp GHC.noExt lNmE e)
+#else
   let expr = (GHC.HsApp lNmE e)
+#endif
   lE <- locate expr
   wrapInPars lE
 
@@ -302,11 +337,7 @@ getDListTy mqual = do
   let nm = gfromJust "Getting emdl's name" $ getFunName "emdl" renamed
   let mBind = getTypedHsBind (getOcc decl) typed
   ty <- case mBind of
-#if __GLASGOW_HASKELL__ >= 800
-          (Just (GHC.FunBind lid _ _ _ _)) ->
-#else
-          (Just (GHC.FunBind lid _ _ _ _ _)) ->
-#endif
+          (Just (GHC.FunBind { GHC.fun_id = lid })) ->
             do let id = GHC.unLoc lid
                return $ GHC.idType id
           Nothing -> error "Could not retrieve DList type"
@@ -314,10 +345,10 @@ getDListTy mqual = do
   return ty
     where
       getOcc :: ParsedLDecl -> GHC.OccName
-#if __GLASGOW_HASKELL__ >= 800
-      getOcc (GHC.L _ (GHC.ValD (GHC.FunBind nm _ _ _ _))) = GHC.rdrNameOcc $ GHC.unLoc nm
+#if __GLASGOW_HASKELL__ >= 806
+      getOcc (GHC.L _ (GHC.ValD _ (GHC.FunBind { GHC.fun_id = nm }))) = GHC.rdrNameOcc $ GHC.unLoc nm
 #else
-      getOcc (GHC.L _ (GHC.ValD (GHC.FunBind nm _ _ _ _ _))) = GHC.rdrNameOcc $ GHC.unLoc nm
+      getOcc (GHC.L _ (GHC.ValD (GHC.FunBind { GHC.fun_id = nm }))) = GHC.rdrNameOcc $ GHC.unLoc nm
 #endif
 
 fullStrs :: [(String,String)]

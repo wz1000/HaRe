@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 module Language.Haskell.Refact.Refactoring.SwapArgs (swapArgs) where
 
 import qualified Data.Generics.Aliases as SYB
@@ -73,30 +74,42 @@ doSwap n1 = do
 
     where
          -- 1. The definition is at top level...
-#if __GLASGOW_HASKELL__ <= 710
-         inMod nm ((GHC.FunBind ln2 infixity (GHC.MG matches p m1 m2) a locals tick)::GHC.HsBind GhcPs)
-#else
+#if __GLASGOW_HASKELL__ >= 806
+         inMod nm ((GHC.FunBind x ln2 (GHC.MG y (GHC.L lm matches) p ) a tick)::GHC.HsBind GhcPs)
+#elif __GLASGOW_HASKELL__ > 710
          inMod nm ((GHC.FunBind ln2 (GHC.MG (GHC.L lm matches) p m1 m2) a locals tick)::GHC.HsBind GhcPs)
+#else
+         inMod nm ((GHC.FunBind ln2 infixity (GHC.MG matches p m1 m2) a locals tick)::GHC.HsBind GhcPs)
 #endif
             | GHC.nameUnique n1 == GHC.nameUnique (rdrName2NamePure nm ln2)
                     = do logm ("inMatch>" ++ showAnnData mempty 0 ln2 ++ "<")
                          newMatches <- updateMatches matches
-#if __GLASGOW_HASKELL__ <= 710
-                         return (GHC.FunBind ln2 infixity (GHC.MG newMatches p m1 m2) a locals tick)
-#else
+#if __GLASGOW_HASKELL__ >= 806
+                         return (GHC.FunBind x ln2 (GHC.MG y (GHC.L lm newMatches) p ) a tick)
+#elif __GLASGOW_HASKELL__ > 710
                          return (GHC.FunBind ln2 (GHC.MG (GHC.L lm newMatches) p m1 m2) a locals tick)
+#else
+                         return (GHC.FunBind ln2 infixity (GHC.MG newMatches p m1 m2) a locals tick)
 #endif
          inMod _ func = return func
 
          -- 2. All call sites of the function...
+#if __GLASGOW_HASKELL__ >= 806
+         inExp nm ((GHC.L l (GHC.HsApp x (GHC.L e0 (GHC.HsApp x2 e e1)) e2))::GHC.LHsExpr GhcPs)
+#else
          inExp nm ((GHC.L l (GHC.HsApp (GHC.L e0 (GHC.HsApp e e1)) e2))::GHC.LHsExpr GhcPs)
+#endif
             | cond
                    -- =  update e2 e1 =<< update e1 e2 expr
                    = do
                        -- expr1 <- update e1 e2 expr
                        -- expr2 <- update e2 e1 expr1
                        -- return expr2
+#if __GLASGOW_HASKELL__ >= 806
+                       return (GHC.L l (GHC.HsApp x (GHC.L e0 (GHC.HsApp x2 e e2)) e1))
+#else
                        return (GHC.L l (GHC.HsApp (GHC.L e0 (GHC.HsApp e e2)) e1))
+#endif
             where
               cond = case (expToNameRdr nm e) of
                 Nothing -> False
@@ -104,12 +117,14 @@ doSwap n1 = do
          inExp _ e = return e
 
          -- 3. Type signature...
-#if __GLASGOW_HASKELL__ <= 710
-         inType nm (GHC.L x (GHC.TypeSig [lname] types pns)::GHC.LSig GhcPs)
-#elif __GLASGOW_HASKELL__ <= 800
+#if __GLASGOW_HASKELL__ >= 806
+         inType nm (GHC.L x (GHC.TypeSig y [lname] (GHC.HsWC wcs (GHC.HsIB vars types)))::GHC.LSig GhcPs)
+#elif __GLASGOW_HASKELL__ > 800
+         inType nm (GHC.L x (GHC.TypeSig [lname] (GHC.HsWC wcs (GHC.HsIB vars types cl)))::GHC.LSig GhcPs)
+#elif __GLASGOW_HASKELL__ > 710
          inType nm (GHC.L x (GHC.TypeSig [lname] (GHC.HsIB ivs (GHC.HsWC wcs mwc types)))::GHC.LSig GhcPs)
 #else
-         inType nm (GHC.L x (GHC.TypeSig [lname] (GHC.HsWC wcs (GHC.HsIB vars types cl)))::GHC.LSig GhcPs)
+         inType nm (GHC.L x (GHC.TypeSig [lname] types pns)::GHC.LSig GhcPs)
 #endif
            | GHC.nameUnique (rdrName2NamePure nm lname) == GHC.nameUnique n1
                 = do
@@ -117,46 +132,68 @@ doSwap n1 = do
                      let (t1:t2:ts) = tyFunToList types
                      let t1' = t2
                      let t2' = t1
-#if __GLASGOW_HASKELL__ <= 710
-                     return (GHC.L x (GHC.TypeSig [lname] (tyListToFun (t1':t2':ts)) pns))
-#elif __GLASGOW_HASKELL__ <= 800
+#if __GLASGOW_HASKELL__ >= 806
+                     return (GHC.L x (GHC.TypeSig y [lname] (GHC.HsWC wcs (GHC.HsIB vars (tyListToFun (t1':t2':ts)) ))))
+#elif __GLASGOW_HASKELL__ > 800
+                     return (GHC.L x (GHC.TypeSig [lname] (GHC.HsWC wcs (GHC.HsIB vars (tyListToFun (t1':t2':ts)) cl))))
+#elif __GLASGOW_HASKELL__ > 710
                      return (GHC.L x (GHC.TypeSig [lname] (GHC.HsIB ivs (GHC.HsWC wcs mwc (tyListToFun (t1':t2':ts))))))
 #else
-                     return (GHC.L x (GHC.TypeSig [lname] (GHC.HsWC wcs (GHC.HsIB vars (tyListToFun (t1':t2':ts)) cl))))
+                     return (GHC.L x (GHC.TypeSig [lname] (tyListToFun (t1':t2':ts)) pns))
 #endif
 
-#if __GLASGOW_HASKELL__ <= 710
-         inType nm (GHC.L _x (GHC.TypeSig (n:ns) _types _)::GHC.LSig GhcPs)
-#else
+#if __GLASGOW_HASKELL__ >= 806
+         inType nm (GHC.L _ (GHC.TypeSig _ (n:ns) _types )::GHC.LSig GhcPs)
+#elif __GLASGOW_HASKELL__ > 710
          inType nm (GHC.L _x (GHC.TypeSig (n:ns) _types )::GHC.LSig GhcPs)
+#else
+         inType nm (GHC.L _x (GHC.TypeSig (n:ns) _types _)::GHC.LSig GhcPs)
 #endif
            | GHC.nameUnique n1 `elem` (map (\n' -> GHC.nameUnique (rdrName2NamePure nm n')) (n:ns))
             = error "Error in swapping arguments in type signature: signature bound to muliple entities!"
 
          inType _ ty = return ty
 
+#if __GLASGOW_HASKELL__ >= 806
+         inTypeDecl nm (GHC.L l (GHC.SigD x s)) = do
+           (GHC.L _ s') <- inType nm (GHC.L l s)
+           return (GHC.L l (GHC.SigD x s'))
+#else
          inTypeDecl nm (GHC.L l (GHC.SigD s)) = do
            (GHC.L _ s') <- inType nm (GHC.L l s)
            return (GHC.L l (GHC.SigD s'))
+#endif
          inTypeDecl _ x = return x
 
-#if __GLASGOW_HASKELL__ <= 710
-         tyFunToList (GHC.L _ (GHC.HsForAllTy _ _ _ _ (GHC.L _ (GHC.HsFunTy t1 t2)))) = t1 : (tyFunToList t2)
-#else
+#if __GLASGOW_HASKELL__ >= 806
+         tyFunToList (GHC.L _ (GHC.HsForAllTy _ _ (GHC.L _ (GHC.HsFunTy _ t1 t2)))) = t1 : (tyFunToList t2)
+#elif __GLASGOW_HASKELL__ > 710
          tyFunToList (GHC.L _ (GHC.HsForAllTy _ (GHC.L _ (GHC.HsFunTy t1 t2)))) = t1 : (tyFunToList t2)
+#else
+         tyFunToList (GHC.L _ (GHC.HsForAllTy _ _ _ _ (GHC.L _ (GHC.HsFunTy t1 t2)))) = t1 : (tyFunToList t2)
 #endif
+#if __GLASGOW_HASKELL__ >= 806
+         tyFunToList (GHC.L _ (GHC.HsFunTy _ t1 t2)) = t1 : (tyFunToList t2)
+#else
          tyFunToList (GHC.L _ (GHC.HsFunTy t1 t2)) = t1 : (tyFunToList t2)
+#endif
          tyFunToList t = [t]
 
          tyListToFun []   = error "SwapArgs.tyListToFun" -- Keep the exhaustiveness checker happy
          tyListToFun [t1] = t1
+#if __GLASGOW_HASKELL__ >= 806
+         tyListToFun (t1:ts) = GHC.noLoc (GHC.HsFunTy GHC.noExt t1 (tyListToFun ts))
+#else
          tyListToFun (t1:ts) = GHC.noLoc (GHC.HsFunTy t1 (tyListToFun ts))
+#endif
 
          updateMatches [] = return []
-#if __GLASGOW_HASKELL__ >= 804
-         updateMatches ((GHC.L x (GHC.Match mfn pats         rhs)::GHC.LMatch GhcPs (GHC.LHsExpr GhcPs)):matches)
+#if __GLASGOW_HASKELL__ >= 806
+         updateMatches ((GHC.L x (GHC.Match y mfn pats         rhs)::GHC.LMatch GhcPs (GHC.LHsExpr GhcPs)):matches)
+#elif __GLASGOW_HASKELL__ >= 804
+         updateMatches ((GHC.L x (GHC.Match   mfn pats         rhs)::GHC.LMatch GhcPs (GHC.LHsExpr GhcPs)):matches)
 #else
-         updateMatches ((GHC.L x (GHC.Match mfn pats nothing rhs)::GHC.LMatch GhcPs (GHC.LHsExpr GhcPs)):matches)
+         updateMatches ((GHC.L x (GHC.Match   mfn pats nothing rhs)::GHC.LMatch GhcPs (GHC.LHsExpr GhcPs)):matches)
 #endif
            = case pats of
                (p1:p2:ps) -> do
@@ -165,7 +202,11 @@ doSwap n1 = do
                                 let p1' = p2
                                 let p2' = p1
                                 matches' <- updateMatches matches
-#if __GLASGOW_HASKELL__ >= 804
+#if __GLASGOW_HASKELL__ >= 806
+                                return ((GHC.L x (GHC.Match y mfn (p1':p2':ps) rhs)):matches')
+               [p] -> return [GHC.L x (GHC.Match y mfn [p] rhs)]
+               []  -> return [GHC.L x (GHC.Match y mfn [] rhs)]
+#elif __GLASGOW_HASKELL__ >= 804
                                 return ((GHC.L x (GHC.Match mfn (p1':p2':ps) rhs)):matches')
                [p] -> return [GHC.L x (GHC.Match mfn [p] rhs)]
                []  -> return [GHC.L x (GHC.Match mfn [] rhs)]

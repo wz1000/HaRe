@@ -30,7 +30,7 @@ getVarAndRHS :: GHC.Match GhcPs (GHC.LHsExpr GhcPs) -> RefactGhc (GHC.LPat GhcPs
 getVarAndRHS match = do
   let (Just pat) = SYB.something (Nothing `SYB.mkQ` varPat) (GHC.m_pats match)
   return (pat , GHC.m_grhss match)
-    where varPat lPat@(GHC.L _ (GHC.VarPat _ )) = Just lPat
+    where varPat lPat@(GHC.L _ (GHC.VarPat {} )) = Just lPat
           varPat _ = Nothing
 
 -- TODO:AZ remove this, use the API version instead
@@ -43,11 +43,7 @@ getHsBind pos ast =
   Nothing -> Nothing
   (Just (GHC.L _ rNm)) -> SYB.everything (<|>) (Nothing `SYB.mkQ` isBind) ast
     where
-#if __GLASGOW_HASKELL__ <= 710
-        isBind (bnd@(GHC.FunBind (GHC.L _ name) _ _ _ _ _) :: GHC.HsBind GhcPs)
-#else
-        isBind (bnd@(GHC.FunBind (GHC.L _ name) _ _ _ _) :: GHC.HsBind GhcPs)
-#endif
+        isBind (bnd@(GHC.FunBind { GHC.fun_id = (GHC.L _ name) } ) :: GHC.HsBind GhcPs)
             | name == rNm = (Just bnd)
         isBind _ = Nothing
 
@@ -57,11 +53,7 @@ getFunName :: (SYB.Data t) => String -> t -> Maybe GHC.Name
 getFunName str = SYB.something (Nothing `SYB.mkQ` comp)
   where
     comp :: GHC.HsBind GhcRn -> Maybe GHC.Name
-#if __GLASGOW_HASKELL__ <= 710
-    comp (GHC.FunBind lid _ _ _ _ _)
-#else
-    comp (GHC.FunBind lid _ _ _ _ )
-#endif
+    comp (GHC.FunBind { GHC.fun_id = lid } )
       | (GHC.unLoc lid) `isNameString` str = Just (GHC.unLoc lid)
       | otherwise = Nothing
     comp _ = Nothing
@@ -74,11 +66,7 @@ getFunName str = SYB.something (Nothing `SYB.mkQ` comp)
 getTypedHsBind :: (Data a) => GHC.OccName -> a -> Maybe (GHC.HsBind GhcTc)
 getTypedHsBind occ = SYB.something (Nothing `SYB.mkQ` isBind)
   where
-#if __GLASGOW_HASKELL__ <= 710
-        isBind (bnd@(GHC.FunBind (GHC.L _ nm) _ _ _ _ _) :: GHC.HsBind GhcTc)
-#else
-        isBind (bnd@(GHC.FunBind (GHC.L _ nm) _ _ _ _) :: GHC.HsBind GhcTc)
-#endif
+        isBind (bnd@(GHC.FunBind { GHC.fun_id = (GHC.L _ nm) } ) :: GHC.HsBind GhcTc)
             |  (GHC.occName (GHC.idName nm)) == occ = (Just bnd)
         isBind _ = Nothing
 
@@ -94,10 +82,12 @@ getTypeSig pos funNm a =
     Nothing -> Nothing
     (Just (GHC.L _ rNm)) -> SYB.everything (<|>) (Nothing `SYB.mkQ` isSig) a
       where
-#if __GLASGOW_HASKELL__ <= 710
-        isSig ty@(GHC.TypeSig [(GHC.L _ nm)] _ _) = if nm == rNm
-#else
+#if __GLASGOW_HASKELL__ >= 806
+        isSig ty@(GHC.TypeSig _ [(GHC.L _ nm)] _) = if nm == rNm
+#elif __GLASGOW_HASKELL__ > 710
         isSig ty@(GHC.TypeSig [(GHC.L _ nm)] _) = if nm == rNm
+#else
+        isSig ty@(GHC.TypeSig [(GHC.L _ nm)] _ _) = if nm == rNm
 #endif
                                                     then (Just ty)
                                                     else Nothing
@@ -106,10 +96,12 @@ getTypeSig pos funNm a =
 --It's common to want to know if an expression is just a certain var
 --This function takes a String of the var and returns true of the given expression represents that var
 isHsVar :: String -> ParsedExpr -> Bool
-#if __GLASGOW_HASKELL__ <= 710
-isHsVar str (GHC.HsVar rNm) =
-#else
+#if __GLASGOW_HASKELL__ >= 806
+isHsVar str (GHC.HsVar _ (GHC.L _ rNm)) =
+#elif __GLASGOW_HASKELL__ > 710
 isHsVar str (GHC.HsVar (GHC.L _ rNm)) =
+#else
+isHsVar str (GHC.HsVar rNm) =
 #endif
   let nm = mkVarUnqual (fsLit str) in
     rNm == nm
@@ -152,10 +144,12 @@ getIdFromVar v@(GHC.L l _var) = do
   return $ mElem >>= (\e -> SYB.something (Nothing `SYB.mkQ` comp) e)
   where
     comp :: GHC.HsExpr GhcTc -> Maybe GHC.Id
-#if __GLASGOW_HASKELL__ <= 710
-    comp (GHC.HsVar n) = Just n
-#else
+#if __GLASGOW_HASKELL__ >= 806
+    comp (GHC.HsVar _ n) = Just (GHC.unLoc n)
+#elif __GLASGOW_HASKELL__ <= 710
     comp (GHC.HsVar n) = Just (GHC.unLoc n)
+#else
+    comp (GHC.HsVar n) = Just n
 #endif
     comp _ = Nothing
 

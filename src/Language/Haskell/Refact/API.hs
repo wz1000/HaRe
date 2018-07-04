@@ -186,7 +186,6 @@ module Language.Haskell.Refact.API
     , expToNameRdr
     , patToNameRdr
     , nameToString
-    , pNtoPat
     , definedPNsRdr,definedNamesRdr
     , definingDeclsRdrNames, definingDeclsRdrNames', definingSigsRdrNames
     , definingTyClDeclsNames

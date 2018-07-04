@@ -556,9 +556,23 @@ initRdrNameMap tm = r
     checkName ln = Just [ln]
 
     rdrNames = gfromJust "initRdrNameMap" $ SYB.everything mappend (nameSybQuery checkRdr ) parsed
-#if __GLASGOW_HASKELL__ <= 710
-    names    = gfromJust "initRdrNameMap" $ SYB.everything mappend (nameSybQuery checkName) renamed
-#else
+#if __GLASGOW_HASKELL__ >= 806
+    names1   = gfromJust "initRdrNameMap" $ SYB.everything mappend (nameSybQuery checkName) renamed
+    names2 = names1 ++ SYB.everything (++) ([] `SYB.mkQ` fieldOcc
+                                              `SYB.extQ` hsRecFieldN) renamed
+    names  = names2 ++ SYB.everything (++) ([] `SYB.mkQ` hsRecFieldT) typechecked
+
+    fieldOcc :: GHC.FieldOcc GhcRn -> [GHC.Located GHC.Name]
+    fieldOcc (GHC.FieldOcc n (GHC.L l _)) = [(GHC.L l n)]
+
+    hsRecFieldN :: GHC.LHsExpr GhcRn -> [GHC.Located GHC.Name]
+    hsRecFieldN (GHC.L _ (GHC.HsRecFld _ (GHC.Unambiguous n (GHC.L l _) ) )) = [GHC.L l n]
+    hsRecFieldN _ = []
+
+    hsRecFieldT :: GHC.LHsExpr GhcTc -> [GHC.Located GHC.Name]
+    hsRecFieldT (GHC.L _ (GHC.HsRecFld _ (GHC.Ambiguous n (GHC.L l _)) )) = [GHC.L l (Var.varName n)]
+    hsRecFieldT _ = []
+#elif __GLASGOW_HASKELL__ > 710
     names1   = gfromJust "initRdrNameMap" $ SYB.everything mappend (nameSybQuery checkName) renamed
     names2 = names1 ++ SYB.everything (++) ([] `SYB.mkQ` fieldOcc
                                               `SYB.extQ` hsRecFieldN) renamed
@@ -574,9 +588,13 @@ initRdrNameMap tm = r
     hsRecFieldT :: GHC.LHsExpr GhcTc -> [GHC.Located GHC.Name]
     hsRecFieldT (GHC.L _ (GHC.HsRecFld (GHC.Ambiguous (GHC.L l _) n) )) = [GHC.L l (Var.varName n)]
     hsRecFieldT _ = []
+#else
+    names    = gfromJust "initRdrNameMap" $ SYB.everything mappend (nameSybQuery checkName) renamed
 #endif
 
-#if (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,2,1,0)))
+#if __GLASGOW_HASKELL__ >= 806
+    namesIe = names
+#elif (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,2,1,0)))
     -- This is a workaround for https://ghc.haskell.org/trac/ghc/ticket/14189
     -- namesIeParsedL = SYB.everything (++) ([] `SYB.mkQ` ieThingWith) (GHC.hsmodExports $ GHC.unLoc parsed)
     namesIeParsed = Map.fromList $ SYB.everything (++) ([] `SYB.mkQ` ieThingWith) (GHC.hsmodExports $ GHC.unLoc parsed)

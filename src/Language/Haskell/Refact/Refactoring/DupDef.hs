@@ -136,14 +136,18 @@ reallyDoDuplicating pn newName _inscopes = do
                 else return match
 
         --3. The definition to be duplicated is a local declaration in a pattern binding
-        dupInPat newNameGhc (pat@(GHC.L _ (GHC.ValD (GHC.PatBind _p _rhs _typ _fvs _))) :: GHC.LHsDecl GhcPs)
+#if __GLASGOW_HASKELL__ >= 806
+        dupInPat newNameGhc (pat@(GHC.L _ (GHC.ValD _ (GHC.PatBind {}))) :: GHC.LHsDecl GhcPs)
+#else
+        dupInPat newNameGhc (pat@(GHC.L _ (GHC.ValD (GHC.PatBind {}))) :: GHC.LHsDecl GhcPs)
+#endif
           = do
             logm $ "dupInPat hit"
             doDuplicating' newNameGhc pat pn
         dupInPat _ pat = return pat
 
         --4: The defintion to be duplicated is a local decl in a Let expression
-        dupInLet newNameGhc (letExp@(GHC.L _ (GHC.HsLet _ds _e)):: GHC.LHsExpr GhcPs)
+        dupInLet newNameGhc (letExp@(GHC.L _ (GHC.HsLet {})):: GHC.LHsExpr GhcPs)
           = doDuplicating' newNameGhc letExp pn
         dupInLet _ letExp = return letExp
 
@@ -151,7 +155,7 @@ reallyDoDuplicating pn newName _inscopes = do
         -- Note: The local declarations in a case alternative are covered in #2 above.
 
         --6.The definition to be duplicated is a local decl in a Let statement.
-        dupInLetStmt newNameGhc (letStmt@(GHC.L _ (GHC.LetStmt _ds)):: GHC.LStmt GhcPs (GHC.LHsExpr GhcPs))
+        dupInLetStmt newNameGhc (letStmt@(GHC.L _ (GHC.LetStmt {})):: GHC.LStmt GhcPs (GHC.LHsExpr GhcPs))
           = doDuplicating' newNameGhc letStmt pn
         dupInLetStmt _ letStmt = return letStmt
 
@@ -282,7 +286,10 @@ doDuplicatingClient serverModName newPNames = do
 willBeUnQualImportedBy :: GHC.ModuleName -> GHC.RenamedSource -> Maybe [GHC.ModuleName]
 willBeUnQualImportedBy modName (_,imps,_,_)
    = let
-         ms = filter (\(GHC.L _ (GHC.ImportDecl _ (GHC.L _ modName1) _qualify _source _safe isQualified _isImplicit _as h))
+         -- ms = filter (\(GHC.L _ (GHC.ImportDecl _ (GHC.L _ modName1) _ _ _ isQualified _ _ h))
+         ms = filter (\(GHC.L _ (GHC.ImportDecl { GHC.ideclName = (GHC.L _ modName1)
+                                                , GHC.ideclQualified = isQualified
+                                                , GHC.ideclHiding = h}))
                     -> modName == modName1
                        && not isQualified
                               && (isNothing h  -- not hiding
@@ -293,7 +300,7 @@ willBeUnQualImportedBy modName (_,imps,_,_)
          in if (emptyList ms) then Nothing
                       else Just $ nub $ map getModName ms
 
-         where getModName (GHC.L _ (GHC.ImportDecl _ _modName1 _qualify _source _safe _isQualified _isImplicit as _h))
+         where getModName (GHC.L _ (GHC.ImportDecl { GHC.ideclAs = as }))
 #if __GLASGOW_HASKELL__ <= 800
                  = if isJust as then (fromJust as)
 #else

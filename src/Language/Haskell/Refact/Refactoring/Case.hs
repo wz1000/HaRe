@@ -38,7 +38,7 @@ compIfToCase fileName beginPos endPos = do
        -- logm $ "Case.compIfToCase:parsed=" ++ (showAnnData oldAnns 0 parsed) -- ++AZ++
        let expr = locToExp beginPos endPos parsed
        case expr of
-         Just exp1@(GHC.L _ (GHC.HsIf _ _ _ _))
+         Just exp1@(GHC.L _ (GHC.HsIf {}))
                 -> do (refactoredMod,_) <- applyRefac (doIfToCaseInternal exp1) RSAlreadyLoaded
                       return [refactoredMod]
          _      -> error $ "You haven't selected an if-then-else  expression!" -- (show (beginPos,endPos,fileName)) ++ "]:" ++ (showAnnData mempty 0 $ ast)
@@ -61,7 +61,7 @@ reallyDoIfToCase expr p = do
    return ()
        where
          inExp :: (GHC.Located (GHC.HsExpr GhcPs)) -> RefactGhc (GHC.Located (GHC.HsExpr GhcPs))
-         inExp exp1@(GHC.L _ (GHC.HsIf _se (GHC.L _ _) (GHC.L _ _) (GHC.L _ _)))
+         inExp exp1@(GHC.L _ (GHC.HsIf {}))
            | sameOccurrence expr exp1
            = do
                newExp <- ifToCaseTransform exp1
@@ -72,7 +72,11 @@ reallyDoIfToCase expr p = do
 -- |Actually do the transformation
 ifToCaseTransform :: GHC.Located (GHC.HsExpr GhcPs)
                   -> RefactGhc (GHC.Located (GHC.HsExpr GhcPs))
+#if __GLASGOW_HASKELL__ >= 806
+ifToCaseTransform li@(GHC.L _ (GHC.HsIf _ _se e1 e2 e3)) = do
+#else
 ifToCaseTransform li@(GHC.L _ (GHC.HsIf _se e1 e2 e3)) = do
+#endif
   caseLoc        <- liftT uniqueSrcSpanT -- HaRe:-1:1
   trueMatchLoc   <- liftT uniqueSrcSpanT -- HaRe:-1:2
   trueLoc1       <- liftT uniqueSrcSpanT -- HaRe:-1:3
@@ -89,14 +93,25 @@ ifToCaseTransform li@(GHC.L _ (GHC.HsIf _se e1 e2 e3)) = do
 #endif
   let trueName  = mkRdrName "True"
   let falseName = mkRdrName "False"
+#if __GLASGOW_HASKELL__ >= 806
+  let ret = GHC.L caseLoc (GHC.HsCase GHC.noExt e1
+#else
   let ret = GHC.L caseLoc (GHC.HsCase e1
+#endif
              (GHC.MG
+#if __GLASGOW_HASKELL__ >= 806
+              GHC.noExt 
+#endif
               (
 #if __GLASGOW_HASKELL__ > 710
               GHC.L matchesLoc
 #endif
               [
+#if __GLASGOW_HASKELL__ >= 806
+                (GHC.L trueMatchLoc $ GHC.Match GHC.noExt 
+#else
                 (GHC.L trueMatchLoc $ GHC.Match
+#endif
 #if __GLASGOW_HASKELL__ <= 710
                  Nothing
 #elif __GLASGOW_HASKELL__ <= 800
@@ -112,16 +127,30 @@ ifToCaseTransform li@(GHC.L _ (GHC.HsIf _se e1 e2 e3)) = do
                  Nothing
 #endif
                  (GHC.GRHSs
+#if __GLASGOW_HASKELL__ >= 806
+                   GHC.noExt 
+#endif
                    [
+#if __GLASGOW_HASKELL__ >= 806
+                     GHC.L trueRhsLoc $ GHC.GRHS GHC.noExt [] e2
+#else
                      GHC.L trueRhsLoc $ GHC.GRHS [] e2
+#endif
                    ]
                    (
 #if __GLASGOW_HASKELL__ > 710
                     GHC.L lbTrueLoc
 #endif
+#if __GLASGOW_HASKELL__ >= 806
+                   (GHC.EmptyLocalBinds GHC.noExt)))
+#else
                    GHC.EmptyLocalBinds))
+#endif
                 )
               , (GHC.L falseMatchLoc $ GHC.Match
+#if __GLASGOW_HASKELL__ >= 806
+                  GHC.noExt 
+#endif
 #if __GLASGOW_HASKELL__ <= 710
                   Nothing
 #elif __GLASGOW_HASKELL__ <= 800
@@ -137,16 +166,31 @@ ifToCaseTransform li@(GHC.L _ (GHC.HsIf _se e1 e2 e3)) = do
                  Nothing
 #endif
                  (GHC.GRHSs
+#if __GLASGOW_HASKELL__ >= 806
+                   GHC.noExt 
+#endif
                    [
+#if __GLASGOW_HASKELL__ >= 806
+                     GHC.L falseRhsLoc $ GHC.GRHS GHC.noExt [] e3
+#else
                      GHC.L falseRhsLoc $ GHC.GRHS [] e3
+#endif
                    ]
                    (
 #if __GLASGOW_HASKELL__ > 710
                    GHC.L lbFalseLoc
 #endif
+#if __GLASGOW_HASKELL__ >= 806
+                   (GHC.EmptyLocalBinds GHC.noExt)))
+#else
                    GHC.EmptyLocalBinds))
+#endif
                 )
-              ]) [] GHC.placeHolderType GHC.FromSource))
+              ])
+#if __GLASGOW_HASKELL__ < 806
+              [] GHC.placeHolderType
+#endif
+              GHC.FromSource))
 
   oldAnns <- liftT $ getAnnsT
   let annIf   = gfromJust "Case.annIf"   $ getAnnotationEP li oldAnns

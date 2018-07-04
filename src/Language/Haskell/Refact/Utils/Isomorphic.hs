@@ -83,16 +83,27 @@ doIsoRefact expr = do
       return expr
     else doIsoRefact' expr
   where doIsoRefact' :: GHC.LHsExpr GhcPs -> IsoRefact (GHC.LHsExpr GhcPs)
+#if __GLASGOW_HASKELL__ >= 806
+        doIsoRefact' (GHC.L l (GHC.HsApp x le re)) = do
+#else
         doIsoRefact' (GHC.L l (GHC.HsApp le re)) = do
+#endif
           le' <- doIsoRefact le
           wrapWithAbs <- shouldInsertAbs
           re' <- doIsoRefact re
           lift $ logm "POST RHS REFACT IN APP CASE"
+#if __GLASGOW_HASKELL__ >= 806
+          let newApp = (GHC.L l (GHC.HsApp x le' re'))
+#else
           let newApp = (GHC.L l (GHC.HsApp le' re'))
+#endif
           if wrapWithAbs
             then do
             absRdr <- getAbsFun
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+            absRdrL <- lift $ locate absRdr
+            let var = GHC.HsVar GHC.noExt absRdrL
+#elif __GLASGOW_HASKELL__ >= 800
             absRdrL <- lift $ locate absRdr
             let var = GHC.HsVar absRdrL
 #else
@@ -101,20 +112,34 @@ doIsoRefact expr = do
             pApp <- lift $ wrapInPars newApp
             lVar <- lift $ locate var
             lift $ addAnnVal lVar
+#if __GLASGOW_HASKELL__ >= 806
+            let fullApp = GHC.HsApp x lVar pApp
+#else
             let fullApp = GHC.HsApp lVar pApp
+#endif
             lift $ locate fullApp
             else return newApp
+#if __GLASGOW_HASKELL__ >= 806
+        doIsoRefact' (GHC.L l (GHC.OpApp x le op re)) = do
+#else
         doIsoRefact' (GHC.L l (GHC.OpApp le op rn re)) = do
+#endif
           op' <- doIsoRefact op
           lift $ addBackquotes op'
           le' <- doIsoRefact le
           re' <- doIsoRefact re
+#if __GLASGOW_HASKELL__ >= 806
+          return (GHC.L l (GHC.OpApp x le' op' re'))
+#else
           return (GHC.L l (GHC.OpApp le' op' rn re'))
-        doIsoRefact' lam@(GHC.L _ (GHC.HsLam _mg)) = do
+#endif
+        doIsoRefact' lam@(GHC.L _ (GHC.HsLam {})) = do
           lift $ logm "Found lambda"
           lift $ logm (showAnnData mempty 3 lam)
           return lam
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+        doIsoRefact' var@(GHC.L l (GHC.HsVar _ (GHC.L lr rdr))) = do
+#elif __GLASGOW_HASKELL__ >= 800
         doIsoRefact' var@(GHC.L l (GHC.HsVar (GHC.L lr rdr))) = do
 #else
         doIsoRefact' var@(GHC.L l (GHC.HsVar rdr)) = do
@@ -149,7 +174,9 @@ doIsoRefact expr = do
               if compType (getResultType ty) goalType
                 then do
                 let changedTypes = typeDifference ty currTy
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+                    newE = (GHC.L l (GHC.HsVar GHC.noExt (GHC.L lr oNm)))
+#elif __GLASGOW_HASKELL__ >= 800
                     newE = (GHC.L l (GHC.HsVar (GHC.L lr oNm)))
 #else
                     newE = (GHC.L l (GHC.HsVar oNm))
@@ -179,7 +206,10 @@ doIsoRefact expr = do
             -- st <- get
             let -- fs = funcs st
                 singletonRdr = mkQualifiedRdrName (GHC.mkModuleName "DList") "singleton"
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+            singletonRdrL <- lift $ locate singletonRdr
+            let singletonVar = (GHC.HsVar GHC.noExt singletonRdrL)
+#elif __GLASGOW_HASKELL__ >= 800
             singletonRdrL <- lift $ locate singletonRdr
             let singletonVar = (GHC.HsVar singletonRdrL)
 #else
@@ -190,20 +220,31 @@ doIsoRefact expr = do
             lift $ zeroDP lVar
             let rhs = head lst
             lift $ setDP (DP (0,1)) rhs
+#if __GLASGOW_HASKELL__ >= 806
+            lApp <- lift $ locate (GHC.HsApp GHC.noExt lVar rhs)
+#else
             lApp <- lift $ locate (GHC.HsApp lVar rhs)
+#endif
             parApp <- lift $ wrapInPars lApp
             return parApp
             else do
             st <- get
             let fs = funcs st
                 absRdr = absFun fs
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+            absRdrL <- lift $ locate absRdr
+            lVar <- lift $ locate (GHC.HsVar GHC.noExt absRdrL)
+#elif __GLASGOW_HASKELL__ >= 800
             absRdrL <- lift $ locate absRdr
             lVar <- lift $ locate (GHC.HsVar absRdrL)
 #else
             lVar <- lift $ locate (GHC.HsVar absRdr)
 #endif
+#if __GLASGOW_HASKELL__ >= 806
+            lApp <- lift $ locate (GHC.HsApp GHC.noExt lVar eLst)
+#else
             lApp <- lift $ locate (GHC.HsApp lVar eLst)
+#endif
             _ <- lift $ wrapInPars lApp
             return lApp
         doIsoRefact' ex = gmapM (SYB.mkM doIsoRefact) ex
@@ -373,9 +414,15 @@ modMGAltsRHS f bnd = do
   applyTP (stop_tdTP (failTP `adhocTP` comp)) bnd
   where
     comp :: GHC.GRHS GhcPs ParsedLExpr -> RefactGhc (GHC.GRHS GhcPs ParsedLExpr)
+#if __GLASGOW_HASKELL__ >= 806
+    comp (GHC.GRHS x lst expr) = do
+      newExpr <- f expr
+      return (GHC.GRHS x lst newExpr)
+#else
     comp (GHC.GRHS lst expr) = do
       newExpr <- f expr
       return (GHC.GRHS lst newExpr)
+#endif
 
 getTyCon :: GHC.Type -> GHC.TyCon
 getTyCon (GHC.TyConApp tc _) = tc
@@ -383,11 +430,7 @@ getTyCon (GHC.TyConApp tc _) = tc
 getTypeFromRdr :: (Data a) => GHC.RdrName -> a -> Maybe GHC.Type
 getTypeFromRdr nm a = SYB.something (Nothing `SYB.mkQ` comp) a
   where comp :: GHC.HsBind GhcTc -> Maybe GHC.Type
-#if __GLASGOW_HASKELL__ >= 800
-        comp (GHC.FunBind (GHC.L _ n) _ _ _ _)
-#else
-        comp (GHC.FunBind (GHC.L _ n) _ _ _ _ _)
-#endif
+        comp (GHC.FunBind { GHC.fun_id = (GHC.L _ n) } )
           | occNm == (GHC.occName (GHC.idName n)) = Just (GHC.idType n)
           | otherwise = Nothing
         comp _ = Nothing
@@ -421,7 +464,10 @@ mkFuncs iDecl projStr absStr fStrings mqual = do
     f (s1, s2) = do
       let o2 = GHC.mkVarOcc s2
           rdr = mkRdr o2
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+      rdrL <- locate rdr
+      lExpr <- locate (GHC.HsVar GHC.noExt rdrL)
+#elif __GLASGOW_HASKELL__ >= 800
       rdrL <- locate rdr
       lExpr <- locate (GHC.HsVar rdrL)
 #else

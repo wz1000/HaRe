@@ -65,7 +65,11 @@ doMaybeToPlus pos argNum = do
     Nothing -> error "Function bind not found"
     Just funBind -> do
       nm <- getRefactNameMap
+#if __GLASGOW_HASKELL__ >= 806
+      let funNm = ghead "doMaybeToPlus" (definedNamesRdr nm (GHC.noLoc (GHC.ValD GHC.noExt funBind)))
+#else
       let funNm = ghead "doMaybeToPlus" (definedNamesRdr nm (GHC.noLoc (GHC.ValD funBind)))
+#endif
       -- Most general: contains Nothing to Nothing, can be Monadic
       -- otherwise canReplaceConstructors coming up true means MonadPlus
       hasNtoN <- containsNothingToNothing argNum pos funBind
@@ -117,7 +121,7 @@ replaceConstructors pos funNm argNum = do
           applyInGRHSs bind fun = applyTP (stop_tdTP (failTP `adhocTP` (runGRHSFun fun))) bind
 
           runGRHSFun :: (Data a) => (a -> RefactGhc a) -> ParsedGRHSs -> RefactGhc ParsedGRHSs
-          runGRHSFun fun grhss@(GHC.GRHSs _ _) = SYB.everywhereM (SYB.mkM fun) grhss
+          runGRHSFun fun grhss@(GHC.GRHSs {}) = SYB.everywhereM (SYB.mkM fun) grhss
 
           mzeroOcc = GHC.mkVarOcc "mzero"
           returnOcc = GHC.mkVarOcc "return"
@@ -143,11 +147,7 @@ replaceBind pos newBind = do
       --logm $ SYB.showData SYB.Parser 3 newParsed
       putRefactParsed newParsed mempty
       addMonadImport
-#if __GLASGOW_HASKELL__ >= 800
-  where worker rNm (funBnd@(GHC.FunBind (GHC.L _ name) _matches _ _ _) :: GHC.HsBind GhcPs)
-#else
-  where worker rNm (funBnd@(GHC.FunBind (GHC.L _ name) _ _matches _ _ _) :: GHC.HsBind GhcPs)
-#endif
+  where worker rNm (funBnd@(GHC.FunBind { GHC.fun_id = (GHC.L _ name) }) :: GHC.HsBind GhcPs)
           | name == rNm = return newBind
           | otherwise   = return funBnd
         worker rNm bind = error $ "replaceBind:unmatched type(rnM,bind):" ++ showGhc (rNm,bind)
@@ -172,7 +172,9 @@ doRewriteAsBind bind funNm = do
       let rhs = justToReturn newRhs
       lam <- wrapInLambda newPat rhs
   --    logm $ "New pat: " ++ (SYB.showData SYB.Parser 3 newPat)
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+      let (GHC.L _ (GHC.VarPat _ (GHC.L _ nm))) = newPat
+#elif __GLASGOW_HASKELL__ >= 800
       let (GHC.L _ (GHC.VarPat (GHC.L _ nm))) = newPat
 #else
       let (GHC.L _ (GHC.VarPat nm)) = newPat
@@ -210,11 +212,7 @@ replaceGRHS funNm new_rhs lhs_name = do
     where
           -- rdrName = GHC.Unqual $ GHC.mkDataOcc funNm
           worker :: NameMap ->  GHC.HsBind GhcPs -> RefactGhc (GHC.HsBind GhcPs)
-#if __GLASGOW_HASKELL__ >= 800
-          worker nm fb@(GHC.FunBind ln _ _ _ _)
-#else
-          worker nm fb@(GHC.FunBind ln _ _ _ _ _)
-#endif
+          worker nm fb@(GHC.FunBind { GHC.fun_id = ln })
             -- *| (GHC.occNameString . GHC.rdrNameOcc) nm == funNm = do
             | sameName nm ln funNm = do
               logm $ "=======Found funbind========"
@@ -224,13 +222,17 @@ replaceGRHS funNm new_rhs lhs_name = do
           worker _ bind = return bind
 
           worker' :: ParsedGRHSs -> RefactGhc ParsedGRHSs
-          worker' (GHC.GRHSs _ _) = do
+          worker' (GHC.GRHSs {}) = do
             logm "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! worker'!!!!!!!!!!!!!!!!!!!!!!"
             return new_rhs
 
           fix_lhs :: ParsedMatchGroup -> RefactGhc ParsedMatchGroup
           fix_lhs mg = do
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+            lhs_nameL <- locate lhs_name
+            let GHC.L lm [(GHC.L _ match)] = GHC.mg_alts mg
+                new_pat = GHC.VarPat GHC.noExt lhs_nameL
+#elif __GLASGOW_HASKELL__ >= 800
             lhs_nameL <- locate lhs_name
             let GHC.L lm [(GHC.L _ match)] = GHC.mg_alts mg
                 new_pat = GHC.VarPat lhs_nameL
@@ -253,7 +255,11 @@ replaceGRHS funNm new_rhs lhs_name = do
 -- | This creates a GRHS of the form "name >>= expr" and adds the appropriate annotations, returns the GRHSs.
 createBindGRHS :: GHC.RdrName -> GHC.LHsExpr GhcPs -> RefactGhc (GHC.GRHSs GhcPs (GHC.LHsExpr GhcPs))
 createBindGRHS name lam_par = do
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+  bindL <- locate (GHC.Unqual (GHC.mkDataOcc ">>="))
+  liftT $ addSimpleAnnT bindL (DP (0,1)) [((G GHC.AnnVal),DP (0,0))]
+  bind_occ <- locate $ GHC.HsVar GHC.noExt bindL
+#elif __GLASGOW_HASKELL__ >= 800
   bindL <- locate (GHC.Unqual (GHC.mkDataOcc ">>="))
   liftT $ addSimpleAnnT bindL (DP (0,1)) [((G GHC.AnnVal),DP (0,0))]
   bind_occ <- locate $ GHC.HsVar bindL
@@ -263,7 +269,11 @@ createBindGRHS name lam_par = do
   let occDp = [(G GHC.AnnVal, DP (0,1))]
       occAnn = annNone {annsDP = occDp}
   liftT $ addAnn bind_occ occAnn
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+  nameL <- locate name
+  liftT $ addSimpleAnnT nameL (DP (0,1)) [((G GHC.AnnVal),DP (0,0))]
+  l_name <- locate $ GHC.HsVar GHC.noExt nameL
+#elif __GLASGOW_HASKELL__ >= 800
   nameL <- locate name
   liftT $ addSimpleAnnT nameL (DP (0,1)) [((G GHC.AnnVal),DP (0,0))]
   l_name <- locate $ GHC.HsVar nameL
@@ -272,11 +282,21 @@ createBindGRHS name lam_par = do
 #endif
   let l_ann = annNone {annsDP = [(G GHC.AnnVal, DP (0,1))]}
   liftT $ addAnn l_name l_ann
+#if __GLASGOW_HASKELL__ >= 806
+  oppApp <- locate $ GHC.OpApp GHC.noExt l_name bind_occ lam_par
+#else
   oppApp <- locate $ GHC.OpApp l_name bind_occ GHC.PlaceHolder lam_par
+#endif
   addEmptyAnn oppApp
+#if __GLASGOW_HASKELL__ >= 806
+  lgrhs <- locate $ GHC.GRHS GHC.noExt [] oppApp
+#else
   lgrhs <- locate $ GHC.GRHS [] oppApp
+#endif
   addEmptyAnn lgrhs
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+  return $ GHC.GRHSs GHC.noExt [lgrhs] (GHC.noLoc (GHC.EmptyLocalBinds GHC.noExt ))
+#elif __GLASGOW_HASKELL__ >= 800
   return $ GHC.GRHSs [lgrhs] (GHC.noLoc GHC.EmptyLocalBinds)
 #else
   return $ GHC.GRHSs [lgrhs] GHC.EmptyLocalBinds
@@ -353,7 +373,11 @@ containsNothingToNothing argNum pos bind = do
         else []
 
     checkGRHS :: ParsedGRHSs -> Bool
+#if __GLASGOW_HASKELL__ >= 806
+    checkGRHS (GHC.GRHSs _ [(GHC.L _ (GHC.GRHS _ _ (GHC.L _ body)))] _)  = isNothingVar body
+#else
     checkGRHS (GHC.GRHSs [(GHC.L _ (GHC.GRHS _ (GHC.L _ body)))] _)  = isNothingVar body
+#endif
     checkGRHS _ = False
 
     checkPats :: [GHC.LPat GhcPs] -> Bool
@@ -372,7 +396,9 @@ containsNothingToNothing argNum pos bind = do
       getNewMs ms newLst
 
     isNothingPat :: GHC.Pat GhcPs -> Bool
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+    isNothingPat (GHC.VarPat _ (GHC.L _ nm)) = ((GHC.occNameString . GHC.rdrNameOcc) nm) == "Nothing"
+#elif __GLASGOW_HASKELL__ >= 800
     isNothingPat (GHC.VarPat (GHC.L _ nm)) = ((GHC.occNameString . GHC.rdrNameOcc) nm) == "Nothing"
 #else
     isNothingPat (GHC.VarPat nm) = ((GHC.occNameString . GHC.rdrNameOcc) nm) == "Nothing"
@@ -380,7 +406,9 @@ containsNothingToNothing argNum pos bind = do
     isNothingPat (GHC.ConPatIn (GHC.L _ nm) _) = ((GHC.occNameString . GHC.rdrNameOcc) nm) == "Nothing"
     isNothingPat _ = False
     isNothingVar :: GHC.HsExpr GhcPs -> Bool
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+    isNothingVar (GHC.HsVar _ (GHC.L _ nm)) = ((GHC.occNameString . GHC.rdrNameOcc) nm) == "Nothing"
+#elif __GLASGOW_HASKELL__ >= 800
     isNothingVar (GHC.HsVar (GHC.L _ nm)) = ((GHC.occNameString . GHC.rdrNameOcc) nm) == "Nothing"
 #else
     isNothingVar (GHC.HsVar nm) = ((GHC.occNameString . GHC.rdrNameOcc) nm) == "Nothing"
@@ -398,11 +426,7 @@ removeMatches pos newBind matches = do
   putRefactParsed newParsed mempty
   return ()
     where replaceBind :: GHC.Located GHC.RdrName -> GHC.HsBind GhcPs -> RefactGhc (GHC.HsBind GhcPs)
-#if __GLASGOW_HASKELL__ >= 800
-          replaceBind rdrNm ((GHC.FunBind name _ _ _ _) :: GHC.HsBind GhcPs)
-#else
-          replaceBind rdrNm ((GHC.FunBind name _ _ _ _ _) :: GHC.HsBind GhcPs)
-#endif
+          replaceBind rdrNm ((GHC.FunBind { GHC.fun_id = name }) :: GHC.HsBind GhcPs)
             | name == rdrNm = return newBind
           replaceBind _ a = return a
 
@@ -420,12 +444,20 @@ fixType' funNm argPos = do
   parsed <- getRefactParsed
   -- TODO:AZ what if there is no signature?
   let m_sig                       = getSigD nm funNm parsed
+#if __GLASGOW_HASKELL__ >= 806
+      (GHC.L sigL (GHC.SigD x sig)) = gfromJust "fixType'" m_sig
+#else
       (GHC.L sigL (GHC.SigD sig)) = gfromJust "fixType'" m_sig
+#endif
   fixedClass <- fixTypeClass sig
   --This needs to be fixed to replace only the correct argument and output type
   replacedMaybe <- replaceMaybeWithVariable fixedClass
 
+#if __GLASGOW_HASKELL__ >= 806
+  newSig <- locate (GHC.SigD x replacedMaybe)
+#else
   newSig <- locate (GHC.SigD replacedMaybe)
+#endif
   synthesizeAnns newSig
   addNewLines 2 newSig
   addNewKeyword ((G GHC.AnnDcolon), DP (0,1)) newSig
@@ -438,7 +470,12 @@ fixType' funNm argPos = do
           replaceMaybeWithVariable sig = SYB.everywhereM (SYB.mkM worker) sig
             where
                   worker :: GHC.HsType GhcPs -> RefactGhc (GHC.HsType GhcPs)
-#if __GLASGOW_HASKELL__ >= 802
+#if __GLASGOW_HASKELL__ >= 806
+                  worker tyVar@(GHC.HsTyVar x p (GHC.L lv rdrName))
+                    | compNames "Maybe" rdrName = let newRdr = (GHC.mkVarUnqual . GHC.fsLit) "m" in
+                        return (GHC.HsTyVar x p (GHC.L lv newRdr))
+                    | otherwise = return tyVar
+#elif __GLASGOW_HASKELL__ >= 802
                   worker tyVar@(GHC.HsTyVar p (GHC.L lv rdrName))
                     | compNames "Maybe" rdrName = let newRdr = (GHC.mkVarUnqual . GHC.fsLit) "m" in
                         return (GHC.HsTyVar p (GHC.L lv newRdr))
@@ -456,7 +493,60 @@ fixType' funNm argPos = do
 #endif
                   worker var = return var
           fixTypeClass :: GHC.Sig GhcPs -> RefactGhc (GHC.Sig GhcPs)
-#if __GLASGOW_HASKELL__ >= 802
+#if __GLASGOW_HASKELL__ >= 806
+          fixTypeClass sig@(GHC.TypeSig x names (GHC.HsWC wcs (GHC.HsIB a (GHC.L lt hsType)))) =
+            case hsType of
+              (GHC.HsQualTy x1 context ty) -> do
+                newContext <- case context of
+                                (GHC.L _ []) -> do
+                                  tyCls <- genMonadPlusClass
+                                  parTy <- locate (GHC.HsParTy GHC.noExt tyCls)
+                                  addNewKeyword ((G GHC.AnnCloseP),DP (0,0)) parTy
+                                  liftT $ setPrecedingLinesT parTy 0 (-1)
+                                  lList <- locate [parTy]
+                                  addNewKeywords [((G GHC.AnnOpenP), DP (0,0)),((G GHC.AnnCloseP), DP (0,-1)),((G GHC.AnnDarrow), DP (0,1))] lList
+                                  return lList
+                                (GHC.L _ [(GHC.L _ (GHC.HsParTy _ innerTy))]) -> do
+                                  tyCls <- genMonadPlusClass
+                                  lList <- locate [innerTy,tyCls]
+                                  return lList
+                                (GHC.L _ lst) -> do
+                                  tyCls <- genMonadPlusClass
+                                  lList <- locate (tyCls:lst)
+                                  return lList
+                newForAll <- locate (GHC.HsQualTy GHC.noExt newContext ty)
+                liftT $ setPrecedingLinesT ty 0 1
+                liftT $ setPrecedingLinesT newForAll 0 1
+                return (GHC.TypeSig x names (GHC.HsWC wcs (GHC.HsIB a newForAll)))
+              (GHC.HsForAllTy x1 bndrs ty) -> do
+                newContext <- do
+                                  tyCls <- genMonadPlusClass
+                                  parTy <- locate (GHC.HsParTy GHC.noExt tyCls)
+                                  addNewKeyword ((G GHC.AnnCloseP),DP (0,0)) parTy
+                                  liftT $ setPrecedingLinesT parTy 0 (-1)
+                                  lList <- locate [parTy]
+                                  addNewKeywords [((G GHC.AnnOpenP), DP (0,0)),((G GHC.AnnCloseP), DP (0,-1)),((G GHC.AnnDarrow), DP (0,1))] lList
+                                  return lList
+                -- newForAll <- locate (GHC.HsForAllTy b ty)
+                newForAll <- locate (GHC.HsQualTy GHC.noExt newContext ty)
+                liftT $ setPrecedingLinesT ty 0 1
+                liftT $ setPrecedingLinesT newForAll 0 1
+                -- return (GHC.TypeSig names newForAll p)
+                return (GHC.TypeSig x names (GHC.HsWC wcs (GHC.HsIB a newForAll)))
+              unexpected -> do
+                logm "fixTypeClass:unexpected"
+                -- logDataWithAnns "fixTypeClass:unexpected" unexpected
+                newContext <- do
+                  tyCls <- genMonadPlusClass
+                  parTy <- locate (GHC.HsParTy GHC.noExt tyCls)
+                  liftT $ setPrecedingLinesT parTy 0 (-1)
+                  lList <- locate [parTy]
+                  addNewKeywords [((G GHC.AnnOpenP), DP (0,1)),((G GHC.AnnCloseP), DP (0,0)),((G GHC.AnnDarrow), DP (0,1))] lList
+                  return lList
+                let qualTy = GHC.HsQualTy GHC.noExt newContext (GHC.L lt hsType)
+                qualTyL <- locate qualTy
+                return (GHC.TypeSig x names (GHC.HsWC wcs (GHC.HsIB a qualTyL)))
+#elif __GLASGOW_HASKELL__ >= 802
           fixTypeClass sig@(GHC.TypeSig names (GHC.HsWC wcs (GHC.HsIB a (GHC.L lt hsType) b))) =
             case hsType of
               (GHC.HsQualTy context ty) -> do
@@ -598,7 +688,11 @@ fixType' funNm argPos = do
             --     mNm     = GHC.mkVarUnqual (GHC.fsLit "m")
             let mPlusNm = mkRdrName "MonadPlus"
                 mNm     = mkRdrName "m"
-#if __GLASGOW_HASKELL__ >= 802
+#if __GLASGOW_HASKELL__ >= 806
+            mPlusNmL <- locate mPlusNm
+            addAnnValWithDP mPlusNmL (DP (0,0))
+            lPlus <- locate (GHC.HsTyVar GHC.noExt GHC.NotPromoted mPlusNmL)
+#elif __GLASGOW_HASKELL__ >= 802
             mPlusNmL <- locate mPlusNm
             addAnnValWithDP mPlusNmL (DP (0,0))
             lPlus <- locate (GHC.HsTyVar GHC.NotPromoted mPlusNmL)
@@ -611,19 +705,26 @@ fixType' funNm argPos = do
             addAnnVal lPlus
 #endif
             liftT $ setPrecedingLinesT lPlus 0 0
-#if __GLASGOW_HASKELL__ >= 802
+#if __GLASGOW_HASKELL__ >= 806
+            mNmL <- locate mNm
+            addAnnVal mNmL
+            lM <- locate (GHC.HsTyVar GHC.noExt GHC.NotPromoted mNmL)
+            lApp <- locate (GHC.HsAppTy GHC.noExt lPlus lM)
+#elif __GLASGOW_HASKELL__ >= 802
             mNmL <- locate mNm
             addAnnVal mNmL
             lM <- locate (GHC.HsTyVar GHC.NotPromoted mNmL)
+            lApp <- locate (GHC.HsAppTy lPlus lM)
 #elif __GLASGOW_HASKELL__ >= 800
             mNmL <- locate mNm
             addAnnVal mNmL
             lM <- locate (GHC.HsTyVar mNmL)
+            lApp <- locate (GHC.HsAppTy lPlus lM)
 #else
             lM <- locate (GHC.HsTyVar mNm)
             addAnnVal lM
-#endif
             lApp <- locate (GHC.HsAppTy lPlus lM)
+#endif
             return lApp
 
 
@@ -636,7 +737,11 @@ fixType funNm = do
   logm $ "fixType:funNm=" ++ showGhc funNm
   -- logParsedSource "fixType"
   let m_sig = getSigD nm funNm parsed
+#if __GLASGOW_HASKELL__ >= 806
+      (GHC.L sigL (GHC.SigD _ sig)) = gfromJust "fixType: getting sig" m_sig
+#else
       (GHC.L sigL (GHC.SigD sig)) = gfromJust "fixType: getting sig" m_sig
+#endif
       iType = gfromJust "fixType: iType" $ getInnerType sig
       strTy = exactPrint iType currAnns
       tyStr = showGhc funNm ++ " :: (MonadPlus m) => m " ++ strTy ++ " -> m " ++ strTy
@@ -655,14 +760,20 @@ getSigD :: (Data a) => NameMap -> GHC.Name -> a -> Maybe (GHC.LHsDecl GhcPs)
 getSigD nm funNm = SYB.something (Nothing `SYB.mkQ` isSigD)
   where
     isSigD :: GHC.LHsDecl GhcPs -> Maybe (GHC.LHsDecl GhcPs)
+#if __GLASGOW_HASKELL__ >= 806
+    isSigD s@(GHC.L _ (GHC.SigD x sig)) = if isSig sig
+#else
     isSigD s@(GHC.L _ (GHC.SigD sig)) = if isSig sig
-                                        then Just s
-                                        else Nothing
+#endif
+                                          then Just s
+                                          else Nothing
     isSigD _ = Nothing
 
     isSig :: GHC.Sig GhcPs -> Bool
     -- TODO:AZ: what about a shared signature, where the one we care about is not the first one?
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+    isSig sig@(GHC.TypeSig _ [ln] _) = (sameName nm ln funNm)
+#elif __GLASGOW_HASKELL__ >= 800
     isSig sig@(GHC.TypeSig [ln] _) = (sameName nm ln funNm)
 #else
     isSig sig@(GHC.TypeSig [ln] _ _) = (sameNAme nm ln funNm)
@@ -682,7 +793,18 @@ compNames s rdr = let sRdr = (GHC.occNameString . GHC.rdrNameOcc) rdr in
 -- | Get the type inside the first Maybe the traversal finds.
 getInnerType :: GHC.Sig GhcPs -> Maybe (GHC.LHsType GhcPs)
 getInnerType = SYB.everything (<|>) (Nothing `SYB.mkQ` getTy)
-#if __GLASGOW_HASKELL__ >= 802
+#if __GLASGOW_HASKELL__ >= 806
+  where getTy :: GHC.HsType GhcPs -> Maybe (GHC.LHsType GhcPs)
+        getTy (GHC.HsAppTy _ mCon  otherTy)
+          = if isMaybeTy mCon
+              then Just otherTy
+              else Nothing
+        getTy _ = Nothing
+
+        isMaybeTy :: GHC.LHsType GhcPs -> Bool
+        isMaybeTy (GHC.L _ (GHC.HsTyVar _ _ (GHC.L _ (GHC.Unqual occNm)))) = (GHC.occNameString occNm) == "Maybe"
+        isMaybeTy _ = False
+#elif __GLASGOW_HASKELL__ >= 802
   where getTy :: GHC.HsType GhcPs -> Maybe (GHC.LHsType GhcPs)
         getTy (GHC.HsAppsTy [GHC.L _ (GHC.HsAppPrefix mCon), GHC.L _ (GHC.HsAppPrefix otherTy)])
           = if isMaybeTy mCon

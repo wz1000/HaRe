@@ -66,20 +66,19 @@ pnUsedInScope pn t' = do
   res <- applyTU (stop_tdTU (failTU `adhocTU` bind `adhocTU` var)) t'
   return $ (length res) > 0
     where
-#if __GLASGOW_HASKELL__ <= 710
-      bind ((GHC.FunBind (GHC.L l name) _ match _ _ _) :: GHC.HsBindLR GhcRn GhcRn)
-#else
-      bind ((GHC.FunBind (GHC.L l name)  match _ _ _) :: GHC.HsBindLR GhcRn GhcRn)
-#endif
+      bind ((GHC.FunBind { GHC.fun_id = (GHC.L l name) }) :: GHC.HsBindLR GhcRn GhcRn)
+      -- bind ((GHC.FunBind (GHC.L l name)  match _ _ _) :: GHC.HsBindLR GhcRn GhcRn)
         | name == pn = do
             logm $ "Found Binding at: " ++ (showGhc l)
             return []
       bind other = do
         mzero
-#if __GLASGOW_HASKELL__ <= 710
-      var ((GHC.HsVar name) :: GHC.HsExpr GhcRn)
-#else
+#if __GLASGOW_HASKELL__ >= 806
+      var ((GHC.HsVar _ (GHC.L _ name)) :: GHC.HsExpr GhcRn)
+#elif __GLASGOW_HASKELL__ > 710
       var ((GHC.HsVar (GHC.L _ name)) :: GHC.HsExpr GhcRn)
+#else
+      var ((GHC.HsVar name) :: GHC.HsExpr GhcRn)
 #endif
         | name == pn = do
             logm $ "Found var"
