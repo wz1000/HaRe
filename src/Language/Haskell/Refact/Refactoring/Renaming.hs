@@ -338,7 +338,20 @@ condChecking2 nm oldPN newName ast = do
         else mzero
 
     -- The name is declared in a ConDecl
-#if __GLASGOW_HASKELL__ > 710
+#if __GLASGOW_HASKELL__ >= 806
+    inConDecl cd@(GHC.ConDeclGADT { GHC.con_names = ns } :: GHC.ConDecl GhcPs) = do
+      declared <- isDeclaredBy ns
+      -- TODO: what about condChecking' ?
+      if declared
+        then condChecking' cd
+        else mzero
+    inConDecl cd@(GHC.ConDeclH98 { GHC.con_name = n, GHC.con_args = dets }) = do
+      declaredn <- isDeclaredBy n
+      declaredd <- isDeclaredBy dets
+      if declaredn || declaredd
+        then condChecking' cd
+        else mzero
+#elif __GLASGOW_HASKELL__ > 710
     inConDecl cd@(GHC.ConDeclGADT { GHC.con_names = ns } :: GHC.ConDecl GhcPs) = do
       declared <- isDeclaredBy ns
       -- TODO: what about condChecking' ?
