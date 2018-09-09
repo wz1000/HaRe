@@ -15,7 +15,6 @@ module Language.Haskell.Refact.Utils.Utils
        -- * Managing the GHC / project environment
          getTargetGhc
        , parseSourceFileGhc
-       -- , getTypecheckedModuleGhc
        , loadTypecheckedModule
 
        -- * The bits that do the work
@@ -89,7 +88,7 @@ getTargetGhc (GM.ModulePath _mn fp) = parseSourceFileGhc fp
 parseSourceFileGhc :: FilePath -> RefactGhc ()
 parseSourceFileGhc targetFile = do
   -- logm $ "parseSourceFileGhc:targetFile=" ++ targetFile
-  (_, mtm, _) <- RefactGhc $ GM.getTypecheckedModuleGhc' id targetFile
+  (_, mtm, _) <- RefactGhc $ GM.getModulesGhc' id targetFile
   case mtm of
     Nothing -> error $ "Couldn't get typechecked module for " ++ targetFile
     Just tm -> loadTypecheckedModule tm
