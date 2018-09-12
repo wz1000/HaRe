@@ -20,4 +20,9 @@ rm .ghc.environment.*
 
 
 # cabal-2.2 new-configure --with-compiler=/opt/ghc/8.4.0.20180204/bin/ghc --allow-newer
-cabal new-configure --enable-tests --with-compiler=/opt/ghc/8.6.0.20180627/bin/ghc --allow-newer
+# cabal new-configure --enable-tests --with-compiler=/opt/ghc/8.6.0.20180627/bin/ghc --allow-newer
+# cabal new-configure --enable-tests --with-compiler=/opt/ghc/8.6.0.20180712/bin/ghc --allow-newer
+# cabal-2.4 new-configure --enable-tests --with-compiler=/opt/ghc/8.6.0.20180810/bin/ghc --allow-newer
+# cabal new-configure --enable-tests --with-compiler=/opt/ghc/8.6.0.20180810/bin/ghc --allow-newer
+
+cabal-2.4 new-configure  --with-compiler=/opt/ghc/8.6.0.20180810/bin/ghc --allow-newer

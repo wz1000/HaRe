@@ -1,7 +1,8 @@
 packages: .
           ./submodules/ghc-mod/core
           ./submodules/cabal-helper
-          ./submodules/ghc-exactprint
+          -- ./submodules/ghc-exactprint
+          -- ./submodules/monad-journal
 
 repository head.hackage
   url: http://head.hackage.haskell.org/
@@ -12,7 +13,7 @@ repository head.hackage
   key-threshold: 3
 
 -- https://github.com/hvr/head.hackage#as-locally-patched-packages
-optional-packages: packages/*/*.cabal
+-- optional-packages: packages/*/*.cabal
 -- $ cd packages
 -- $ cabal unpack --pristine $PKGID
 -- $ cd $PKGID/

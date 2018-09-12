@@ -1,24 +1,19 @@
-resolver: nightly-2018-06-29
+# resolver: nightly-2018-06-29
+resolver: lts-12.9
 
 packages:
 - .
-- location:
-    ./submodules/ghc-mod
-  extra-dep: true
-  subdirs:
-    # - .
-    - core
-
-- location:
-    ./submodules/cabal-helper
-  extra-dep: true
-
-- location:
-    ./submodules/ghc-exactprint
-  extra-dep: true
 
 extra-deps:
+- ./submodules/ghc-mod/core
+# - ./submodules/monad-journal
+
 - syz-0.2.0.0
+- ghc-exactprint-0.5.7.1
+- pretty-show-1.8.1
+# - cabal-helper-0.8.1.2
+- cabal-helper-0.8.1.0@rev:0
+
 
 - cabal-plan-0.3.0.0
 - temporary-1.2.1.1

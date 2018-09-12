@@ -19,7 +19,9 @@ main :: IO ()
 main = do
   cleanupDirs (Tu.ends "/.stack-work")
   cleanupDirs (Tu.ends "/dist")
+  cleanupDirs (Tu.ends "/dist-newstyle")
   if True
+  -- if False
     then setupStackFiles
     else setupDistDirs
   hspec Spec.spec
@@ -37,6 +39,8 @@ setupDistDirs =
     withCurrentDirectory d $ do
       run "cabal" [ "install", "--dependencies-only" ]
       run "cabal" [ "configure" ]
+      -- run "cabal-2.4" [ "install", "--dependencies-only", "--allow-newer" ]
+      -- run "cabal-2.4" [ "configure", "--allow-newer" ]
 
 -- This is shamelessly copied from cabal-helper GhcSession test.
 run :: String -> [String] -> IO ()

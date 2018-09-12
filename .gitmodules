@@ -10,3 +10,6 @@
 [submodule "submodules/ghc-exactprint"]
 	path = submodules/ghc-exactprint
 	url = https://github.com/alanz/ghc-exactprint.git
+[submodule "submodules/monad-journal"]
+	path = submodules/monad-journal
+	url = https://github.com/alanz/monad-journal.git
