@@ -25,4 +25,7 @@ rm .ghc.environment.*
 # cabal-2.4 new-configure --enable-tests --with-compiler=/opt/ghc/8.6.0.20180810/bin/ghc --allow-newer
 # cabal new-configure --enable-tests --with-compiler=/opt/ghc/8.6.0.20180810/bin/ghc --allow-newer
 
-cabal-2.4 new-configure  --with-compiler=/opt/ghc/8.6.0.20180810/bin/ghc --allow-newer
+# cabal-2.4 new-configure  --with-compiler=/opt/ghc/8.6.0.20180810/bin/ghc --allow-newer
+
+# cabal new-configure  --with-compiler=ghc-8.6.1 --allow-newer
+cabal new-configure  --with-compiler=ghc-8.6.1

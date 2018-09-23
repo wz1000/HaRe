@@ -6,7 +6,6 @@ packages:
 
 extra-deps:
 - ./submodules/ghc-mod/core
-# - ./submodules/monad-journal
 
 - syz-0.2.0.0
 - ghc-exactprint-0.5.7.1

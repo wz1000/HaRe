@@ -1,9 +1,10 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -45,6 +46,9 @@ import qualified HscTypes      as GHC
 import qualified Outputable    as GHC
 
 import Control.Applicative
+#if __GLASGOW_HASKELL__ >= 806
+import qualified Control.Monad.Fail as Fail
+#endif
 import Control.Monad.State
 import Data.IORef
 --import Data.Time.Clock
@@ -208,6 +212,11 @@ newtype RefactGhc a = RefactGhc
                , GM.MonadIO
                , ExceptionMonad
                )
+
+#if __GLASGOW_HASKELL__ >= 806
+instance Fail.MonadFail RefactGhc where
+  fail = Fail.fail
+#endif
 
 -- ---------------------------------------------------------------------
 
