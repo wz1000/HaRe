@@ -70,13 +70,15 @@ stackFiles = map (++"stack.yaml") cabalDirs
 resolver :: String
 resolver =
 #if (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,6,0,0)))
-  "resolver: nightly-2018-06-29"
+  "resolver: nightly-2018-11-07"
+#elif (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,4,4,0)))
+  "resolver: lts-12.17"
 #elif (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,4,3,0)))
   "resolver: nightly-2018-06-29"
 #elif (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,4,2,0)))
   "resolver: nightly-2018-04-24"
 #elif (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,4,1,0)))
-  "resolver: nightly-2018-04-21" -- last one for GHC 8.4.1 
+  "resolver: nightly-2018-04-21" -- last one for GHC 8.4.1
 #elif (defined(MIN_VERSION_GLASGOW_HASKELL) && (MIN_VERSION_GLASGOW_HASKELL(8,2,2,0)))
   "resolver: lts-11.6"
 #elif __GLASGOW_HASKELL__ >= 802
@@ -149,4 +151,3 @@ listStackDirs :: IO ()
 listStackDirs = Tu.sh $ do
   dirs <- Tu.find (Tu.ends "/.stack-work") "./test"
   mapM Tu.echo $ Tu.textToLines $ "found:" Tu.<> (Tu.repr dirs)
-

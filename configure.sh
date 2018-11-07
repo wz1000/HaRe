@@ -29,3 +29,4 @@ rm .ghc.environment.*
 
 # cabal new-configure  --with-compiler=ghc-8.6.1 --allow-newer
 cabal new-configure  --with-compiler=ghc-8.6.1
+cabal new-configure --with-compiler=ghc-8.6.1 --enable-tests

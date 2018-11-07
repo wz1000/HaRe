@@ -1,7 +1,7 @@
 packages: .
           ./submodules/ghc-mod/core
           ./submodules/cabal-helper
-          ./submodules/hslogger
+          -- ./submodules/hslogger
           -- ./submodules/ghc-exactprint
           -- ../ghc-exactprint
 
@@ -22,10 +22,12 @@ packages: .
 -- $ cp ${WhereThisGitHubRepoIsCloned}/patches/$PKGID.cabal ./*.cabal
 -- $ cd ../..
 
-allow-newer:HTTP-4000.3.12:base
-allow-newer:polyparse-1.12:base
-allow-newer:unliftio-core-0.1.2.0:base
-allow-newer:fclabels-2.0.3.3:base
-allow-newer:fclabels-2.0.3.3:template-haskell
+-- allow-newer:HTTP-4000.3.12:base
+-- allow-newer:polyparse-1.12:base
+-- allow-newer:unliftio-core-0.1.2.0:base
+-- allow-newer:fclabels-2.0.3.3:base
+-- allow-newer:fclabels-2.0.3.3:template-haskell
 
--- allow-newer:hslogger-1.2.10:containers
+-- For tests
+-- allow-newer:foldl-1.4.4:containers
+-- allow-newer:turtle-1.5.11:containers
