@@ -1312,7 +1312,11 @@ spec = do
             "(FN [FreeAndDeclared.Binders.gfromJust,\n "++
             "FreeAndDeclared.Binders.somethingStaged,\n "++
             "FreeAndDeclared.Binders.Renamer, "++
+#if __GLASGOW_HASKELL__ >= 806
+            "GHC.Maybe.Nothing, "++
+#else
             "GHC.Base.Nothing, "++
+#endif
             "renamed,\n "++
             "FreeAndDeclared.Binders.Name, "++
             "GHC.Classes.==, "++
@@ -1320,7 +1324,11 @@ spec = do
             "FreeAndDeclared.Binders.occNameString,\n "++
             "FreeAndDeclared.Binders.getOccName, "++
             "name, "++
+#if __GLASGOW_HASKELL__ >= 806
+            "GHC.Maybe.Just],"++
+#else
             "GHC.Base.Just],"++
+#endif
             "DN [res, worker])"
 
     -- -----------------------------------
@@ -3661,9 +3669,12 @@ spec = do
 
           let res = usedByRhsRdr nm decls' [name]
 
+          logDataWithAnns "decls' :"  decls'
+
           return (res,decls,tl,name)
 
       ((r,d,n1,n2),_s) <- runRefactGhc comp (initialState { rsModule = initRefactModule [] t }) testOptions
+      -- ((r,d,n1,n2),_s) <- runRefactGhc comp (initialLogOnState { rsModule = initRefactModule [] t }) testOptions
       (showGhcQual n1) `shouldBe` "MoveDef.Demote.toplevel"
       (showGhcQual n2) `shouldBe` "MoveDef.Demote.c"
       (showGhcQual d) `shouldBe` "[toplevel x = c * x]"

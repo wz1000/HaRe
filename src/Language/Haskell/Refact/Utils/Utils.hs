@@ -431,7 +431,7 @@ clientModsAndFiles :: GM.ModulePath -> RefactGhc [TargetModule]
 clientModsAndFiles m = do
   logm $ "clientModsAndFiles:m=" ++ show m
   mgs <- cabalModuleGraphs
-  logm $ "clientModsAndFiles:mgs=" ++ show mgs
+  -- logm $ "clientModsAndFiles:mgs=" ++ show mgs
   -- mgs is [Map ModulePath (Set ModulePath)]
   --  where eack key imports the corresponding set.
   -- There are no cycles

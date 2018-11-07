@@ -44,6 +44,7 @@ module Language.Haskell.Refact.Utils.TypeUtils
     inScopeInfo, isInScopeAndUnqualified, isInScopeAndUnqualifiedGhc, inScopeNames
    , isExported, isExplicitlyExported, modIsExported
    , equivalentNameInNewMod
+   , equivalentNameInNewMod'
    , hsQualifier
 
     -- ** Property checking
@@ -270,6 +271,23 @@ equivalentNameInNewMod old = do
   -- logm $ "equivalentNameInNewMod:clientInscopes=" ++ (showGhcQual ( map GHC.nameModule clientInscopes))
   let newNames = filter (\n -> showGhcQual n == showGhcQual old) clientInscopes
   return newNames
+
+-- ---------------------------------------------------------------------
+
+equivalentNameInNewMod' :: GHC.Name -> RefactGhc (Maybe GHC.Name)
+equivalentNameInNewMod' oldPN = do
+    -- We need to find the old name in the module, and get it as a
+    -- GHC.Name to know what to look for in the call to renamePN', as it
+    -- checks the GHC.nameUnique value.
+    newNames <- equivalentNameInNewMod oldPN
+    logm $ "equivalentNameInNewMod':(newNames)=" ++ showGhcQual newNames
+
+    let newNames' = filter (sameNameSpace oldPN) newNames
+    case newNames' of
+        []          -> return Nothing
+        [equivName] -> return $ Just equivName
+        ns -> error $ "HaRe: equivalentNameInNewMod': could not find name to replace, got:"
+          ++ (showGhcQual $ map (\n -> (n,GHC.occNameSpace $ GHC.nameOccName n)) ns)
 
 -- ---------------------------------------------------------------------
 
@@ -837,11 +855,14 @@ instance UsedByRhs (GHC.Match GhcPs (GHC.LHsExpr GhcPs)) where
 -- -------------------------------------
 
 instance UsedByRhs (GHC.HsBind GhcPs) where
-#if __GLASGOW_HASKELL__ <= 710
-  usedByRhsRdr nm  (GHC.FunBind _ _ matches _ _ _)        pns = findNamesRdr nm pns matches
-#else
+#if __GLASGOW_HASKELL__ >= 806
+  usedByRhsRdr nm  (GHC.FunBind _ _ matches _ _)          pns = findNamesRdr nm pns matches
+#elif __GLASGOW_HASKELL__ > 710
   usedByRhsRdr nm  (GHC.FunBind _ matches _ _ _)          pns = findNamesRdr nm pns matches
+#else
+  usedByRhsRdr nm  (GHC.FunBind _ _ matches _ _ _)        pns = findNamesRdr nm pns matches
 #endif
+
 #if __GLASGOW_HASKELL__ >= 806
   usedByRhsRdr nm  (GHC.PatBind _ _ rhs _)                  pns = findNamesRdr nm pns rhs
   usedByRhsRdr nm  (GHC.PatSynBind _ (GHC.PSB _ _ _ rhs _)) pns = findNamesRdr nm pns rhs

@@ -476,13 +476,15 @@ hsFreeAndDeclaredRdr' nm t = do
           pat (GHC.L _ (GHC.NPlusKPat n _ _ _)) = return (FN [],DN [rdrName2NamePure nm n])
 #endif
 #if __GLASGOW_HASKELL__ >= 806
-          pat (GHC.L _ (GHC.SigPat _ p)) = pat p
+          pat (GHC.L _ (GHC.SigPat b p)) = do
 #else
           pat (GHC.L _ _p@(GHC.SigPatIn p b)) = do
+#endif
             fdp <- pat p
             (FN fb,DN _db) <- hsFreeAndDeclaredRdr' nm b
             -- error $ "pat.SigPatIn:(b,fb,db)" ++ showGhc (b,fb,db)
             return $ fdp <> (FN fb,DN [])
+#if __GLASGOW_HASKELL__ < 806
           pat (GHC.L _ (GHC.SigPatOut p _)) = pat p
 #endif
 #if __GLASGOW_HASKELL__ >= 806
@@ -633,10 +635,12 @@ hsFreeAndDeclaredRdr' nm t = do
             return (FN (f\\d),DN d)
 
           -- stmts --
-#if __GLASGOW_HASKELL__ <= 710
-          stmts ((GHC.BindStmt pat' expre _bindOp _failOp) :: GHC.Stmt GhcPs (GHC.LHsExpr GhcPs)) = do
-#else
+#if __GLASGOW_HASKELL__ >= 806
+          stmts ((GHC.BindStmt _x pat' expre _bindOp _failOp) :: GHC.Stmt GhcPs (GHC.LHsExpr GhcPs)) = do
+#elif __GLASGOW_HASKELL__ > 710
           stmts ((GHC.BindStmt pat' expre _bindOp _failOp _) :: GHC.Stmt GhcPs (GHC.LHsExpr GhcPs)) = do
+#else
+          stmts ((GHC.BindStmt pat' expre _bindOp _failOp) :: GHC.Stmt GhcPs (GHC.LHsExpr GhcPs)) = do
 #endif
             -- TODO ++AZ++ : Not sure it is meaningful to pull
             --               anything out of bindOp/failOp
@@ -1538,7 +1542,7 @@ hsVisibleDsRdr :: (SYB.Data t)
 -- TODO: DeclaredNames is probably the wrong type. Perhaps create VisibleNames
 --       And perhaps use a NameSet or Set, to avoid the nub call
 hsVisibleDsRdr nm e t = do
-  -- logm $ "hsVisibleDsRdr:(e,t)=" ++ (SYB.showData SYB.Renamer 0 (e,t))
+  -- logDataWithAnns "hsVisibleDsRdr:(e,t)=" (e,t)
   (DN d) <- res
   return (DN (nub d))
   where
@@ -2004,15 +2008,21 @@ hsVisibleDsRdr nm e t = do
 #else
     lstmt (GHC.L _ (GHC.LastStmt ex _)) = hsVisibleDsRdr nm e ex
 #endif
-#if __GLASGOW_HASKELL__ <= 710
-    lstmt (GHC.L _ (GHC.BindStmt pa ex _ _)) = do
-#else
+#if __GLASGOW_HASKELL__ >= 806
+    lstmt (GHC.L _ (GHC.BindStmt _ pa ex _ _)) = do
+#elif __GLASGOW_HASKELL__ < 710
     lstmt (GHC.L _ (GHC.BindStmt pa ex _ _ _)) = do
+#else
+    lstmt (GHC.L _ (GHC.BindStmt pa ex _ _)) = do
 #endif
       fdp <- hsVisibleDsRdr nm e pa
       fde <- hsVisibleDsRdr nm e ex
       return (fdp <> fde)
+#if __GLASGOW_HASKELL__ >= 806
+    lstmt (GHC.L _ (GHC.BodyStmt _ ex _ _)) = hsVisibleDsRdr nm e ex
+#else
     lstmt (GHC.L _ (GHC.BodyStmt ex _ _ _)) = hsVisibleDsRdr nm e ex
+#endif
 
 #if __GLASGOW_HASKELL__ >= 806
     lstmt (GHC.L _ (GHC.LetStmt _ bs)) = hsVisibleDsRdr nm e bs

@@ -68,16 +68,17 @@ compAddOneParameter fileName paramName (row, col) = do
                   if exported
                     then do
                      clients <- clientModsAndFiles targetModule
+                     logm $ "compAddOneParameter:clients=" ++ showGhc clients
                      decls <- liftT $ hsDecls parsed
                      let inscopes = []
                      defaultArg <- mkTopLevelDefaultArgName pn paramName inscopes decls
-                     logm $ "compAdd:defaultArg=" ++ showGhc defaultArg
+                     logm $ "compAddOneParameter:defaultArg=" ++ showGhc defaultArg
                      (refactoredMod,_) <- applyRefac (doAddingParam pn paramName (Just defaultArg) True) RSAlreadyLoaded
                      refactoredClients <- mapM (addArgInClientMod pn defaultArg) clients
                      -- let refactoredClients = []
                      return $ refactoredMod:refactoredClients
                     else do
-                     logm $ "compAdd:not exported"
+                     logm $ "compAddOneParameter:not exported"
                      (refactoredMod,_) <- applyRefac (doAddingParam pn paramName Nothing False) (RSFile fileName)
                      return [refactoredMod]
 
@@ -208,6 +209,7 @@ doAddingParam pn newParam defaultArg isExported' = do
                if paramNameOk nm pn newParam ds
                    then do
                        ds' <- addParamsToDecls ds pn [mkRdrName newParam] --addFormalParam pn newParam ds
+                       -- logDataWithAnns "doAdding:ds'" ds'
                        defaultParamPName <-if isNothing defaultArg
                                            then mkLocalDefaultArgName pn newParam parent
                                            else return (gfromJust "doAdding" defaultArg)
@@ -504,9 +506,11 @@ addArgInClientMod pnt defaultArg serverModName = do
 
 addArgInClientMod' :: GHC.Name -> GHC.Located GHC.RdrName -> GHC.ModuleName -> RefactGhc ()
 addArgInClientMod' pnt defaultArg serverModName = do
+   logm $ "addArgInClientMod':serverModName=" ++ showGhc serverModName
    parsed <- getRefactParsed
    let pn = pnt
    qual <- hsQualifier pnt
+   logm $ "addArgInClientMod':(qual,pnt)=" ++ showGhc (qual,pnt)
    if qual == []
           then return ()
           else do
@@ -525,24 +529,35 @@ addDefaultActualArgInClientMod :: (SYB.Data t)
   -> RefactGhc t
 addDefaultActualArgInClientMod pn argPName t = do
   logm $ "addDefaultActualArgInClientMod entered:argPName=" ++ showGhc argPName
+  logm $ "addDefaultActualArgInClientMod entered:pn=" ++ showGhc pn
+  logDataWithAnns "addDefaultActualArgInClientMod:pn" pn
+  -- logDataWithAnns "addDefaultActualArgInClientMod:t" t
   nm <- getRefactNameMap
-  r <- applyTP (stop_tdTP (failTP `adhocTP` (funApp nm))) t
-  return r
+  mOldName <- equivalentNameInNewMod' pn
+  case mOldName of
+    Just oldName -> do
+      r <- applyTP (stop_tdTP (failTP `adhocTP` (funApp nm oldName))) t
+      return r
+    _ -> return t
   where
 #if __GLASGOW_HASKELL__ >= 806
-    funApp nm (expr@((GHC.L l (GHC.HsVar _ (GHC.L _ pname) )))::GHC.LHsExpr GhcPs)
+    funApp nm old (expr@((GHC.L l (GHC.HsVar _ (GHC.L _ pname) )))::GHC.LHsExpr GhcPs)
 #elif __GLASGOW_HASKELL__ > 710
-    funApp nm (expr@((GHC.L l (GHC.HsVar (GHC.L _ pname) )))::GHC.LHsExpr GhcPs)
+    funApp nm old (expr@((GHC.L l (GHC.HsVar (GHC.L _ pname) )))::GHC.LHsExpr GhcPs)
 #else
-    funApp nm (expr@((GHC.L l (GHC.HsVar pname )))::GHC.LHsExpr GhcPs)
+    funApp nm old (expr@((GHC.L l (GHC.HsVar pname )))::GHC.LHsExpr GhcPs)
 #endif
-      | GHC.nameUnique (rdrName2NamePure nm (GHC.L l pname)) == GHC.nameUnique pn
-       = do
+      = do
+        logm $ "addDefaultActualArgInClientMod.funapp: pname=" ++ showGhc (rdrName2NamePure nm (GHC.L l pname))
+        logDataWithAnns "pname" (rdrName2NamePure nm (GHC.L l pname))
+        if GHC.nameUnique (rdrName2NamePure nm (GHC.L l pname)) == GHC.nameUnique old
+          then do
             logm $ "addDefaultActualArgInClientMod:hit"
             -- vs <- hsVisibleNamesRdr (GHC.L l pname) t
             let argExp = GHC.unLoc argPName
             addParamToExp expr argExp
-    funApp _ _ = mzero
+          else mzero
+    funApp _ _ _ = mzero
 
 -------------------------------End of adding a parameter-----------------------------------
 
@@ -954,9 +969,8 @@ rmNthArgInFunCallMod pn nTh = do
   logm $ "rmNthArgInFunCallMod:(newNames)=" ++ showGhcQual newNames
   case newNames of
     [] -> return ()
-    [_pnt] -> do
-      parsed' <- rmNthArgInFunCall pn nTh parsed
+    [pnt] -> do
+      parsed' <- rmNthArgInFunCall pnt nTh parsed
       putRefactParsed parsed' emptyAnns
       return ()
     _ns   -> error "HaRe: rmParam: more than one name matches"
-

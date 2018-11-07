@@ -86,10 +86,12 @@ checkPreconditions retRhs doStmts boundVars = do
         checkOrdering [] [] = True
         checkOrdering [] ((GHC.L _ (GHC.BodyStmt _ _ _ _)):stmts) = checkOrdering [] stmts
         checkOrdering vars ((GHC.L _ (GHC.BodyStmt _ _ _ _)):stmts) = checkOrdering vars stmts
-#if __GLASGOW_HASKELL__ <= 710
-        checkOrdering (var:vars) ((GHC.L _ (GHC.BindStmt pat _ _ _)):stmts) =
-#else
+#if __GLASGOW_HASKELL__ >= 806
+        checkOrdering (var:vars) ((GHC.L _ (GHC.BindStmt _ pat _ _ _)):stmts) =
+#elif __GLASGOW_HASKELL__ > 710
         checkOrdering (var:vars) ((GHC.L _ (GHC.BindStmt pat _ _ _ _)):stmts) =
+#else
+        checkOrdering (var:vars) ((GHC.L _ (GHC.BindStmt pat _ _ _)):stmts) =
 #endif
           if (checkPat var pat)
           then (checkOrdering vars stmts)
@@ -349,11 +351,7 @@ nameOccurs nm = SYB.everything (||) (False `SYB.mkQ` isName)
 -}
 
 isBindStmt :: GHC.ExprLStmt GhcPs -> Bool
-#if __GLASGOW_HASKELL__ <= 710
-isBindStmt (GHC.L _ (GHC.BindStmt _ _ _ _)) = True
-#else
-isBindStmt (GHC.L _ (GHC.BindStmt _ _ _ _ _)) = True
-#endif
+isBindStmt (GHC.L _ (GHC.BindStmt {})) = True
 isBindStmt _ = False
 
 lFApp :: RefactGhc ParsedLExpr

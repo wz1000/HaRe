@@ -528,19 +528,13 @@ renameInClientMod oldPN newName newNameGhc targetModule = do
     -- We need to find the old name in the module, and get it as a
     -- GHC.Name to know what to look for in the call to renamePN', as it
     -- checks the GHC.nameUnique value.
-    newNames <- equivalentNameInNewMod oldPN
-    logm $ "renameInClientMod:(newNames)=" ++ showGhcQual newNames
-
-    let newNames' = filter (sameNameSpace oldPN) newNames
-    case newNames' of
-        []        -> return []
-        [oldName] | findNameInRdr nm oldName parsed -> doRenameInClientMod nm oldName modName parsed
-                  | otherwise -> do
-                      logm "renameInClientMod: name not present in module, returning"
-                      return []
-        -- ns -> error $ "HaRe: renameInClientMod: could not find name to replace, got:" ++ showGhcQual ns
-        ns -> error $ "HaRe: renameInClientMod: could not find name to replace, got:"
-          ++ (showGhcQual $ map (\n -> (n,GHC.occNameSpace $ GHC.nameOccName n)) ns)
+    mOldName <- equivalentNameInNewMod' oldPN
+    case mOldName of
+      Just oldName
+        | findNameInRdr nm oldName parsed -> doRenameInClientMod nm oldName modName parsed
+        | otherwise -> do
+            logm "renameInClientMod: name not present in module, returning"
+            return []
 
   where
     doRenameInClientMod nm oldNameGhc modName parsed = do
