@@ -464,3 +464,5 @@ test/testdata/cabal/cabal4/stack.yaml
 test/testdata/cabal/foo/stack.yaml
 test/testdata/stack.yaml
 /cabal.project.local
+cabal.project.local*
+/ctags

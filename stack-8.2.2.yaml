@@ -2,27 +2,15 @@ resolver: lts-11.6
 packages:
 - .
 
-- location:
-    ./submodules/ghc-mod
-  extra-dep: true
-  subdirs:
-    # - .
-    - core
-
-- location:
-    ./submodules/cabal-helper
-  extra-dep: true
-
-- location:
-    ./submodules/ghc-exactprint
-  extra-dep: true
-
-
 extra-deps:
-# - ghc-exactprint-0.5.6.1
+- ./submodules/cabal-helper
+- ./submodules/ghc-mod/core
+
+- cabal-plan-0.4.0.0
+- ghc-exactprint-0.5.8.2
+- pretty-show-1.8.2
 - syz-0.2.0.0
-- unix-compat-0.4.3.1
-- cabal-plan-0.3.0.0
+
 # For the tests
 - conversion-1.2.1
 - conversion-bytestring-1.0.1

@@ -2,24 +2,16 @@ resolver: nightly-2018-04-21 # Last one for GHC 8.4.1
 
 packages:
 - .
-- location:
-    ./submodules/ghc-mod
-  extra-dep: true
-  subdirs:
-    # - .
-    - core
-
-- location:
-    ./submodules/cabal-helper
-  extra-dep: true
-
-- location:
-    ./submodules/ghc-exactprint
-  extra-dep: true
 
 extra-deps:
+- ./submodules/cabal-helper
+- ./submodules/ghc-mod/core
+
+- cabal-plan-0.4.0.0
+- ghc-exactprint-0.5.8.2
+- pretty-show-1.8.2
 - syz-0.2.0.0
-- cabal-plan-0.3.0.0
+
 # Neded for the tests
 - conversion-1.2.1
 - conversion-case-insensitive-1.0.0.0

@@ -1,5 +1,4 @@
-# resolver: nightly-2018-06-29
-resolver: lts-12.9
+resolver: lts-12.14 # last for GHC 8.4.3
 
 packages:
 - .
@@ -8,13 +7,11 @@ extra-deps:
 - ./submodules/cabal-helper
 - ./submodules/ghc-mod/core
 
-- syz-0.2.0.0
+- cabal-plan-0.4.0.0
 - ghc-exactprint-0.5.8.2
 - pretty-show-1.8.2
-
-- cabal-plan-0.4.0.0
+- syz-0.2.0.0
 - temporary-1.2.1.1
-# - base-compat-0.9.3
 
 # Neded for the tests
 - conversion-1.2.1
