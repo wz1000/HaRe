@@ -130,6 +130,7 @@ condChecking :: (SYB.Data t)
 condChecking oldPN newName newNameGhc modName ast existChecking exportChecking = do
   condChecking1 oldPN newName newNameGhc modName ast existChecking exportChecking
   nm <- getRefactNameMap
+  -- logDataWithAnns "Renaming.condChecking:ast" ast
   condChecking2 nm oldPN newName ast
 
 -- ---------------------------------------------------------------------
@@ -288,7 +289,11 @@ condChecking2 nm oldPN newName ast = do
       if isDeclaredDs
         then condChecking' expr
         else mzero
+#if __GLASGOW_HASKELL__ >= 806
+    inExp expr@((GHC.L _ (GHC.HsDo _ _ ds)):: GHC.LHsExpr GhcPs) = do
+#else
     inExp expr@((GHC.L _ (GHC.HsDo _ ds _e)):: GHC.LHsExpr GhcPs) = do
+#endif
       isDeclared   <- isDeclaredBy ds
       -- logDataWithAnns "inExp.HsDo:expr" expr
       logm $ "inExp.HsDo:isDeclared=" ++ show isDeclared
@@ -532,7 +537,7 @@ renameInClientMod oldPN newName newNameGhc targetModule = do
     case mOldName of
       Just oldName
         | findNameInRdr nm oldName parsed -> doRenameInClientMod nm oldName modName parsed
-        | otherwise -> do
+      _ -> do
             logm "renameInClientMod: name not present in module, returning"
             return []
 

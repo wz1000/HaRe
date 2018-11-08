@@ -461,7 +461,7 @@ spec = do
     -- ---------------------------------
 
     it "rename in a do statement" $ do
-     -- ct $ rename logTestSettings testOptions "./Layout/Do1.hs" "g2" (10,3)
+     -- r <- ct $ rename logTestSettings testOptions "./Layout/Do1.hs" "g2" (10,3)
      r <- ct $ rename defaultTestSettings testOptions "./Layout/Do1.hs" "g2" (10,3)
 
      r' <- ct $ mapM makeRelativeToCurrentDirectory r

@@ -744,7 +744,11 @@ fixType funNm = do
 #endif
       iType = gfromJust "fixType: iType" $ getInnerType sig
       strTy = exactPrint iType currAnns
+#if __GLASGOW_HASKELL__ >= 806
+      tyStr = showGhc funNm ++ " :: (MonadPlus m) => m" ++ strTy ++ " -> m" ++ strTy
+#else
       tyStr = showGhc funNm ++ " :: (MonadPlus m) => m " ++ strTy ++ " -> m " ++ strTy
+#endif
       pRes = parseDecl dFlags "MaybeToMonadPlus.hs" tyStr
   logm $ "fixType:sig " ++ showGhc sig
   logm $ "fixType:iType " ++ showGhc iType

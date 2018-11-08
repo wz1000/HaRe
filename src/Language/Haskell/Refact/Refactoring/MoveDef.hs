@@ -973,9 +973,14 @@ demotingInClientMod pns targetModule = do
 doDemotingInClientMod :: [GHC.Name] -> GHC.Module -> RefactGhc ()
 doDemotingInClientMod pns modName = do
   logm $ "doDemotingInClientMod:(pns,modName)=" ++ showGhc (pns,modName)
+  -- logDataWithAnns "doDemotingInClientMod:pns" pns
+
+  mpns <- mapM equivalentNameInNewMod' pns
+  -- logDataWithAnns "doDemotingInClientMod:mpns" mpns
+  let modPns = catMaybes mpns
   (GHC.L _ p) <- getRefactParsed
   nm <- getRefactNameMap
-  if any (\pn -> findNameInRdr nm pn (GHC.hsmodDecls p) || findNameInRdr nm pn (GHC.hsmodExports p)) pns
+  if any (\pn -> findNameInRdr nm pn (GHC.hsmodDecls p) || findNameInRdr nm pn (GHC.hsmodExports p)) modPns
      then error $ "This definition can not be demoted, as it is used in the client module '"++(showGhc modName)++"'!"
      else if any (\pn->findNameInRdr nm pn (GHC.hsmodImports p)) pns
              -- TODO: reinstate this

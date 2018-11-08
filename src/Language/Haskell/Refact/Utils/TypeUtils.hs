@@ -995,10 +995,13 @@ addImportDecl (GHC.L l p) modName pkgQual source safe qualify alias hide idNames
        let lmodname = GHC.L newSpan1 modName
        liftT $ addSimpleAnnT lmodname (DP (0,1)) [((G GHC.AnnVal),DP (0,0))]
        return $ GHC.ImportDecl
-#if __GLASGOW_HASKELL__ <= 800
-                        { GHC.ideclSourceSrc = Nothing
-#else
+#if __GLASGOW_HASKELL__ >= 806
+                        { GHC.ideclExt       = GHC.NoExt
+                        , GHC.ideclSourceSrc = GHC.NoSourceText
+#elif __GLASGOW_HASKELL__ > 800
                         { GHC.ideclSourceSrc = GHC.NoSourceText
+#else
+                        { GHC.ideclSourceSrc = Nothing
 #endif
                         , GHC.ideclName      = lmodname
                         , GHC.ideclPkgQual   = pkgQual
