@@ -2010,7 +2010,7 @@ hsVisibleDsRdr nm e t = do
 #endif
 #if __GLASGOW_HASKELL__ >= 806
     lstmt (GHC.L _ (GHC.BindStmt _ pa ex _ _)) = do
-#elif __GLASGOW_HASKELL__ < 710
+#elif __GLASGOW_HASKELL__ > 710
     lstmt (GHC.L _ (GHC.BindStmt pa ex _ _ _)) = do
 #else
     lstmt (GHC.L _ (GHC.BindStmt pa ex _ _)) = do
