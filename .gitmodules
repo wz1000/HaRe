@@ -1,18 +1,10 @@
-[submodule "ext/cabal-helper"]
+
+[submodule "submodules/cabal-helper"]
 	path = submodules/cabal-helper
-        #url = https://github.com/DanielG/cabal-helper.git
-        url = https://github.com/alanz/cabal-helper.git
-	#url = git@github.com:alanz/cabal-helper.git
-[submodule "ext/ghc-mod"]
+	url = https://github.com/alanz/cabal-helper.git
+
+[submodule "submodules/ghc-mod"]
 	path = submodules/ghc-mod
-        url = https://github.com/alanz/ghc-mod.git
-	#url = git@github.com:alanz/ghc-mod.git
-[submodule "submodules/ghc-exactprint"]
-	path = submodules/ghc-exactprint
-	url = https://github.com/alanz/ghc-exactprint.git
-[submodule "submodules/monad-journal"]
-	path = submodules/monad-journal
-	url = https://github.com/alanz/monad-journal.git
-[submodule "submodules/hslogger"]
-	path = submodules/hslogger
-	url = https://github.com/alanz/hslogger.git
+	url = https://github.com/alanz/ghc-mod.git
+
+
