@@ -54,11 +54,7 @@ import Data.IORef
 --import Data.Time.Clock
 import Distribution.Helper
 import Exception
-import qualified GhcModCore         as GM
-import qualified GhcMod.Monad.Out   as GM
-import qualified GhcMod.Monad.Types as GM
-import qualified GhcMod.Target      as GM
-import qualified GhcMod.Types       as GM
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),GmOut(..),ModulePath(..),GmComponent(..),GmComponentType(..),GhcModT,GmEnv(..),runGhcModT,GmlT(..),GmModuleGraph(..),gmlGetSession,gmlSetSession,IOish,cradle,Cradle(..),cabalResolvedComponents,MonadIO(..))
 import Language.Haskell.Refact.Utils.Types
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
@@ -162,15 +158,15 @@ data RefacSource = RSFile FilePath
                  | RSAlreadyLoaded
                  deriving (Show)
 
-type TargetModule = GM.ModulePath -- From ghc-mod
+type TargetModule = HIE.ModulePath -- From ghc-mod
 
 instance GHC.Outputable TargetModule where
   ppr t = GHC.text (show t)
 
 
 -- The CabalGraph comes directly from ghc-mod
--- type CabalGraph = Map.Map ChComponentName (GM.GmComponent GMCResolved (Set.Set ModulePath))
-type CabalGraph = Map.Map ChComponentName (GM.GmComponent 'GM.GMCResolved (Set.Set GM.ModulePath))
+-- type CabalGraph = Map.Map ChComponentName (HIE.GmComponent GMCResolved (Set.Set ModulePath))
+type CabalGraph = Map.Map ChComponentName (HIE.GmComponent 'HIE.GMCResolved (Set.Set HIE.ModulePath))
 
 type Targets = [Either FilePath GHC.ModuleName]
 
@@ -200,16 +196,16 @@ instance Show StateStorage where
 -- StateT and GhcT stack
 
 newtype RefactGhc a = RefactGhc
-    { unRefactGhc :: GM.GhcModT (StateT RefactState IO) a
+    { unRefactGhc :: HIE.GhcModT (StateT RefactState IO) a
     } deriving ( Functor
                , Applicative
                , Alternative
                , Monad
                , MonadPlus
                , MonadIO
-               , GM.GmEnv
-               , GM.GmOut
-               , GM.MonadIO
+               , HIE.GmEnv
+               , HIE.GmOut
+               -- , HIE.MonadIO
                , ExceptionMonad
                )
 
@@ -221,22 +217,24 @@ instance Fail.MonadFail RefactGhc where
 -- ---------------------------------------------------------------------
 
 runRefactGhc ::
-  RefactGhc a -> RefactState -> GM.Options -> IO (a, RefactState)
+  RefactGhc a -> RefactState -> HIE.Options -> IO (a, RefactState)
 runRefactGhc comp initState opt = do
-    ((merr,_log),s) <- runStateT (GM.runGhcModT opt (unRefactGhc comp)) initState
+    ((merr,_log),s) <- runStateT (HIE.runGhcModT opt (unRefactGhc comp)) initState
     case merr of
       Left err -> error (show err)
       Right a  -> return (a,s)
 
 -- ---------------------------------------------------------------------
 
-instance GM.GmOut (StateT RefactState IO) where
-  gmoAsk = lift GM.gmoAsk
+instance HIE.GmOut (StateT RefactState IO) where
+  gmoAsk = lift HIE.gmoAsk
 
-instance GM.GmOut IO where
-  gmoAsk = GM.gmoAsk
+instance HIE.GmOut IO where
+  gmoAsk = HIE.gmoAsk
 
-instance GM.MonadIO (StateT RefactState IO) where
+-- instance HIE.MonadIO (StateT RefactState IO) where
+--   liftIO = liftIO
+instance HIE.MonadIO (StateT RefactState IO) where
   liftIO = liftIO
 
 instance MonadState RefactState RefactGhc where
@@ -244,8 +242,8 @@ instance MonadState RefactState RefactGhc where
     put s = RefactGhc (lift $ lift (put s))
 
 instance GHC.GhcMonad RefactGhc where
-  getSession     = RefactGhc $ GM.unGmlT GM.gmlGetSession
-  setSession env = RefactGhc $ GM.unGmlT (GM.gmlSetSession env)
+  getSession     = RefactGhc $ HIE.unGmlT HIE.gmlGetSession
+  setSession env = RefactGhc $ HIE.unGmlT (HIE.gmlSetSession env)
 
 
 instance GHC.HasDynFlags RefactGhc where
@@ -262,16 +260,16 @@ instance ExceptionMonad (StateT RefactState IO) where
 
 -- ---------------------------------------------------------------------
 
-cabalModuleGraphs :: RefactGhc [GM.GmModuleGraph]
+cabalModuleGraphs :: RefactGhc [HIE.GmModuleGraph]
 cabalModuleGraphs = RefactGhc doCabalModuleGraphs
   where
-    doCabalModuleGraphs :: (GM.IOish m) => GM.GhcModT m [GM.GmModuleGraph]
+    doCabalModuleGraphs :: (HIE.IOish m) => HIE.GhcModT m [HIE.GmModuleGraph]
     doCabalModuleGraphs = do
-      crdl <- GM.cradle
-      case GM.cradleCabalFile crdl of
+      crdl <- HIE.cradle
+      case HIE.cradleCabalFile crdl of
         Just _ -> do
-          mcs <- GM.cabalResolvedComponents
-          let graph = map GM.gmcHomeModuleGraph $ Map.elems mcs
+          mcs <- HIE.cabalResolvedComponents
+          let graph = map HIE.gmcHomeModuleGraph $ Map.elems mcs
           return graph
         Nothing -> return []
 

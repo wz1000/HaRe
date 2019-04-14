@@ -12,10 +12,10 @@ import           Distribution.Text (display)
 import           Language.Haskell.Refact.API
 import           Language.Haskell.Refact.HaRe
 import           Options.Applicative.Simple
-import qualified GhcModCore as GM
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),globalArgSpec)
 import qualified Paths_HaRe as Meta
 
-import           GhcMod.Options.Options
+-- import           GhcMod.Options.Options
 
 main :: IO ()
 main = do
@@ -117,7 +117,7 @@ data HareParams = DemoteCmd      FilePath Row Col
                 | Monadify       FilePath [(Row,Col)]
                deriving Show
 
-runCmd :: HareParams -> (RefactSettings,GM.Options) -> IO ()
+runCmd :: HareParams -> (RefactSettings,HIE.Options) -> IO ()
 runCmd (DemoteCmd fileName r c) (opt, gOpt)
   = runFunc $ demote opt gOpt fileName (r,c)
 
@@ -348,8 +348,8 @@ monadifyOpts =
 -- ---------------------------------------------------------------------
 
 
-allOptsParser :: Parser (RefactSettings,GM.Options)
-allOptsParser = (,) <$> globalOptsParser <*> globalArgSpec
+allOptsParser :: Parser (RefactSettings,HIE.Options)
+allOptsParser = (,) <$> globalOptsParser <*> HIE.globalArgSpec
 
 globalOptsParser :: Parser RefactSettings
 globalOptsParser = mkRefSet

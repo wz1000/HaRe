@@ -11,8 +11,7 @@ import qualified GHC
 import qualified Name                  as GHC
 import qualified Outputable            as GHC
 
-import qualified GhcModCore   as GM
-import qualified GhcMod.Types as GM
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),mpModule)
 import Language.Haskell.Refact.API
 
 import Language.Haskell.GHC.ExactPrint.Types
@@ -40,7 +39,7 @@ import Data.Generics.Strafunski.StrategyLib.StrategyLib
 -}
 -----------------------------------------------------------------------------------------------------
 
-addOneParameter :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> IO [FilePath]
+addOneParameter :: RefactSettings -> HIE.Options -> FilePath -> String -> SimpPos -> IO [FilePath]
 addOneParameter settings opts fileName paramName (row,col) = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compAddOneParameter absFileName paramName (row,col))
@@ -500,7 +499,7 @@ addArgToSig pn decls = do
 
 addArgInClientMod :: GHC.Name -> GHC.Located GHC.RdrName -> TargetModule -> RefactGhc ApplyRefacResult
 addArgInClientMod pnt defaultArg serverModName = do
-  (r,_) <- applyRefac (addArgInClientMod' pnt defaultArg (GM.mpModule serverModName)) (RSTarget serverModName)
+  (r,_) <- applyRefac (addArgInClientMod' pnt defaultArg (HIE.mpModule serverModName)) (RSTarget serverModName)
   return r
 
 
@@ -576,7 +575,7 @@ addDefaultActualArgInClientMod pn argPName t = do
 -- function. The condition acompanying this refactoring is that the parameter to
 -- be removed is not being used.
 -- The @SimpPos@ should be somwewhere inside the parameter to be removed
-rmOneParameter :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> IO [FilePath]
+rmOneParameter :: RefactSettings -> HIE.Options -> FilePath -> SimpPos -> IO [FilePath]
 rmOneParameter settings opts fileName (row,col) = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compRmOneParameter absFileName (row,col))

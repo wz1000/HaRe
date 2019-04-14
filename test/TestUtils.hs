@@ -53,8 +53,9 @@ import Language.Haskell.GHC.ExactPrint.Annotate
 import Language.Haskell.GHC.ExactPrint.Parsers
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Utils
-import qualified GhcModCore   as GM
-import qualified GhcMod.Types as GM
+-- import qualified GhcModCore   as GM
+-- import qualified GhcMod.Types as GM
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),defaultOptions,OutputOpts(..),LineSeparator(..),OutputStyle(..),GmLogLevel(..))
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.MonadFunctions
 import Language.Haskell.Refact.Utils.Types
@@ -174,7 +175,7 @@ mkTokenCache forest = TK (Map.fromList [((TId 0),forest)]) (TId 0)
 
 -- ---------------------------------------------------------------------
 
-runTestInternal :: RefactGhc a -> RefactState -> GM.Options
+runTestInternal :: RefactGhc a -> RefactState -> HIE.Options
                 -> IO (a, RefactState)
 runTestInternal comp st opts =
   runRefactGhc comp st opts
@@ -216,18 +217,18 @@ runRefactGhcStateLog comp logOn  = do
 
 -- ---------------------------------------------------------------------
 
-testOptions :: GM.Options
--- testOptions = GM.defaultOptions { GM.ooptLogLevel = GM.GmError }
-testOptions = GM.defaultOptions {
-    GM.optOutput     = GM.OutputOpts {
-      GM.ooptLogLevel       = GM.GmError
-      -- GM.ooptLogLevel       = GM.GmDebug
-      -- GM.ooptLogLevel       = GM.GmVomit
-    , GM.ooptStyle          = GM.PlainStyle
-    , GM.ooptLineSeparator  = GM.LineSeparator "\0"
-    , GM.ooptLinePrefix     = Nothing
+testOptions :: HIE.Options
+-- testOptions = HIE.defaultOptions { HIE.ooptLogLevel = HIE.GmError }
+testOptions = HIE.defaultOptions {
+    HIE.optOutput     = HIE.OutputOpts {
+      HIE.ooptLogLevel       = HIE.GmError
+      -- HIE.ooptLogLevel       = HIE.GmDebug
+      -- HIE.ooptLogLevel       = HIE.GmVomit
+    , HIE.ooptStyle          = HIE.PlainStyle
+    , HIE.ooptLineSeparator  = HIE.LineSeparator "\0"
+    , HIE.ooptLinePrefix     = Nothing
     }
-    -- , GM.optGhcUserOptions = ["-v4", "-DDEBUG"]
+    -- , HIE.optGhcUserOptions = ["-v4", "-DDEBUG"]
     }
 
 -- ---------------------------------------------------------------------

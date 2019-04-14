@@ -89,7 +89,7 @@ import Data.List
 
 import qualified GHC           as GHC
 import qualified GhcMonad      as GHC
-import qualified GhcMod.Utils  as GM
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),mkRevRedirMapFunc)
 import qualified Module        as GHC
 import qualified Name          as GHC
 import qualified Unique        as GHC
@@ -369,7 +369,7 @@ getRefactFileName = do
   case mtm of
     Nothing  -> return Nothing
     Just tm -> do
-      revMap <- RefactGhc GM.mkRevRedirMapFunc
+      revMap <- RefactGhc HIE.mkRevRedirMapFunc
       return $ Just (revMap $ fileNameFromModSummary $ GHC.pm_mod_summary
                             $ GHC.tm_parsed_module $ rsTypecheckedMod tm)
     --Just tm -> return $ Just (tmFileNameUnmapped $ rsTypecheckedMod tm)

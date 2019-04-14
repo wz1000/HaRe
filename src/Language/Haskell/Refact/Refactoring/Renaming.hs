@@ -22,7 +22,7 @@ import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Utils
 import Language.Haskell.Refact.API
 import System.Directory
-import qualified GhcModCore as GM (Options(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..))
 import qualified Data.Map as Map
 
 {-# ANN module "HLint: ignore Redunant do" #-}
@@ -58,7 +58,7 @@ modules.
 
 -- | Rename the given identifier.
 rename :: RefactSettings
-       -> GM.Options
+       -> HIE.Options
        -> FilePath
        -> String
        -> SimpPos

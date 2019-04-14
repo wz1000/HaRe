@@ -12,7 +12,8 @@ import Control.Exception
 import Control.Monad.State
 import Data.List
 
-import qualified GhcMod.Types as GM (mpModule)
+-- import qualified GhcMod.Types as GM (mpModule)
+import qualified Haskell.Ide.Engine.PluginApi as HIE (mpModule)
 
 import Language.Haskell.GHC.ExactPrint.Utils
 import Language.Haskell.GHC.ExactPrint.Types
@@ -201,7 +202,7 @@ spec = do
          return g
       (mg,_s) <- cdAndDo testDir $ runRefactGhc comp initialState testOptions
       -- (mg,_s) <- cdAndDo testDir $ runRefactGhc comp initialLogOnState testOptions
-      showGhc (map GM.mpModule mg) `shouldBe` "[]"
+      showGhc (map HIE.mpModule mg) `shouldBe` "[]"
 
   -- -----------------------------------
 
@@ -443,7 +444,7 @@ spec = do
          return g
       (mg,_s) <- ct $ runRefactGhc comp initialState testOptions
       -- (mg,_s) <- ct $ runRefactGhc comp initialLogOnState testOptions
-      (sort $ map (showGhc . GM.mpModule) mg) `shouldBe` ["M2", "M3", "Main"]
+      (sort $ map (showGhc . HIE.mpModule) mg) `shouldBe` ["M2", "M3", "Main"]
 
     ------------------------------------
 
@@ -456,7 +457,7 @@ spec = do
          return g
       (mg,_s) <- ct $ runRefactGhc comp initialState testOptions
       -- (mg,_s) <- ct $ runRefactGhc comp initialLogOnState testOptions
-      showGhc (map GM.mpModule mg) `shouldBe` "[Main]"
+      showGhc (map HIE.mpModule mg) `shouldBe` "[Main]"
 
     ------------------------------------
 
@@ -470,7 +471,7 @@ spec = do
          return g
       (mg,_s) <- cdAndDo dir $ runRefactGhc comp initialState testOptions
       -- (mg,_s) <- ct $ runRefactGhc comp initialLogOnState testOptions
-      showGhc (map GM.mpModule mg) `shouldBe` "[Main]"
+      showGhc (map HIE.mpModule mg) `shouldBe` "[Main]"
     ------------------------------------
 
     it "gets modules which import a module in different cabal targets" $ do
@@ -484,7 +485,7 @@ spec = do
          g <- clientModsAndFiles tm
          return g
       (mg,_s) <- runRefactGhc comp initialState testOptions
-      showGhc (map GM.mpModule mg) `shouldBe` "[Main, Main]"
+      showGhc (map HIE.mpModule mg) `shouldBe` "[Main, Main]"
 
       setCurrentDirectory currentDir
 
@@ -518,7 +519,7 @@ spec = do
          return g
       (mg,_s) <- cdAndDo testDir $ runRefactGhc comp initialState testOptions
       -- (mg,_s) <- cdAndDo testDir $ runRefactGhc comp initialLogOnState testOptions
-      showGhc (map GM.mpModule mg) `shouldBe` "[]"
+      showGhc (map HIE.mpModule mg) `shouldBe` "[]"
 
 
     ------------------------------------
@@ -533,7 +534,7 @@ spec = do
          return g
       (mg,_s) <- runRefactGhc comp initialState testOptions
       -- (mg,_s) <- runRefactGhc comp initialLogOnState testOptions
-      show (sort $ map GM.mpModule mg) `shouldBe` "[ModuleName \"Language.Haskell.Refact.API\",ModuleName \"Language.Haskell.Refact.HaRe\",ModuleName \"Language.Haskell.Refact.Refactoring.Case\",ModuleName \"Language.Haskell.Refact.Refactoring.DupDef\",ModuleName \"Language.Haskell.Refact.Refactoring.MoveDef\",ModuleName \"Language.Haskell.Refact.Refactoring.Renaming\",ModuleName \"Language.Haskell.Refact.Refactoring.RoundTrip\",ModuleName \"Language.Haskell.Refact.Refactoring.SwapArgs\",ModuleName \"Language.Haskell.Refact.Refactoring.Simple\",ModuleName \"MoveDefSpec\",ModuleName \"Main\",ModuleName \"Main\",ModuleName \"CaseSpec\",ModuleName \"DupDefSpec\",ModuleName \"GhcUtilsSpec\",ModuleName \"RenamingSpec\",ModuleName \"RoundTripSpec\",ModuleName \"SimpleSpec\",ModuleName \"SwapArgsSpec\",ModuleName \"TypeUtilsSpec\",ModuleName \"UtilsSpec\"]"
+      show (sort $ map HIE.mpModule mg) `shouldBe` "[ModuleName \"Language.Haskell.Refact.API\",ModuleName \"Language.Haskell.Refact.HaRe\",ModuleName \"Language.Haskell.Refact.Refactoring.Case\",ModuleName \"Language.Haskell.Refact.Refactoring.DupDef\",ModuleName \"Language.Haskell.Refact.Refactoring.MoveDef\",ModuleName \"Language.Haskell.Refact.Refactoring.Renaming\",ModuleName \"Language.Haskell.Refact.Refactoring.RoundTrip\",ModuleName \"Language.Haskell.Refact.Refactoring.SwapArgs\",ModuleName \"Language.Haskell.Refact.Refactoring.Simple\",ModuleName \"MoveDefSpec\",ModuleName \"Main\",ModuleName \"Main\",ModuleName \"CaseSpec\",ModuleName \"DupDefSpec\",ModuleName \"GhcUtilsSpec\",ModuleName \"RenamingSpec\",ModuleName \"RoundTripSpec\",ModuleName \"SimpleSpec\",ModuleName \"SwapArgsSpec\",ModuleName \"TypeUtilsSpec\",ModuleName \"UtilsSpec\"]"
     -}
       pendingWith "make an equivalent test using testdata/cabal"
 
@@ -610,7 +611,7 @@ spec = do
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
       (show $ getModuleName parsed) `shouldBe` "Just (ModuleName \"S1\",\"S1\")"
-      (sort $ map (showGhc . GM.mpModule) mg) `shouldBe` ["M2", "M3", "Main"]
+      (sort $ map (showGhc . HIE.mpModule) mg) `shouldBe` ["M2", "M3", "Main"]
 
     -- ---------------------------------
 
@@ -627,7 +628,7 @@ spec = do
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
 
       (show $ getModuleName parsed) `shouldBe` "Just (ModuleName \"S1\",\"S1\")"
-      (sort $ map (showGhc . GM.mpModule) mg) `shouldBe` ["M2", "M3", "Main"]
+      (sort $ map (showGhc . HIE.mpModule) mg) `shouldBe` ["M2", "M3", "Main"]
 
     -- ---------------------------------
 
@@ -643,7 +644,7 @@ spec = do
       ((t, mg), _s) <- ct $ runRefactGhc comp  initialState testOptions
       let parsed = GHC.pm_parsed_source $ GHC.tm_parsed_module t
       (show $ getModuleName parsed) `shouldBe` "Just (ModuleName \"DupDef.Dd1\",\"DupDef.Dd1\")"
-      showGhc (map GM.mpModule mg) `shouldBe` "[DupDef.Dd2, DupDef.Dd3, Main, Main]"
+      showGhc (map HIE.mpModule mg) `shouldBe` "[DupDef.Dd2, DupDef.Dd3, Main, Main]"
 
 
   -- -------------------------------------------------------------------

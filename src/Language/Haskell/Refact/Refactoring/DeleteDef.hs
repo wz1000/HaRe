@@ -4,21 +4,17 @@ module Language.Haskell.Refact.Refactoring.DeleteDef
   (deleteDef, compDeleteDef) where
 
 import qualified Data.Generics as SYB
--- import qualified GHC.SYB.Utils as SYB
--- import BasicTypes
 import qualified GHC
 import Control.Monad
 import Control.Monad.State
-import GhcModCore
 import Language.Haskell.Refact.API
 import Data.Generics.Strafunski.StrategyLib.StrategyLib
-import qualified GhcModCore   as GM
-import qualified GhcMod.Types as GM
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..),mpPath)
 import System.Directory
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
 
-deleteDef :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> IO [FilePath]
+deleteDef :: RefactSettings -> HIE.Options -> FilePath -> SimpPos -> IO [FilePath]
 deleteDef settings cradle fileName (row,col) = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings cradle (compDeleteDef absFileName (row,col))
@@ -54,7 +50,7 @@ compDeleteDef fileName (row,col) = do
     Nothing -> error "Invalid cursor position!"
 
 
-isPNUsed :: GHC.Name -> GM.ModulePath -> FilePath -> RefactGhc Bool
+isPNUsed :: GHC.Name -> HIE.ModulePath -> FilePath -> RefactGhc Bool
 isPNUsed pn modPath filePath = do
   renamed <- getRefactRenamed
   pnUsedInScope pn renamed
@@ -87,7 +83,7 @@ pnUsedInScope pn t' = do
         mzero
 
 
-isPNUsedInClients :: GHC.Name -> GHC.RdrName -> GM.ModulePath -> RefactGhc Bool
+isPNUsedInClients :: GHC.Name -> GHC.RdrName -> HIE.ModulePath -> RefactGhc Bool
 isPNUsedInClients pn rdrn modPath = do
         pnIsExported <- isExported pn
         if pnIsExported
@@ -101,7 +97,7 @@ pnUsedInClientScope :: GHC.Name -> Bool -> TargetModule -> RefactGhc Bool
 pnUsedInClientScope name b mod = do
   getTargetGhc mod
   isInScope <- isInScopeAndUnqualifiedGhc (nameToString name) Nothing
-  logm $ "The module file path: " ++ (show (GM.mpPath mod)) ++ "\n is pn in scope: " ++ (show isInScope)
+  logm $ "The module file path: " ++ (show (HIE.mpPath mod)) ++ "\n is pn in scope: " ++ (show isInScope)
   return (b || isInScope)
 
 doDeletion :: GHC.Name -> RefactGhc ()

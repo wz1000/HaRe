@@ -5,8 +5,7 @@ module Language.Haskell.Refact.Refactoring.GenApplicative
   (genApplicative, compGenApplicative) where
 
 import Language.Haskell.Refact.API
-import qualified GhcModCore   as GM
-import qualified GhcMod.Types as GM
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..))
 import qualified GHC as GHC
 import qualified RdrName as GHC
 import System.Directory
@@ -17,7 +16,7 @@ import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Parsers
 
-genApplicative :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> IO [FilePath]
+genApplicative :: RefactSettings -> HIE.Options -> FilePath -> SimpPos -> IO [FilePath]
 genApplicative settings cradle fileName pos = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings cradle (compGenApplicative absFileName pos)

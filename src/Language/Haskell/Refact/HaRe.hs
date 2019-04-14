@@ -7,8 +7,8 @@ module Language.Haskell.Refact.HaRe
  , defaultSettings
  , SimpPos
  -- ** Re-exported from ghc-mod
- , GM.Options(..)
- , GM.defaultOptions
+ , HIE.Options(..)
+ , HIE.defaultOptions
 
  -- * Refactorings
  , ifToCase,        compIfToCase
@@ -47,4 +47,4 @@ import Language.Haskell.Refact.Refactoring.Sugar
 import Language.Haskell.Refact.Refactoring.RoundTrip
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.Types
-import qualified GhcModCore as GM (Options(..),defaultOptions)
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),defaultOptions)

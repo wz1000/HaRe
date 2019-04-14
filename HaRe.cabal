@@ -130,8 +130,8 @@ Library
                                , filepath
                                , ghc
                                , ghc-exactprint >= 0.5.8.1
-                               , ghc-mod-core == 5.9.0.*
                                -- , ghc-syb-utils
+                               , hie-plugin-api
                                , hslogger
                                , monad-control
                                , mtl
@@ -208,14 +208,13 @@ Executable ghc-hare
 
         -- GHC 7.10.2 ships with base 4.8.1.0
         Build-Depends:          base >= 4.8.1.0  && < 5
-                                , ghc-mod-core == 5.9.0.*
+                                , Cabal
+                                , HaRe
                                 , gitrev >= 1.1
+                                , hie-plugin-api
                                 , mtl
                                 , optparse-applicative >= 0.12 && < 0.15
                                 , optparse-simple
-                                , Cabal
-                                -- , Paths_HaRe
-                                , HaRe
         if impl (ghc < 7.10.2)
             buildable: False
         default-language:    Haskell2010
@@ -288,8 +287,8 @@ test-suite spec
     , foldl
     , ghc
     , ghc-exactprint >= 0.5.8.1
-    , ghc-mod-core == 5.9.0.*
     -- , ghc-syb-utils
+    , hie-plugin-api
     , hslogger
     , hspec
     , mtl

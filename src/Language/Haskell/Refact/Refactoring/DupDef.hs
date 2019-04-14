@@ -16,8 +16,7 @@ import qualified RdrName       as GHC
 import Data.List
 import Data.Maybe
 
-import qualified GhcModCore   as GM
-import qualified GhcMod.Types as GM
+import qualified Haskell.Ide.Engine.PluginApi as HIE
 import Language.Haskell.Refact.API
 
 import Language.Haskell.GHC.ExactPrint.Types
@@ -30,7 +29,7 @@ import System.Directory
 -- | This refactoring duplicates a definition (function binding or
 -- simple pattern binding) at the same level with a new name provided by
 -- the user. The new name should not cause name clash/capture.
-duplicateDef :: RefactSettings -> GM.Options -> FilePath -> String -> SimpPos -> IO [FilePath]
+duplicateDef :: RefactSettings -> HIE.Options -> FilePath -> String -> SimpPos -> IO [FilePath]
 duplicateDef settings opts fileName newName (row,col) = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compDuplicateDef absFileName newName (row,col))
@@ -243,7 +242,7 @@ refactorInClientMod oldPN serverModName newPName targetModule
        logm ("refactorInClientMod: (oldPN,serverModName,newPName)=" ++ (showGhc (oldPN,serverModName,newPName)))
        getTargetGhc targetModule
 
-       let fileName = GM.mpPath targetModule
+       let fileName = HIE.mpPath targetModule
        renamed <- getRefactRenamed
        parsed  <- getRefactParsed
 

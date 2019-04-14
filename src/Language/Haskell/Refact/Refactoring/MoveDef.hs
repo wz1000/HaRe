@@ -30,7 +30,7 @@ import Data.Foldable
 import Data.List
 import Data.Maybe
 
-import qualified GhcModCore as GM
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..))
 import Language.Haskell.Refact.API
 
 import Language.Haskell.GHC.ExactPrint.Types
@@ -81,7 +81,7 @@ the following six contexts:
 -}
 
 -- | Lift a definition to the top level
-liftToTopLevel :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> IO [FilePath]
+liftToTopLevel :: RefactSettings -> HIE.Options -> FilePath -> SimpPos -> IO [FilePath]
 liftToTopLevel settings opts fileName (row,col) = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compLiftToTopLevel absFileName (row,col))
@@ -230,7 +230,7 @@ isTupleDecl _ = False
 -- ---------------------------------------------------------------------
 
 -- | Move a definition one level up from where it is now
-liftOneLevel :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> IO [FilePath]
+liftOneLevel :: RefactSettings -> HIE.Options -> FilePath -> SimpPos -> IO [FilePath]
 liftOneLevel settings opts fileName (row,col) = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compLiftOneLevel absFileName (row,col))
@@ -593,7 +593,7 @@ liftOneLevel' modName pn@(GHC.L _ n) = do
 -- ---------------------------------------------------------------------
 
 -- | Move a definition one level down
-demote :: RefactSettings -> GM.Options -> FilePath -> SimpPos -> IO [FilePath]
+demote :: RefactSettings -> HIE.Options -> FilePath -> SimpPos -> IO [FilePath]
 demote settings opts fileName (row,col) = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compDemote absFileName (row,col))

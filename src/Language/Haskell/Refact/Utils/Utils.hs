@@ -48,8 +48,7 @@ import Language.Haskell.GHC.ExactPrint.Preprocess
 import Language.Haskell.GHC.ExactPrint.Print
 import Language.Haskell.GHC.ExactPrint.Utils
 
-import qualified GhcModCore          as GM
-import qualified GhcMod.Types        as GM
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..),getModulesGhc',GmModuleGraph(..))
 
 import Language.Haskell.Refact.Utils.GhcModuleGraph
 import Language.Haskell.Refact.Utils.GhcVersionSpecific
@@ -79,7 +78,7 @@ getModuleName (GHC.L _ modn) =
 -- ---------------------------------------------------------------------
 
 getTargetGhc :: TargetModule -> RefactGhc ()
-getTargetGhc (GM.ModulePath _mn fp) = parseSourceFileGhc fp
+getTargetGhc (HIE.ModulePath _mn fp) = parseSourceFileGhc fp
 
 -- ---------------------------------------------------------------------
 
@@ -87,7 +86,7 @@ getTargetGhc (GM.ModulePath _mn fp) = parseSourceFileGhc fp
 parseSourceFileGhc :: FilePath -> RefactGhc ()
 parseSourceFileGhc targetFile = do
   -- logm $ "parseSourceFileGhc:targetFile=" ++ targetFile
-  (_, mtm, _) <- RefactGhc $ GM.getModulesGhc' id targetFile
+  (_, mtm, _) <- RefactGhc $ HIE.getModulesGhc' id targetFile
   case mtm of
     Nothing -> error $ "Couldn't get typechecked module for " ++ targetFile
     Just tm -> loadTypecheckedModule tm
@@ -119,7 +118,7 @@ loadTypecheckedModule t = do
   (mfp,_modSum) <- canonicalizeModSummary modSum
   newTargetModule <- case mfp of
     Nothing -> error $ "HaRe:no file path for module:" ++ showGhc modSum
-    Just fp -> return $ GM.ModulePath (GHC.moduleName $ GHC.ms_mod modSum) fp
+    Just fp -> return $ HIE.ModulePath (GHC.moduleName $ GHC.ms_mod modSum) fp
 
   oldTargetModule <- gets rsCurrentTarget
   let
@@ -154,7 +153,7 @@ loadTypecheckedModule t = do
 --
 runRefacSession ::
        RefactSettings
-    -> GM.Options                   -- ^ ghc-mod options
+    -> HIE.Options                   -- ^ ghc-mod options
     -> RefactGhc [ApplyRefacResult] -- ^ The computation doing the
                                     -- refactoring. Normally created
                                     -- via 'applyRefac'
@@ -184,7 +183,7 @@ runRefacSession settings opt comp = do
 -- computations and runs all of them threading the state through all of the
 -- computations
 
-runMultRefacSession :: RefactSettings -> GM.Options -> [RefactGhc [ApplyRefacResult]] -> IO [FilePath]
+runMultRefacSession :: RefactSettings -> HIE.Options -> [RefactGhc [ApplyRefacResult]] -> IO [FilePath]
 runMultRefacSession settings opt comps = do
   let
     initialState = RefSt
@@ -213,7 +212,7 @@ mergeRefResults lst = Map.elems $ mergeHelp lst Map.empty
 
 -- | Take an ordered list of refactorings and apply them in order, threading the
 -- state through all of them
-threadState :: GM.Options -> RefactState -> [RefactGhc [ApplyRefacResult]]
+threadState :: HIE.Options -> RefactState -> [RefactGhc [ApplyRefacResult]]
             -> IO [([ApplyRefacResult], RefactState)]
 threadState _ _ [] = return []
 threadState opt currState (rGhc : rst) = do
@@ -275,7 +274,7 @@ applyRefac' clearSt refac source = do
          RSFile fname    -> do parseSourceFileGhc fname
                                return fname
          RSTarget tgt    -> do getTargetGhc tgt
-                               return (GM.mpPath tgt)
+                               return (HIE.mpPath tgt)
          -- RSMod  ms       -> do parseSourceFileGhc $ fileNameFromModSummary ms
          --                       return $ fileNameFromModSummary ms
          RSAlreadyLoaded -> do mfn <- getRefactFileName
@@ -426,7 +425,7 @@ writeRefactoredFiles verbosity files
 -- import module m.
 
 -- clientModsAndFiles :: GHC.ModuleName -> RefactGhc [TargetModule]
-clientModsAndFiles :: GM.ModulePath -> RefactGhc [TargetModule]
+clientModsAndFiles :: HIE.ModulePath -> RefactGhc [TargetModule]
 -- TODO: Use ghc-mod cache if there is a cabal file, else normal GHC modulegraph
 clientModsAndFiles m = do
   logm $ "clientModsAndFiles:m=" ++ show m
@@ -442,7 +441,7 @@ clientModsAndFiles m = do
   -- So
   --  Flatten the module graph, reverse the dependencies, then rebuild it
   let
-    flattenSwap (GM.GmModuleGraph mg)
+    flattenSwap (HIE.GmModuleGraph mg)
       = concatMap (\(k,vs) -> map (\v -> (v,Set.singleton k)) (Set.elems vs)) $ Map.toList mg
     transposed = mgs'
       where
