@@ -1,4 +1,4 @@
-resolver: lts-13.9 # Last 8.6.3 LTS
+resolver: lts-13.16
 
 packages:
 - .
