@@ -86,7 +86,7 @@ getTargetGhc (HIE.ModulePath _mn fp) = parseSourceFileGhc fp
 parseSourceFileGhc :: FilePath -> RefactGhc ()
 parseSourceFileGhc targetFile = do
   -- logm $ "parseSourceFileGhc:targetFile=" ++ targetFile
-  (_, mtm, _) <- RefactGhc $ HIE.getModulesGhc' id targetFile
+  (_, mtm, _) <- RefactGhc $ lift $ HIE.getModulesGhc' id targetFile
   case mtm of
     Nothing -> error $ "Couldn't get typechecked module for " ++ targetFile
     Just tm -> loadTypecheckedModule tm

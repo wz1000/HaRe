@@ -369,7 +369,7 @@ getRefactFileName = do
   case mtm of
     Nothing  -> return Nothing
     Just tm -> do
-      revMap <- RefactGhc HIE.mkRevRedirMapFunc
+      revMap <- RefactGhc $ lift HIE.mkRevRedirMapFunc
       return $ Just (revMap $ fileNameFromModSummary $ GHC.pm_mod_summary
                             $ GHC.tm_parsed_module $ rsTypecheckedMod tm)
     --Just tm -> return $ Just (tmFileNameUnmapped $ rsTypecheckedMod tm)

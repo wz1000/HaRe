@@ -50,11 +50,12 @@ import Control.Applicative
 import qualified Control.Monad.Fail as Fail
 #endif
 import Control.Monad.State
+import qualified Data.Map as Map
 import Data.IORef
 --import Data.Time.Clock
 import Distribution.Helper
 import Exception
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),GmOut(..),ModulePath(..),GmComponent(..),GmComponentType(..),GhcModT,GmEnv(..),runGhcModT,GmlT(..),GmModuleGraph(..),gmlGetSession,gmlSetSession,IOish,cradle,Cradle(..),cabalResolvedComponents,MonadIO(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),GmOut(..),ModulePath(..),GmComponent(..),GmComponentType(..),GhcModT,GmEnv(..),runGhcModT,GmlT(..),GmModuleGraph(..),gmlGetSession,gmlSetSession,IOish,cradle,Cradle(..),cabalResolvedComponents,MonadIO(..),IdeGhcM(..),runIdeGhcMBare)
 import Language.Haskell.Refact.Utils.Types
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
@@ -195,6 +196,23 @@ instance Show StateStorage where
 -- ---------------------------------------------------------------------
 -- StateT and GhcT stack
 
+-- type IdeGhcM = GM.GhcModT IdeM
+-- type IdeM = ReaderT IdeEnv (MultiThreadState IdeState)
+
+newtype RefactGhc a = RefactGhc
+    { unRefactGhc :: StateT RefactState HIE.IdeGhcM a
+    } deriving ( Functor
+               , Applicative
+               , Alternative
+               , Monad
+               , MonadPlus
+               , MonadIO
+               -- , HIE.GmEnv
+               -- , HIE.GmOut
+               -- , HIE.MonadIO
+               , ExceptionMonad
+               )
+{-
 newtype RefactGhc a = RefactGhc
     { unRefactGhc :: HIE.GhcModT (StateT RefactState IO) a
     } deriving ( Functor
@@ -208,6 +226,7 @@ newtype RefactGhc a = RefactGhc
                -- , HIE.MonadIO
                , ExceptionMonad
                )
+-}
 
 #if __GLASGOW_HASKELL__ >= 806
 instance Fail.MonadFail RefactGhc where
@@ -215,15 +234,20 @@ instance Fail.MonadFail RefactGhc where
 #endif
 
 -- ---------------------------------------------------------------------
+-- runIdeGhcM :: GM.Options -> IdePlugins -> Maybe (Core.LspFuncs Config) -> TVar IdeState -> IdeGhcM a -> IO a
 
 runRefactGhc ::
   RefactGhc a -> RefactState -> HIE.Options -> IO (a, RefactState)
+runRefactGhc comp initState opt = do
+    -- ((merr,_log),s) <- runStateT (HIE.runIdeGhcMBare opt (unRefactGhc comp)) initState
+    HIE.runIdeGhcMBare opt (runStateT (unRefactGhc comp) initState)
+{-
 runRefactGhc comp initState opt = do
     ((merr,_log),s) <- runStateT (HIE.runGhcModT opt (unRefactGhc comp)) initState
     case merr of
       Left err -> error (show err)
       Right a  -> return (a,s)
-
+-}
 -- ---------------------------------------------------------------------
 
 instance HIE.GmOut (StateT RefactState IO) where
@@ -238,12 +262,12 @@ instance HIE.MonadIO (StateT RefactState IO) where
   liftIO = liftIO
 
 instance MonadState RefactState RefactGhc where
-    get   = RefactGhc (lift $ lift get)
-    put s = RefactGhc (lift $ lift (put s))
+    get   = RefactGhc get
+    put s = RefactGhc (put s)
 
 instance GHC.GhcMonad RefactGhc where
-  getSession     = RefactGhc $ HIE.unGmlT HIE.gmlGetSession
-  setSession env = RefactGhc $ HIE.unGmlT (HIE.gmlSetSession env)
+  getSession     = RefactGhc $ lift $ HIE.unGmlT HIE.gmlGetSession
+  setSession env = RefactGhc $ lift $ HIE.unGmlT (HIE.gmlSetSession env)
 
 
 instance GHC.HasDynFlags RefactGhc where
@@ -251,7 +275,7 @@ instance GHC.HasDynFlags RefactGhc where
 
 -- ---------------------------------------------------------------------
 
-instance ExceptionMonad (StateT RefactState IO) where
+instance ExceptionMonad (StateT RefactState HIE.IdeGhcM) where
     gcatch act handler = control $ \run ->
         run act `gcatch` (run . handler)
 
@@ -261,7 +285,7 @@ instance ExceptionMonad (StateT RefactState IO) where
 -- ---------------------------------------------------------------------
 
 cabalModuleGraphs :: RefactGhc [HIE.GmModuleGraph]
-cabalModuleGraphs = RefactGhc doCabalModuleGraphs
+cabalModuleGraphs = RefactGhc $ lift doCabalModuleGraphs
   where
     doCabalModuleGraphs :: (HIE.IOish m) => HIE.GhcModT m [HIE.GmModuleGraph]
     doCabalModuleGraphs = do
