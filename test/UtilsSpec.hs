@@ -93,9 +93,9 @@ spec = do
       let testFileName = "./B.hs"
       let
         comp = do
-         parseSourceFileGhc testFileName
+         parseSourceFileCanonical testFileName
          p1 <- getRefactParsed
-         parseSourceFileGhc testFileName
+         parseSourceFileCanonical testFileName
          p2 <- getRefactParsed
          return (p1,p2)
       ((parsed1,parsed2),_s) <- ct $ runRefactGhc comp initialState testOptions
@@ -438,7 +438,7 @@ spec = do
       -- TODO: harvest this commonality
       let
         comp = do
-         parseSourceFileGhc "./S1.hs"
+         parseSourceFileCanonical "./S1.hs"
          tm <- getRefactTargetModule
          g <- clientModsAndFiles tm
          return g
@@ -451,7 +451,7 @@ spec = do
     it "gets modules which directly or indirectly import a module #2" $ do
       let
         comp = do
-         parseSourceFileGhc "./M3.hs"
+         parseSourceFileCanonical "./M3.hs"
          tm <- getRefactTargetModule
          g <- clientModsAndFiles tm
          return g
@@ -465,13 +465,14 @@ spec = do
       let dir = "./test/testdata/cabal/cabal1"
       let
         comp = do
-         parseSourceFileGhc "./src/Foo/Bar.hs"
+         parseSourceFileCanonical "./src/Foo/Bar.hs"
          tm <- getRefactTargetModule
          g <- clientModsAndFiles tm
          return g
       (mg,_s) <- cdAndDo dir $ runRefactGhc comp initialState testOptions
       -- (mg,_s) <- ct $ runRefactGhc comp initialLogOnState testOptions
       showGhc (map HIE.mpModule mg) `shouldBe` "[Main]"
+
     ------------------------------------
 
     it "gets modules which import a module in different cabal targets" $ do
@@ -480,7 +481,7 @@ spec = do
 
       let
         comp = do
-         parseSourceFileGhc "./src/Foo/Bar.hs" -- Load the file first
+         parseSourceFileCanonical "./src/Foo/Bar.hs" -- Load the file first
          tm <- getRefactTargetModule
          g <- clientModsAndFiles tm
          return g
@@ -512,8 +513,8 @@ spec = do
 
       let
         comp = do
-         parseSourceFileGhc "./Foo.hs" -- Load the file first
-         parseSourceFileGhc "./B.hs" -- Load the file first
+         parseSourceFileCanonical "./Foo.hs" -- Load the file first
+         parseSourceFileCanonical "./B.hs" -- Load the file first
          tm <- getRefactTargetModule
          g <- clientModsAndFiles tm
          return g
@@ -547,7 +548,7 @@ spec = do
     it "gets modules which are directly or indirectly imported by a module #1" $ do
       let
         comp = do
-         parseSourceFileGhc "./M.hs" -- Load the file first
+         parseSourceFileCanonical "./M.hs" -- Load the file first
          g <- serverModsAndFiles $ GHC.mkModuleName "S1"
          return g
       (mg,_s) <- ct $ runRefactGhc comp initialState testOptions
@@ -557,7 +558,7 @@ spec = do
     it "gets modules which are directly or indirectly imported by a module #2" $ do
       let
         comp = do
-         parseSourceFileGhc "./M3.hs" -- Load the file first
+         parseSourceFileCanonical "./M3.hs" -- Load the file first
          g <- serverModsAndFiles $ GHC.mkModuleName "M3"
          return g
       (mg,_s) <- ct $ runRefactGhc comp initialState testOptions
@@ -600,7 +601,7 @@ spec = do
     it "retrieves a module from an existing module graph #1" $ do
       let
         comp = do
-          parseSourceFileGhc "./S1.hs"
+          parseSourceFileCanonical "./S1.hs"
           pr <- getTypecheckedModule
           tm <- getRefactTargetModule
           g <- clientModsAndFiles tm
@@ -618,7 +619,7 @@ spec = do
     it "loads the module and dependents if no existing module graph" $ do
       let
         comp = do
-          parseSourceFileGhc "./S1.hs"
+          parseSourceFileCanonical "./S1.hs"
           pr <- getTypecheckedModule
           tm <- getRefactTargetModule
           g <- clientModsAndFiles tm
@@ -635,7 +636,7 @@ spec = do
     it "retrieves a module from an existing module graph #2" $ do
       let
         comp = do
-          parseSourceFileGhc "./DupDef/Dd1.hs"
+          parseSourceFileCanonical "./DupDef/Dd1.hs"
           pr <- getTypecheckedModule
           tm <- getRefactTargetModule
           g <- clientModsAndFiles tm
@@ -654,7 +655,7 @@ spec = do
       let
        comp = do
         s <- get
-        parseSourceFileGhc "./TypeUtils/B.hs"
+        parseSourceFileCanonical "./TypeUtils/B.hs"
 
         g <- GHC.getModuleGraph
 #if __GLASGOW_HASKELL__ >= 804
@@ -675,7 +676,7 @@ spec = do
       let
        comp = do
         s <- get
-        parseSourceFileGhc "./TypeUtils/B.hs"
+        parseSourceFileCanonical "./TypeUtils/B.hs"
 
         g <- GHC.getModuleGraph
 #if __GLASGOW_HASKELL__ >= 804

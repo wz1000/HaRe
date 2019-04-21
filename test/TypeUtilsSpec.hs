@@ -1336,7 +1336,7 @@ spec = do
     it "finds free vars in TH files" $ do
       let
         comp = do
-          parseSourceFileGhc "./TH/Main.hs"
+          parseSourceFileCanonical "./TH/Main.hs"
           parsed <- getRefactParsed
           nm <- getRefactNameMap
           let fds' = hsFreeAndDeclaredRdr nm parsed
@@ -1462,7 +1462,7 @@ spec = do
     it "True if the identifier is in scope and unqualified" $ do
       let
         comp = do
-         parseSourceFileGhc "./DupDef/Dd1.hs"
+         parseSourceFileCanonical "./DupDef/Dd1.hs"
          ctx <- GHC.getContext
          res1 <- isInScopeAndUnqualifiedGhc "c" Nothing
          res2 <- isInScopeAndUnqualifiedGhc "DupDef.Dd1.c" Nothing
@@ -1479,7 +1479,7 @@ spec = do
       t <- ct $ parsedFileGhc  "./ScopeAndQual.hs"
       let
         comp = do
-         parseSourceFileGhc "./ScopeAndQual.hs"
+         parseSourceFileCanonical "./ScopeAndQual.hs"
          -- putParsedModule t
          renamed <- getRefactRenamed
          parsed <- getRefactParsed
@@ -3460,11 +3460,11 @@ spec = do
         ctc = cdAndDo "./test/testdata/cabal/foo"
       let
         comp = do
-          parseSourceFileGhc "./src/Foo/Bar.hs"
+          parseSourceFileCanonical "./src/Foo/Bar.hs"
           parsed <- getRefactParsed
           nm <- getRefactNameMap
           let Just old = locToNamePure nm (3,1) parsed
-          parseSourceFileGhc "./src/Main.hs"
+          parseSourceFileCanonical "./src/Main.hs"
           equivs <- equivalentNameInNewMod old
           logm $ "equivs:" ++ showGhc equivs
           [equiv] <- equivalentNameInNewMod old
@@ -3483,11 +3483,11 @@ spec = do
         ctc = cdAndDo "./test/testdata/cabal/cabal4"
       let
         comp = do
-          parseSourceFileGhc "./src/Foo/Bar.hs"
+          parseSourceFileCanonical "./src/Foo/Bar.hs"
           parsed <- getRefactParsed
           nm <- getRefactNameMap
           let Just old = locToNamePure nm (3,1) parsed
-          parseSourceFileGhc "./src/main4.hs"
+          parseSourceFileCanonical "./src/main4.hs"
           parsed' <- getRefactParsed
           [equiv] <- equivalentNameInNewMod old
 
@@ -3630,7 +3630,7 @@ spec = do
     it "removes the qualifiers from a list of identifiers in a given syntax phrase" $ do
       let
         comp = do
-          parseSourceFileGhc "./TypeUtils/Qualified.hs"
+          parseSourceFileCanonical "./TypeUtils/Qualified.hs"
           parsed <- getRefactParsed
           decls <- liftT $ hsDecls parsed
           nm <- getRefactNameMap
@@ -3722,7 +3722,7 @@ spec = do
       let
         comp = do
          clearParsedModule
-         parseSourceFileGhc "./DupDef/Dd2.hs"
+         parseSourceFileCanonical "./DupDef/Dd2.hs"
          renamed2 <- getRefactRenamed
          parsed2 <- getRefactParsed
 

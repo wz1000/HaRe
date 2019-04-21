@@ -267,16 +267,6 @@ typeCheckModule = do
       t = rsTypecheckedMod tm
       pm = GHC.tm_parsed_module t
   tm' <- GHC.typecheckModule pm
-  -- let
-  --   rmSource = gfromJust "typecheckModule rmSource" (GHC.tm_renamed_source tm')
-  --   (gblEnv, md) = GHC.tm_internals_ tm'
-  --   tm'' = TypecheckedModule {
-  --       tmParsedModule = GHC.tm_parsed_module tm',
-  --       tmRenamedSource = rmSource,
-  --       tmTypecheckedSource = GHC.tm_typechecked_source tm',
-  --       tmMinfExports = GHC.md_exports md,
-  --       tmMinfRdrEnv = Just (GHC.tcg_rdr_env gblEnv)
-  --       }
   let rm = tm {rsTypecheckedMod = tm'}
   put $ st {rsModule = Just rm}
 

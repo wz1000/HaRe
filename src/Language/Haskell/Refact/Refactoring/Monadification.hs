@@ -437,7 +437,6 @@ getNamedExprByPos pos a = let res = SYB.something (Nothing `SYB.mkQ` comp) a in
         comp e@(GHC.L l _) = if l == pos
                              then (Just e)
                              else Nothing
-        comp _ = Nothing
 
 -- getParsedExprByPos :: (Data a) => GHC.SrcSpan -> a -> ParsedLExpr
 -- getParsedExprByPos = getParsedByPos

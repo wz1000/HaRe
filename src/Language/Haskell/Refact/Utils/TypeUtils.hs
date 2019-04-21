@@ -769,6 +769,7 @@ instance UsedByRhs (GHC.HsDecl GhcPs) where
       GHC.SpliceD _ d     -> f d
       GHC.DocD _ d        -> f d
       GHC.RoleAnnotD _ d  -> f d
+      GHC.XHsDecl _       -> error "XHsDecl in usedByRhsRdr"
 #else
       GHC.TyClD d       -> f d
       GHC.InstD d       -> f d
@@ -851,6 +852,9 @@ instance UsedByRhs (GHC.Match GhcPs (GHC.LHsExpr GhcPs)) where
   usedByRhsRdr nm (GHC.Match _ _ _ (GHC.GRHSs rhs _)) pns
 #endif
     = findNamesRdr nm pns rhs
+#if __GLASGOW_HASKELL__ >= 806
+  usedByRhsRdr _ (GHC.XMatch _) _ = False
+#endif
 
 -- -------------------------------------
 
@@ -1651,7 +1655,7 @@ addParamsToDecls decls pn paramPNames = do
 #endif
       where
 #if __GLASGOW_HASKELL__ >= 806
-       addParamtoMatch (GHC.L l (GHC.Match x fn1 pats      rhs))
+       addParamtoMatch (GHC.L l (GHC.Match xx fn1 pats      rhs))
 #elif __GLASGOW_HASKELL__ >= 804
        addParamtoMatch (GHC.L l (GHC.Match fn1 pats      rhs))
 #else
@@ -1662,11 +1666,11 @@ addParamsToDecls decls pn paramPNames = do
              pats' <- liftT $ mapM addParam paramPNames
              -- logDataWithAnns "addParamToDecl.addParam:pats'" pats'
 #if __GLASGOW_HASKELL__ >= 806
-             return (GHC.L l (GHC.Match x fn1 (pats'++pats)      rhs'))
+             return (GHC.L l (GHC.Match xx fn1 (pats'++pats)      rhs'))
 #elif __GLASGOW_HASKELL__ >= 804
-             return (GHC.L l (GHC.Match   fn1 (pats'++pats)      rhs'))
+             return (GHC.L l (GHC.Match    fn1 (pats'++pats)      rhs'))
 #else
-             return (GHC.L l (GHC.Match   fn1 (pats'++pats) mtyp rhs'))
+             return (GHC.L l (GHC.Match    fn1 (pats'++pats) mtyp rhs'))
 #endif
 
    -- TODO: The following will never match, as a PatBind only deals with complex patterns.
@@ -2685,7 +2689,7 @@ renamePN oldPN newName useQual t = do
 
     -- TODO: check inside the ns here too
 #if __GLASGOW_HASKELL__ >= 806
-    renameLIE useQual' (GHC.L l (GHC.IEThingWith x old@(GHC.L ln n) wc ns fls))
+    renameLIE useQual' (GHC.L l (GHC.IEThingWith x old@(GHC.L _  _) wc ns fls))
 #elif __GLASGOW_HASKELL__ > 710
     renameLIE useQual' (GHC.L l (GHC.IEThingWith   old@(GHC.L ln n) wc ns fls))
 #else

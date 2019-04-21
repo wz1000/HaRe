@@ -2,6 +2,7 @@ module TestUtils
        ( compareFiles
        , parsedFileGhc
        , parsedFileGhcCd
+       , parseSourceFileCanonical
        , parseSourceFileTest
        , runLogTestGhc
        , runTestGhc
@@ -40,6 +41,7 @@ module TestUtils
 import qualified DynFlags      as GHC
 import qualified FastString    as GHC
 import qualified GHC           as GHC
+import qualified MonadUtils    as GHC
 import qualified Name          as GHC
 import qualified Outputable    as GHC
 import qualified Unique        as GHC
@@ -137,9 +139,17 @@ cdAndDo path fn = do
 
 -- ---------------------------------------------------------------------
 
+parseSourceFileCanonical :: FilePath -> RefactGhc ()
+parseSourceFileCanonical fileName = do
+  fp <- GHC.liftIO $ canonicalizePath fileName
+  parseSourceFileGhc fp
+
+-- ---------------------------------------------------------------------
+
 parseSourceFileTest :: FilePath -> RefactGhc ParseResult
 parseSourceFileTest fileName = do
-  parseSourceFileGhc fileName -- Load the file first
+  -- parseSourceFileGhc fileName -- Load the file first
+  parseSourceFileCanonical fileName -- Load the file first
   getTypecheckedModule
 
 -- ---------------------------------------------------------------------

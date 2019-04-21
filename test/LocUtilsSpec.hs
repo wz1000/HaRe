@@ -13,6 +13,7 @@ import Language.Haskell.Refact.Utils.LocUtils
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.MonadFunctions
 import Language.Haskell.Refact.Utils.Utils
+import System.Directory
 
 -- ---------------------------------------------------------------------
 
@@ -28,12 +29,13 @@ spec = do
     it "Finds the top SrcSpan" $ do
       let
         comp = do
-         parseSourceFileGhc "./DupDef/Dd1.hs"
+         parseSourceFileCanonical "./DupDef/Dd1.hs"
          parsed <- getRefactParsed
          decls <- liftT $ hsDecls parsed
          let ss = getSrcSpan decls
          return (decls,ss)
       ((d,ss'),_s) <- ct $ runRefactGhc comp initialState testOptions
+      -- ((d,ss'),_s) <- ct $ runRefactGhc comp initialLogOnState testOptions
 #if __GLASGOW_HASKELL__ >= 802
       (showGhcQual d) `shouldBe` "[toplevel :: Integer -> Integer, toplevel x = c * x,\n c, d :: Integer, c = 7, d = 9, tup :: (Int, Int), h :: Int,\n t :: Int,\n tup@(h, t)\n   = head $ zip [1 .. 10] [3 .. ff]\n   where\n       ff :: Int\n       ff = 15,\n data D = A | B String | C,\n ff y\n   = y + zz\n   where\n       zz = 1,\n l z = let ll = 34 in ll + z,\n dd q\n   = do let ss = 5\n        return (ss + q)]"
 #else
@@ -46,7 +48,7 @@ spec = do
     it "Finds the SrcSpan for a top level decl" $ do
       let
         comp = do
-         parseSourceFileGhc "./MoveDef/Demote.hs"
+         parseSourceFileCanonical "./MoveDef/Demote.hs"
          parsed <- getRefactParsed
          decls <- liftT $ hsDecls parsed
          let decl = head $ drop 2 decls

@@ -350,23 +350,23 @@ traverseTypeSig argNum f (GHC.TypeSig x lst (GHC.HsWC wcs (GHC.HsIB v ty'))) = d
   newTy <- comp argNum ty'
   return (GHC.TypeSig x lst (GHC.HsWC wcs (GHC.HsIB v newTy)))
   where
-    comp argNum' (GHC.L l (GHC.HsForAllTy x bndrs ty)) =
+    comp argNum' (GHC.L l (GHC.HsForAllTy xx bndrs ty)) =
       case ty of
         (GHC.L _ (GHC.HsFunTy {})) -> comp' argNum' ty
-          >>= (\res -> return (GHC.L l (GHC.HsForAllTy x bndrs res)))
-        _ -> f ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy x bndrs res)))
+          >>= (\res -> return (GHC.L l (GHC.HsForAllTy xx bndrs res)))
+        _ -> f ty >>= (\res -> return (GHC.L l (GHC.HsForAllTy xx bndrs res)))
     comp _ ty = do
       logDataWithAnns "traverseTypeSig.comp:unknwon ty" ty
       error "foo"
 
-    comp' 1 (GHC.L l (GHC.HsFunTy x lhs rhs)) = do
+    comp' 1 (GHC.L l (GHC.HsFunTy xx lhs rhs)) = do
       resLHS <- f lhs
-      let funTy = (GHC.L l (GHC.HsFunTy x resLHS rhs))
+      let funTy = (GHC.L l (GHC.HsFunTy xx resLHS rhs))
       zeroDP funTy
       return funTy
     comp' 1 lTy = f lTy
-    comp' n (GHC.L l (GHC.HsFunTy x lhs rhs)) = comp' (n-1) rhs
-      >>= (\res -> return (GHC.L l (GHC.HsFunTy x lhs res)))
+    comp' n (GHC.L l (GHC.HsFunTy xx lhs rhs)) = comp' (n-1) rhs
+      >>= (\res -> return (GHC.L l (GHC.HsFunTy xx lhs res)))
     comp' _ lHsTy = return lHsTy
 #elif __GLASGOW_HASKELL__ >= 802
 traverseTypeSig argNum f (GHC.TypeSig lst (GHC.HsWC wcs (GHC.HsIB v ty' c))) = do

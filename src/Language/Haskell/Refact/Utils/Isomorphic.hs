@@ -415,9 +415,9 @@ modMGAltsRHS f bnd = do
   where
     comp :: GHC.GRHS GhcPs ParsedLExpr -> RefactGhc (GHC.GRHS GhcPs ParsedLExpr)
 #if __GLASGOW_HASKELL__ >= 806
-    comp (GHC.GRHS x lst expr) = do
+    comp (GHC.GRHS xx lst expr) = do
       newExpr <- f expr
-      return (GHC.GRHS x lst newExpr)
+      return (GHC.GRHS xx lst newExpr)
 #else
     comp (GHC.GRHS lst expr) = do
       newExpr <- f expr

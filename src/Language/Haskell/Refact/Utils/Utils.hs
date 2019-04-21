@@ -15,7 +15,7 @@ module Language.Haskell.Refact.Utils.Utils
        -- * Managing the GHC / project environment
          getTargetGhc
        , parseSourceFileGhc
-       , loadTypecheckedModule
+       -- , loadTypecheckedModule
 
        -- * The bits that do the work
        , runRefacSession
@@ -48,7 +48,7 @@ import Language.Haskell.GHC.ExactPrint.Preprocess
 import Language.Haskell.GHC.ExactPrint.Print
 import Language.Haskell.GHC.ExactPrint.Utils
 
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..),getModulesGhc',GmModuleGraph(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..),getModulesGhc',GmModuleGraph(..),setTypecheckedModule,filePathToUri,ifCachedModule,CachedInfo(..),IdeM)
 
 import Language.Haskell.Refact.Utils.GhcModuleGraph
 import Language.Haskell.Refact.Utils.GhcVersionSpecific
@@ -81,11 +81,33 @@ getTargetGhc :: TargetModule -> RefactGhc ()
 getTargetGhc (HIE.ModulePath _mn fp) = parseSourceFileGhc fp
 
 -- ---------------------------------------------------------------------
-
 -- | Parse a single source file into a GHC session
 parseSourceFileGhc :: FilePath -> RefactGhc ()
 parseSourceFileGhc targetFile = do
-  -- logm $ "parseSourceFileGhc:targetFile=" ++ targetFile
+  logm $ "parseSourceFileGhc:targetFile=" ++ targetFile
+  let uri = HIE.filePathToUri targetFile
+  logm $ "parseSourceFileGhc:uri=" ++ show uri
+  _ <- RefactGhc $ lift $ HIE.setTypecheckedModule uri
+  let
+    -- loader :: GHC.TypecheckedModule -> HIE.CachedInfo -> HIE.IdeM ()
+    -- loader :: (Monad m) => GHC.TypecheckedModule -> HIE.CachedInfo -> m ()
+    loader :: GHC.TypecheckedModule -> HIE.CachedInfo -> RefactGhc ()
+    loader tm _ = loadTypecheckedModule tm
+
+    err :: ()
+    err = error $ "Couldn't get typechecked module for " ++ targetFile
+  HIE.ifCachedModule targetFile err loader
+  return ()
+-- ifCachedModule :: (HasGhcModuleCache m, GM.MonadIO m, CacheableModule b)
+--                => FilePath -> a -> (b -> CachedInfo -> m a) -> m a
+
+
+-- ---------------------------------------------------------------------
+
+-- | Parse a single source file into a GHC session
+parseSourceFileGhc' :: FilePath -> RefactGhc ()
+parseSourceFileGhc' targetFile = do
+  -- logm $ "parseSourceFileGhc':targetFile=" ++ targetFile
   (_, mtm, _) <- RefactGhc $ lift $ HIE.getModulesGhc' id targetFile
   case mtm of
     Nothing -> error $ "Couldn't get typechecked module for " ++ targetFile

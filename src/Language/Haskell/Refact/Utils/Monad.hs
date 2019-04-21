@@ -55,7 +55,7 @@ import Data.IORef
 --import Data.Time.Clock
 import Distribution.Helper
 import Exception
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),GmOut(..),ModulePath(..),GmComponent(..),GmComponentType(..),GhcModT,GmlT(..),GmModuleGraph(..),gmlGetSession,gmlSetSession,IOish,cradle,Cradle(..),cabalResolvedComponents,MonadIO(..),runIdeGhcMBare,IdeGhcM)
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),GmOut(..),ModulePath(..),GmComponent(..),GmComponentType(..),GhcModT,GmlT(..),GmModuleGraph(..),gmlGetSession,gmlSetSession,IOish,cradle,Cradle(..),cabalResolvedComponents,MonadIO(..),runIdeGhcMBare,IdeGhcM,HasGhcModuleCache(..))
 import Language.Haskell.Refact.Utils.Types
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
@@ -207,9 +207,7 @@ newtype RefactGhc a = RefactGhc
                , Monad
                , MonadPlus
                , MonadIO
-               -- , HIE.GmEnv
-               -- , HIE.GmOut
-               -- , HIE.MonadIO
+               , HIE.MonadIO
                , ExceptionMonad
                )
 {-
@@ -258,7 +256,10 @@ instance HIE.GmOut IO where
 
 -- instance HIE.MonadIO (StateT RefactState IO) where
 --   liftIO = liftIO
-instance HIE.MonadIO (StateT RefactState IO) where
+-- instance HIE.MonadIO (StateT RefactState IO) where
+--   liftIO = liftIO
+
+instance HIE.MonadIO (StateT RefactState HIE.IdeGhcM) where
   liftIO = liftIO
 
 instance MonadState RefactState RefactGhc where
@@ -272,6 +273,14 @@ instance GHC.GhcMonad RefactGhc where
 
 instance GHC.HasDynFlags RefactGhc where
   getDynFlags = GHC.hsc_dflags <$> GHC.getSession
+
+-- ---------------------------------------------------------------------
+
+instance HIE.HasGhcModuleCache RefactGhc where
+  -- getModuleCache :: m GhcModuleCache
+  -- setModuleCache :: GhcModuleCache -> m ()
+  getModuleCache = RefactGhc $ lift HIE.getModuleCache
+  setModuleCache mc = RefactGhc $ lift $ HIE.setModuleCache mc
 
 -- ---------------------------------------------------------------------
 
