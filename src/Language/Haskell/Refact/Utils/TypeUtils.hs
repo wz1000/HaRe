@@ -1385,7 +1385,7 @@ addParamsToSigs newParams (GHC.L l (GHC.TypeSig lns ltyp pns)) = do
       return typ
 
     printSigComponent :: GHC.Type -> String
-    printSigComponent x = ppType x
+    printSigComponent xx = ppType xx
 
 addParamsToSigs np ls = error $ "addParamsToSigs: no match for:" ++ showGhc (np,ls)
 
@@ -2300,6 +2300,9 @@ rmTypeSig pn t
            -> RefactGhc (GHC.LMatch GhcPs (GHC.LHsExpr GhcPs))
    inMatch x@(GHC.L _ (GHC.Match {}))
       = doRmTypeSig x
+#if __GLASGOW_HASKELL__ >= 806
+   inMatch x@(GHC.L _ (GHC.XMatch {})) = return x
+#endif
 
    inPatDecl ::GHC.LHsDecl GhcPs -> RefactGhc (GHC.LHsDecl GhcPs)
 #if __GLASGOW_HASKELL__ >= 806

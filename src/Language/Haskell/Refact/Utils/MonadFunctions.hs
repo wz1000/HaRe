@@ -89,7 +89,7 @@ import Data.List
 
 import qualified GHC           as GHC
 import qualified GhcMonad      as GHC
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),mkRevRedirMapFunc)
+import qualified Haskell.Ide.Engine.PluginApi as HIE (mkRevRedirMapFunc)
 import qualified Module        as GHC
 import qualified Name          as GHC
 import qualified Unique        as GHC
@@ -564,6 +564,7 @@ initRdrNameMap tm = r
 
     fieldOcc :: GHC.FieldOcc GhcRn -> [GHC.Located GHC.Name]
     fieldOcc (GHC.FieldOcc n (GHC.L l _)) = [(GHC.L l n)]
+    fieldOcc (GHC.XFieldOcc _) = []
 
     hsRecFieldN :: GHC.LHsExpr GhcRn -> [GHC.Located GHC.Name]
     hsRecFieldN (GHC.L _ (GHC.HsRecFld _ (GHC.Unambiguous n (GHC.L l _) ) )) = [GHC.L l n]

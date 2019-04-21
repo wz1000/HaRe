@@ -68,24 +68,29 @@ instance GHC.Outputable (GHC.Match GhcRn (GHC.LHsExpr GhcRn)) where
 instance GHC.Outputable (GHC.GRHSs GhcRn (GHC.LHsExpr GhcRn)) where
 #if __GLASGOW_HASKELL__ >= 806
   ppr (GHC.GRHSs _ grhss binds) = GHC.text "GRHSs" GHC.<+> GHC.ppr grhss
+                                                   GHC.<+> GHC.ppr binds
+  ppr (GHC.XGRHSs _) = GHC.text "XGRHSs"
 #else
   ppr (GHC.GRHSs   grhss binds) = GHC.text "GRHSs" GHC.<+> GHC.ppr grhss
-#endif
                                                    GHC.<+> GHC.ppr binds
+#endif
 
 
 instance GHC.Outputable (GHC.GRHS GhcRn (GHC.LHsExpr GhcRn)) where
 #if __GLASGOW_HASKELL__ >= 806
   ppr (GHC.GRHS _ guards rhs) = GHC.text "GRHS" GHC.<+> GHC.ppr guards
+                                                GHC.<+> GHC.ppr rhs
+  ppr (GHC.XGRHS _) = GHC.text "XGRHS"
 #else
   ppr (GHC.GRHS   guards rhs) = GHC.text "GRHS" GHC.<+> GHC.ppr guards
-#endif
                                                 GHC.<+> GHC.ppr rhs
+#endif
 
 
 instance GHC.Outputable (GHC.HsTupArg GhcRn) where
 #if __GLASGOW_HASKELL__ >= 806
   ppr (GHC.Present _ e)    = GHC.text "Present" GHC.<+> GHC.ppr e
+  ppr (GHC.XTupArg _)      = GHC.text "XTupArg"
 #else
   ppr (GHC.Present   e)    = GHC.text "Present" GHC.<+> GHC.ppr e
 #endif

@@ -50,12 +50,12 @@ import Control.Applicative
 import qualified Control.Monad.Fail as Fail
 #endif
 import Control.Monad.State
-import qualified Data.Map as Map
+-- import qualified Data.Map as Map
 import Data.IORef
 --import Data.Time.Clock
 import Distribution.Helper
 import Exception
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),GmOut(..),ModulePath(..),GmComponent(..),GmComponentType(..),GhcModT,GmEnv(..),runGhcModT,GmlT(..),GmModuleGraph(..),gmlGetSession,gmlSetSession,IOish,cradle,Cradle(..),cabalResolvedComponents,MonadIO(..),IdeGhcM(..),runIdeGhcMBare)
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),GmOut(..),ModulePath(..),GmComponent(..),GmComponentType(..),GhcModT,GmlT(..),GmModuleGraph(..),gmlGetSession,gmlSetSession,IOish,cradle,Cradle(..),cabalResolvedComponents,MonadIO(..),runIdeGhcMBare,IdeGhcM)
 import Language.Haskell.Refact.Utils.Types
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types

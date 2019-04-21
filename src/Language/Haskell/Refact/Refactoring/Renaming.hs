@@ -21,7 +21,7 @@ import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Utils
 import Language.Haskell.Refact.API
-import System.Directory
+-- import System.Directory
 import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..))
 import qualified Data.Map as Map
 
@@ -341,6 +341,9 @@ condChecking2 nm oldPN newName ast = do
       if declared
         then condChecking' dd
         else mzero
+#if __GLASGOW_HASKELL__ >= 806
+    inDataDefn (GHC.XHsDataDefn _) = mzero
+#endif
 
     -- The name is declared in a ConDecl
 #if __GLASGOW_HASKELL__ >= 806
@@ -356,6 +359,7 @@ condChecking2 nm oldPN newName ast = do
       if declaredn || declaredd
         then condChecking' cd
         else mzero
+    inConDecl (GHC.XConDecl _) = mzero
 #elif __GLASGOW_HASKELL__ > 710
     inConDecl cd@(GHC.ConDeclGADT { GHC.con_names = ns } :: GHC.ConDecl GhcPs) = do
       declared <- isDeclaredBy ns
@@ -468,7 +472,7 @@ condChecking1 oldPN newName newNameGhc modName ast existChecking exportChecking 
           [] -> do
             --the same name has been declared in this module.
             error $ mconcat ["Name '", newName, "' already exists in this module\n"]
-          ds -> do
+          _ds -> do
             -- TODO: Check that we do not in fact have a name clash. It is only
             -- safe if we are changing a field name where the name clashes with
             -- a field name in another constructor
@@ -501,6 +505,7 @@ renameTopLevelVarName oldPN newName newNameGhc exportChecking = do
 
 -- ---------------------------------------------------------------------
 
+{-
 renameLocalVarName :: (SYB.Data t) => GHC.Name -> String -> GHC.Name -> t -> RefactGhc t
 renameLocalVarName oldPN newName newNameGhc t = do
   -- nm <- getRefactNameMap
@@ -516,6 +521,7 @@ renameLocalVarName oldPN newName newNameGhc t = do
                            ++showGhc oldPN++ "' to '"++newName++
                           "' will change the program's semantics!\n")
               else renamePN oldPN newNameGhc qual t
+-}
 
 ------------------------------------------------------------------------
 
