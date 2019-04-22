@@ -490,17 +490,17 @@ expr ===>
 
 handleBind :: (GHC.RecFlag, GHC.LHsBinds GhcRn) -> MonadifyState (Maybe (GHC.LHsBindLR GhcPs GhcPs))
 handleBind (_, bg) = do
-  let [(GHC.L l _bnd)] = GHC.bagToList bg
+  let [(GHC.L ll _bnd)] = GHC.bagToList bg
   parsed <- lift getRefactParsed
-  let pBnd = getParsedBindByPos l parsed
+  let pBnd = getParsedBindByPos ll parsed
   case pBnd of
-    (GHC.L l fb@(GHC.FunBind { GHC.fun_id = (GHC.L _ id), GHC.fun_matches = mg })) -> do
+    (GHC.L l fb@(GHC.FunBind { GHC.fun_id = (GHC.L _ n), GHC.fun_matches = mg })) -> do
       let expr = getExprFromMG mg
       isModCall <- isModFunCall expr
       newExpr <- stripMonArgs False expr
       if isModCall
         then do
-        pat <- lift (mkVarPat id)
+        pat <- lift (mkVarPat n)
         pushQueue (pat,newExpr)
         return Nothing
         else return (Just (GHC.L l (fb {GHC.fun_matches = replaceMGExpr newExpr mg})))

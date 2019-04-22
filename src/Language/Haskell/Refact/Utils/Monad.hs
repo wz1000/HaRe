@@ -50,12 +50,11 @@ import Control.Applicative
 import qualified Control.Monad.Fail as Fail
 #endif
 import Control.Monad.State
--- import qualified Data.Map as Map
 import Data.IORef
 --import Data.Time.Clock
 import Distribution.Helper
 import Exception
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),GmOut(..),ModulePath(..),GmComponent(..),GmComponentType(..),GhcModT,GmlT(..),GmModuleGraph(..),gmlGetSession,gmlSetSession,IOish,cradle,Cradle(..),cabalResolvedComponents,MonadIO(..),runIdeGhcMBare,IdeGhcM,HasGhcModuleCache(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..),GmComponent(..),GmComponentType(..),GmModuleGraph(..),runIdeGhcMBare,IdeGhcM,HasGhcModuleCache(..),cabalModuleGraphs)
 import Language.Haskell.Refact.Utils.Types
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
@@ -207,24 +206,9 @@ newtype RefactGhc a = RefactGhc
                , Monad
                , MonadPlus
                , MonadIO
-               , HIE.MonadIO
-               , ExceptionMonad
-               )
-{-
-newtype RefactGhc a = RefactGhc
-    { unRefactGhc :: HIE.GhcModT (StateT RefactState IO) a
-    } deriving ( Functor
-               , Applicative
-               , Alternative
-               , Monad
-               , MonadPlus
-               , MonadIO
-               , HIE.GmEnv
-               , HIE.GmOut
                -- , HIE.MonadIO
                , ExceptionMonad
                )
--}
 
 #if __GLASGOW_HASKELL__ >= 806
 instance Fail.MonadFail RefactGhc where
@@ -236,39 +220,21 @@ instance Fail.MonadFail RefactGhc where
 
 runRefactGhc ::
   RefactGhc a -> RefactState -> HIE.Options -> IO (a, RefactState)
-runRefactGhc comp initState opt = do
-    -- ((merr,_log),s) <- runStateT (HIE.runIdeGhcMBare opt (unRefactGhc comp)) initState
+runRefactGhc comp initState opt =
     HIE.runIdeGhcMBare opt (runStateT (unRefactGhc comp) initState)
-{-
-runRefactGhc comp initState opt = do
-    ((merr,_log),s) <- runStateT (HIE.runGhcModT opt (unRefactGhc comp)) initState
-    case merr of
-      Left err -> error (show err)
-      Right a  -> return (a,s)
--}
+
 -- ---------------------------------------------------------------------
 
-instance HIE.GmOut (StateT RefactState IO) where
-  gmoAsk = lift HIE.gmoAsk
-
-instance HIE.GmOut IO where
-  gmoAsk = HIE.gmoAsk
-
--- instance HIE.MonadIO (StateT RefactState IO) where
+-- instance HIE.MonadIO (StateT RefactState HIE.IdeGhcM) where
 --   liftIO = liftIO
--- instance HIE.MonadIO (StateT RefactState IO) where
---   liftIO = liftIO
-
-instance HIE.MonadIO (StateT RefactState HIE.IdeGhcM) where
-  liftIO = liftIO
 
 instance MonadState RefactState RefactGhc where
     get   = RefactGhc get
     put s = RefactGhc (put s)
 
 instance GHC.GhcMonad RefactGhc where
-  getSession     = RefactGhc $ lift $ HIE.unGmlT HIE.gmlGetSession
-  setSession env = RefactGhc $ lift $ HIE.unGmlT (HIE.gmlSetSession env)
+  getSession     = RefactGhc $ lift $ GHC.getSession
+  setSession env = RefactGhc $ lift $ GHC.setSession env
 
 
 instance GHC.HasDynFlags RefactGhc where
@@ -277,8 +243,6 @@ instance GHC.HasDynFlags RefactGhc where
 -- ---------------------------------------------------------------------
 
 instance HIE.HasGhcModuleCache RefactGhc where
-  -- getModuleCache :: m GhcModuleCache
-  -- setModuleCache :: GhcModuleCache -> m ()
   getModuleCache = RefactGhc $ lift HIE.getModuleCache
   setModuleCache mc = RefactGhc $ lift $ HIE.setModuleCache mc
 
@@ -294,6 +258,10 @@ instance ExceptionMonad (StateT RefactState HIE.IdeGhcM) where
 -- ---------------------------------------------------------------------
 
 cabalModuleGraphs :: RefactGhc [HIE.GmModuleGraph]
+cabalModuleGraphs = RefactGhc $ lift HIE.cabalModuleGraphs
+
+{-
+cabalModuleGraphs :: RefactGhc [HIE.GmModuleGraph]
 cabalModuleGraphs = RefactGhc $ lift doCabalModuleGraphs
   where
     doCabalModuleGraphs :: (HIE.IOish m) => HIE.GhcModT m [HIE.GmModuleGraph]
@@ -305,6 +273,7 @@ cabalModuleGraphs = RefactGhc $ lift doCabalModuleGraphs
           let graph = map HIE.gmcHomeModuleGraph $ Map.elems mcs
           return graph
         Nothing -> return []
+-}
 
 -- ---------------------------------------------------------------------
 

@@ -3,7 +3,7 @@ module Language.Haskell.Refact.Refactoring.RoundTrip(roundTrip) where
 import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..))
 import Language.Haskell.Refact.API
 
-import System.Directory
+-- import System.Directory
 
 -- ---------------------------------------------------------------------
 

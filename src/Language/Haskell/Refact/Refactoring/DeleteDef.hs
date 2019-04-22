@@ -6,11 +6,11 @@ module Language.Haskell.Refact.Refactoring.DeleteDef
 import qualified Data.Generics as SYB
 import qualified GHC
 import Control.Monad
-import Control.Monad.State
+-- import Control.Monad.State
 import Language.Haskell.Refact.API
 import Data.Generics.Strafunski.StrategyLib.StrategyLib
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..),mpPath)
-import System.Directory
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..))
+-- import System.Directory
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
 
@@ -22,14 +22,15 @@ deleteDef settings cradle fileName (row,col) = do
 compDeleteDef ::FilePath -> SimpPos -> RefactGhc [ApplyRefacResult]
 compDeleteDef fileName (row,col) = do
   parseSourceFileGhc fileName
-  renamed <- getRefactRenamed
+  -- renamed <- getRefactRenamed
   parsed <- getRefactParsed
   targetModule <- getRefactTargetModule
-  m <- getModule
-  let (Just (modName,_)) = getModuleName parsed
+  -- m <- getModule
+  let
+      -- (Just (modName,_)) = getModuleName parsed
       maybeRdrPn = locToRdrName (row,col) parsed
   case maybeRdrPn of
-    Just pn@(GHC.L _ n) ->
+    Just (GHC.L _ n) ->
       do
         logm $ "DeleteDef.comp: before isPNUsed"
         Just ghcn <- locToName (row,col) parsed

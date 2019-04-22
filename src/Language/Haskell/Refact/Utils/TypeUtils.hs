@@ -854,6 +854,7 @@ instance UsedByRhs (GHC.Match GhcPs (GHC.LHsExpr GhcPs)) where
     = findNamesRdr nm pns rhs
 #if __GLASGOW_HASKELL__ >= 806
   usedByRhsRdr _ (GHC.XMatch _) _ = False
+  usedByRhsRdr _ (GHC.Match _ _ _ (GHC.XGRHSs _ )) _ = False
 #endif
 
 -- -------------------------------------
@@ -870,6 +871,7 @@ instance UsedByRhs (GHC.HsBind GhcPs) where
 #if __GLASGOW_HASKELL__ >= 806
   usedByRhsRdr nm  (GHC.PatBind _ _ rhs _)                  pns = findNamesRdr nm pns rhs
   usedByRhsRdr nm  (GHC.PatSynBind _ (GHC.PSB _ _ _ rhs _)) pns = findNamesRdr nm pns rhs
+  usedByRhsRdr _   (GHC.PatSynBind _ (GHC.XPatSynBind _))   _   = False
   usedByRhsRdr nm  (GHC.VarBind _ _ rhs _)                  pns = findNamesRdr nm pns rhs
 #else
   usedByRhsRdr nm  (GHC.PatBind _ rhs _ _ _)              pns = findNamesRdr nm pns rhs
@@ -880,6 +882,9 @@ instance UsedByRhs (GHC.HsBind GhcPs) where
 #if __GLASGOW_HASKELL__ >= 804
 #elif __GLASGOW_HASKELL__ > 710
   usedByRhsRdr _nm (GHC.AbsBindsSig _ _ _ _ _ _)         _pns = False
+#endif
+#if __GLASGOW_HASKELL__ >= 806
+  usedByRhsRdr _ (GHC.XHsBindsLR _) _ = False
 #endif
 
 -- -------------------------------------
@@ -1277,6 +1282,9 @@ addItemsToImport' serverModName (GHC.L l p) pns impType = do
 
     replaceHiding (GHC.L l1 imp@(GHC.ImportDecl {})) h1 =
                   (GHC.L l1 imp { GHC.ideclHiding = h1} )
+#if __GLASGOW_HASKELL__ >= 806
+    replaceHiding i@(GHC.L _ (GHC.XImportDecl {})) _ = i
+#endif
 
 -- ---------------------------------------------------------------------
 
@@ -1671,6 +1679,9 @@ addParamsToDecls decls pn paramPNames = do
              return (GHC.L l (GHC.Match    fn1 (pats'++pats)      rhs'))
 #else
              return (GHC.L l (GHC.Match    fn1 (pats'++pats) mtyp rhs'))
+#endif
+#if __GLASGOW_HASKELL__ >= 806
+       addParamtoMatch xx@(GHC.L _ (GHC.XMatch _)) = return xx
 #endif
 
    -- TODO: The following will never match, as a PatBind only deals with complex patterns.

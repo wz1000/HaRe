@@ -39,7 +39,7 @@ import Language.Haskell.GHC.ExactPrint
 
 import Data.Generics.Strafunski.StrategyLib.StrategyLib
 
-import System.Directory
+-- import System.Directory
 
 -- import Debug.Trace
 
@@ -1530,8 +1530,8 @@ foldParams pns match@(GHC.L l (GHC.Match { GHC.m_grhss = rhs})) _decls demotedDe
 #endif
                     = do
                          nm <- getRefactNameMap
-                         let pats'=filter (\x->not ((patToNameRdr nm x /= Nothing) &&
-                                          elem (gfromJust "rmParamsInDemotedDecls" $ patToNameRdr nm x) ps)) pats2
+                         let pats'=filter (\xx->not ((patToNameRdr nm xx /= Nothing) &&
+                                          elem (gfromJust "rmParamsInDemotedDecls" $ patToNameRdr nm xx) ps)) pats2
 #if __GLASGOW_HASKELL__ >= 806
                          return (GHC.Match x mfn' pats' rhs1)
 #elif __GLASGOW_HASKELL__ >= 804

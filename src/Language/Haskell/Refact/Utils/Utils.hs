@@ -48,7 +48,7 @@ import Language.Haskell.GHC.ExactPrint.Preprocess
 import Language.Haskell.GHC.ExactPrint.Print
 import Language.Haskell.GHC.ExactPrint.Utils
 
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..),getModulesGhc',GmModuleGraph(..),setTypecheckedModule,filePathToUri,ifCachedModule,CachedInfo(..),IdeM)
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..),GmModuleGraph(..),setTypecheckedModule,filePathToUri,ifCachedModule,CachedInfo(..))
 
 import Language.Haskell.Refact.Utils.GhcModuleGraph
 import Language.Haskell.Refact.Utils.GhcVersionSpecific
@@ -104,6 +104,7 @@ parseSourceFileGhc targetFile = do
 
 -- ---------------------------------------------------------------------
 
+{-
 -- | Parse a single source file into a GHC session
 parseSourceFileGhc' :: FilePath -> RefactGhc ()
 parseSourceFileGhc' targetFile = do
@@ -112,6 +113,7 @@ parseSourceFileGhc' targetFile = do
   case mtm of
     Nothing -> error $ "Couldn't get typechecked module for " ++ targetFile
     Just tm -> loadTypecheckedModule tm
+-}
 
 -- ---------------------------------------------------------------------
 

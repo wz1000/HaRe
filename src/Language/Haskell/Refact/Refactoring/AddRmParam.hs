@@ -11,7 +11,7 @@ import qualified GHC
 import qualified Name                  as GHC
 import qualified Outputable            as GHC
 
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),mpModule)
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..))
 import Language.Haskell.Refact.API
 
 import Language.Haskell.GHC.ExactPrint.Types
