@@ -26,14 +26,14 @@ removeBracket :: RefactSettings -> HIE.Options -> FilePath -> SimpPos -> SimpPos
 removeBracket settings opts fileName beginPos endPos = do
   absFileName <- normaliseFilePath fileName
   let applied = (:[]) . fst <$> applyRefac
-                  (removeBracketTransform absFileName beginPos endPos)
+                  (removeBracketTransform beginPos endPos)
                   (RSFile absFileName)
   runRefacSession settings opts applied
 
 -- type HsExpr a = GHC.Located (GHC.HsExpr a)
 
-removeBracketTransform  :: FilePath -> SimpPos -> SimpPos -> RefactGhc ()
-removeBracketTransform fileName beginPos endPos = do
+removeBracketTransform  :: SimpPos -> SimpPos -> RefactGhc ()
+removeBracketTransform beginPos endPos = do
        parsed <- getRefactParsed
        let expr :: GHC.Located (GHC.HsExpr GhcPs)
            expr = fromJust $ locToExp beginPos endPos parsed

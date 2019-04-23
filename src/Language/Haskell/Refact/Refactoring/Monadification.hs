@@ -20,14 +20,14 @@ monadification settings cradle fileName posLst = do
 
 compMonadification :: FilePath -> [SimpPos] -> RefactGhc [ApplyRefacResult]
 compMonadification fileName posLst = do
-  (refRes@((_fp,ismod),_), ()) <- applyRefac (doMonadification fileName posLst) (RSFile fileName)
+  (refRes@((_fp,ismod),_), ()) <- applyRefac (doMonadification posLst) (RSFile fileName)
   case ismod of
     RefacUnmodifed -> error "Monadification failed"
     RefacModified -> return ()
   return [refRes]
 
-doMonadification :: FilePath -> [SimpPos] -> RefactGhc ()
-doMonadification fileName posLst = do
+doMonadification :: [SimpPos] -> RefactGhc ()
+doMonadification posLst = do
   nmsList <- getNames posLst
   mapM_ (monadifyFunc nmsList) posLst
 
@@ -72,6 +72,7 @@ modMatchRHSExpr fun = comp
         comp' :: ParsedGRHS -> RefactGhc ParsedGRHS
 #if __GLASGOW_HASKELL__ >= 806
         comp' (GHC.GRHS x lst body) = (fun body) >>= (\newBody -> return (GHC.GRHS x lst newBody))
+        comp' g@(GHC.XGRHS _) = return g
 #else
         comp' (GHC.GRHS lst body) = (fun body) >>= (\newBody -> return (GHC.GRHS lst newBody))
 #endif
@@ -403,9 +404,9 @@ applyAtArgSubTrees f (GHC.L l (GHC.HsApp lhs rhs)) = do
   return (GHC.L l (GHC.HsApp newLhs newRhs))
 #endif
 #if __GLASGOW_HASKELL__ >= 806
-applyAtArgSubTrees f (GHC.L l (GHC.HsLet x locBnds expr)) = do
+applyAtArgSubTrees f (GHC.L l (GHC.HsLet x _locBnds expr)) = do
 #else
-applyAtArgSubTrees f (GHC.L l (GHC.HsLet locBnds expr)) = do
+applyAtArgSubTrees f (GHC.L l (GHC.HsLet _locBnds expr)) = do
 #endif
   renamed <- lift getRefactRenamed
   let renExpr = getNamedExprByPos l renamed
@@ -441,9 +442,10 @@ getNamedExprByPos pos a = let res = SYB.something (Nothing `SYB.mkQ` comp) a in
 -- getParsedExprByPos :: (Data a) => GHC.SrcSpan -> a -> ParsedLExpr
 -- getParsedExprByPos = getParsedByPos
 
-getParsedBindByPos :: (Data a) => GHC.SrcSpan -> a -> ParsedLBind
+getParsedBindByPos :: (Data a) => GHC.SrcSpan -> a -> GHC.LHsBind GHC.GhcPs
 getParsedBindByPos = getParsedByPos
 
+getParsedByPos :: (Data t) => GHC.SrcSpan -> t -> GHC.LHsBind GHC.GhcPs
 getParsedByPos pos a = let res = SYB.something (Nothing `SYB.mkQ` comp) a in
   gfromJust "getNamedExprByPos: No expression found." res
   where comp e@(GHC.L l _) = if l == pos
@@ -459,7 +461,11 @@ filterBinds (GHC.L _ (GHC.HsLet _ (GHC.L _ locBnds) _)) = case locBnds of
     newLst <- mMapMaybe handleBind (reverse lst)
     case newLst of
       [] -> return Nothing
-      lst -> return (Just (GHC.HsValBinds GHC.noExt (GHC.ValBinds GHC.noExt (GHC.listToBag (reverse lst)) [])))
+      lst' -> return (Just (GHC.HsValBinds GHC.noExt (GHC.ValBinds GHC.noExt (GHC.listToBag (reverse lst')) [])))
+  (GHC.HsValBinds _ (GHC.ValBinds {})) -> error "filterBinds:invalid ValBinds"
+  (GHC.EmptyLocalBinds _) -> return Nothing
+  (GHC.HsIPBinds _ _)     -> return Nothing
+  (GHC.XHsLocalBindsLR _) -> return Nothing
 #elif __GLASGOW_HASKELL__ >= 800
 filterBinds (GHC.L _ (GHC.HsLet (GHC.L _ locBnds) _)) = case locBnds of
   (GHC.HsValBinds (GHC.ValBindsOut lst _)) -> do
@@ -549,7 +555,7 @@ mMapMaybe f (x:xs) = do
   rst <- mMapMaybe f xs
   case mElem of
     Nothing -> return rst
-    (Just elem) -> return (elem:rst)
+    (Just el) -> return (el:rst)
 
 
 getTypeSigByName :: (Data t) => GHC.RdrName -> t -> Maybe (GHC.Sig GhcPs)

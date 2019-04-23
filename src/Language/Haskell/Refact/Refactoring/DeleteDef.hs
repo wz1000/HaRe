@@ -30,13 +30,13 @@ compDeleteDef fileName (row,col) = do
       -- (Just (modName,_)) = getModuleName parsed
       maybeRdrPn = locToRdrName (row,col) parsed
   case maybeRdrPn of
-    Just (GHC.L _ n) ->
+    Just (GHC.L _ _n) ->
       do
         logm $ "DeleteDef.comp: before isPNUsed"
         Just ghcn <- locToName (row,col) parsed
-        pnIsUsedLocal <- isPNUsed ghcn targetModule fileName
+        pnIsUsedLocal <- isPNUsed ghcn
         clients <- clientModsAndFiles targetModule
-        pnUsedClients <- isPNUsedInClients ghcn n targetModule
+        pnUsedClients <- isPNUsedInClients ghcn targetModule
         if (pnIsUsedLocal || pnUsedClients)
            then error "The def to be deleted is still being used"
           else do
@@ -51,8 +51,8 @@ compDeleteDef fileName (row,col) = do
     Nothing -> error "Invalid cursor position!"
 
 
-isPNUsed :: GHC.Name -> HIE.ModulePath -> FilePath -> RefactGhc Bool
-isPNUsed pn modPath filePath = do
+isPNUsed :: GHC.Name -> RefactGhc Bool
+isPNUsed pn = do
   renamed <- getRefactRenamed
   pnUsedInScope pn renamed
 
@@ -68,7 +68,7 @@ pnUsedInScope pn t' = do
         | name == pn = do
             logm $ "Found Binding at: " ++ (showGhc l)
             return []
-      bind other = do
+      bind _other = do
         mzero
 #if __GLASGOW_HASKELL__ >= 806
       var ((GHC.HsVar _ (GHC.L _ name)) :: GHC.HsExpr GhcRn)
@@ -80,12 +80,12 @@ pnUsedInScope pn t' = do
         | name == pn = do
             logm $ "Found var"
             return [pn]
-      var other = do
+      var _other = do
         mzero
 
 
-isPNUsedInClients :: GHC.Name -> GHC.RdrName -> HIE.ModulePath -> RefactGhc Bool
-isPNUsedInClients pn rdrn modPath = do
+isPNUsedInClients :: GHC.Name -> HIE.ModulePath -> RefactGhc Bool
+isPNUsedInClients pn modPath = do
         pnIsExported <- isExported pn
         if pnIsExported
           then do clients <- clientModsAndFiles modPath
@@ -95,10 +95,10 @@ isPNUsedInClients pn rdrn modPath = do
           else do return False
 
 pnUsedInClientScope :: GHC.Name -> Bool -> TargetModule -> RefactGhc Bool
-pnUsedInClientScope name b mod = do
-  getTargetGhc mod
+pnUsedInClientScope name b modu = do
+  getTargetGhc modu
   isInScope <- isInScopeAndUnqualifiedGhc (nameToString name) Nothing
-  logm $ "The module file path: " ++ (show (HIE.mpPath mod)) ++ "\n is pn in scope: " ++ (show isInScope)
+  logm $ "The module file path: " ++ (show (HIE.mpPath modu)) ++ "\n is pn in scope: " ++ (show isInScope)
   return (b || isInScope)
 
 doDeletion :: GHC.Name -> RefactGhc ()

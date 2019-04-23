@@ -22,7 +22,7 @@ import Language.Haskell.Refact.Utils.Query
 import qualified GHC as GHC
 import qualified RdrName as GHC
 import qualified OccName as GHC
-import qualified Id as GHC
+-- import qualified Id as GHC
 #if __GLASGOW_HASKELL__ <= 710
 import qualified TypeRep as GHC
 #else
@@ -333,12 +333,12 @@ printQueue = do
   let tq = typeQueue st
   lift $ logm "Current Type queue: "
   mapM_ (\t -> lift $ logm (showAnnData mempty 3 t)) tq
-    where printType :: Maybe GHC.Type -> IsoRefact ()
-          printType mTy = do
-            case mTy of
-              Nothing -> lift $ logm "NOTHING"
-              Just ty -> lift $ logm (showType 3 ty)
-            lift $ logm "---------------"
+    -- where printType :: Maybe GHC.Type -> IsoRefact ()
+    --       printType mTy = do
+    --         case mTy of
+    --           Nothing -> lift $ logm "NOTHING"
+    --           Just ty -> lift $ logm (showType 3 ty)
+    --         lift $ logm "---------------"
 
 getAbsFun :: IsoRefact GHC.RdrName
 getAbsFun = do
@@ -418,15 +418,18 @@ modMGAltsRHS f bnd = do
     comp (GHC.GRHS xx lst expr) = do
       newExpr <- f expr
       return (GHC.GRHS xx lst newExpr)
+    comp g@(GHC.XGRHS _) = return g
 #else
     comp (GHC.GRHS lst expr) = do
       newExpr <- f expr
       return (GHC.GRHS lst newExpr)
 #endif
 
+-- TODO:AZ: looks like this is not actually used
 getTyCon :: GHC.Type -> GHC.TyCon
 getTyCon (GHC.TyConApp tc _) = tc
 
+{-
 getTypeFromRdr :: (Data a) => GHC.RdrName -> a -> Maybe GHC.Type
 getTypeFromRdr nm a = SYB.something (Nothing `SYB.mkQ` comp) a
   where comp :: GHC.HsBind GhcTc -> Maybe GHC.Type
@@ -435,6 +438,7 @@ getTypeFromRdr nm a = SYB.something (Nothing `SYB.mkQ` comp) a
           | otherwise = Nothing
         comp _ = Nothing
         occNm = (GHC.occName nm)
+-}
 
 getInitState :: ParsedLImportDecl -> IsoFuncStrings -> String -> String -> Maybe String -> GHC.Type -> RefactGhc IsoRefactState
 getInitState iDecl fStrs absStr projStr mqual fstResTy = do

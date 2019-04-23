@@ -18,7 +18,7 @@ import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Transform
 import Language.Haskell.GHC.ExactPrint.Utils
 
-import System.Directory
+-- import System.Directory
 import Data.Char
 import Data.Foldable
 import Data.Maybe
@@ -330,7 +330,7 @@ addDefaultActualArg recursion pn argPName t = do
        where
          inDecl :: NameMap -> GHC.LHsDecl GhcPs -> RefactGhc (GHC.LHsDecl GhcPs)
 #if __GLASGOW_HASKELL__ >= 806
-         inDecl nm fun@(GHC.L _ (GHC.ValD x (GHC.FunBind { GHC.fun_id = n })))
+         inDecl nm fun@(GHC.L _ (GHC.ValD _ (GHC.FunBind { GHC.fun_id = n })))
 #elif __GLASGOW_HASKELL__ > 710
          inDecl nm fun@(GHC.L _ (GHC.ValD (GHC.FunBind n _ _co _fvs _)))
 #else
@@ -405,7 +405,7 @@ addArgToSig pn decls = do
     where
        addArgToSig' :: [GHC.LHsDecl GhcPs] -> RefactGhc [GHC.LHsDecl GhcPs]
 #if __GLASGOW_HASKELL__ >= 806
-       addArgToSig' sig@[(GHC.L l (GHC.SigD x (GHC.TypeSig y is typ@(GHC.HsWC wcs (GHC.HsIB a tp)))))] = do
+       addArgToSig' sig@[(GHC.L l (GHC.SigD _x (GHC.TypeSig _y is typ@(GHC.HsWC wcs (GHC.HsIB a tp)))))] = do
 #elif __GLASGOW_HASKELL__ > 800
        addArgToSig' sig@[(GHC.L l (GHC.SigD (GHC.TypeSig is typ@(GHC.HsWC wcs (GHC.HsIB a tp b)))))] = do
 #elif __GLASGOW_HASKELL__ > 710
@@ -432,8 +432,8 @@ addArgToSig pn decls = do
                            then  --the type sig only defines the type for pn
                                 [GHC.L l (GHC.SigD GHC.noExt (GHC.TypeSig GHC.noExt is typeVar))]
                            else  --otherwise, seperate it into two type signatures.
-                               [GHC.L l (GHC.SigD GHC.noExt (GHC.TypeSig GHC.noExt (filter (\x->rdrName2NamePure nm x/=pn) is) typ)),
-                                GHC.L l (GHC.SigD GHC.noExt (GHC.TypeSig GHC.noExt (filter (\x->rdrName2NamePure nm x==pn) is) typeVar))]
+                               [GHC.L l (GHC.SigD GHC.noExt (GHC.TypeSig GHC.noExt (filter (\xx->rdrName2NamePure nm xx/=pn) is) typ)),
+                                GHC.L l (GHC.SigD GHC.noExt (GHC.TypeSig GHC.noExt (filter (\xx->rdrName2NamePure nm xx==pn) is) typeVar))]
 #elif __GLASGOW_HASKELL__ > 710
                            then  --the type sig only defines the type for pn
                                 [GHC.L l (GHC.SigD (GHC.TypeSig is typeVar))]
@@ -839,7 +839,7 @@ rmNthArgInSig pn nTh decls = do
 
    where
 #if __GLASGOW_HASKELL__ >= 806
-         rmNthArgInSig' nm [GHC.L l (GHC.SigD x (GHC.TypeSig y is typ@(GHC.HsWC wcs (GHC.HsIB a tp))))]
+         rmNthArgInSig' nm [GHC.L l (GHC.SigD _x (GHC.TypeSig _y is typ@(GHC.HsWC wcs (GHC.HsIB a tp))))]
 #elif __GLASGOW_HASKELL__ > 800
          rmNthArgInSig' nm [GHC.L l (GHC.SigD (GHC.TypeSig is typ@(GHC.HsWC wcs (GHC.HsIB a tp b))))]
 #elif __GLASGOW_HASKELL__ > 710
@@ -872,8 +872,8 @@ rmNthArgInSig pn nTh decls = do
                      return [GHC.L l (GHC.SigD (GHC.TypeSig is typ' c))]
 #endif
                 else do --this type signature also defines the type of other ids.
-                     let otherNames = filter (\x->rdrName2NamePure nm x/=pn) is
-                         [thisName] = filter (\x->rdrName2NamePure nm x==pn) is
+                     let otherNames = filter (\xx->rdrName2NamePure nm xx/=pn) is
+                         [thisName] = filter (\xx->rdrName2NamePure nm xx==pn) is
                      removeTrailingCommaT thisName
                      removeTrailingCommaT (last otherNames)
                      ls <- uniqueSrcSpanT

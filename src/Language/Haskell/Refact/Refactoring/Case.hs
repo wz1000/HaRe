@@ -18,7 +18,7 @@ import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Utils
 
-import System.Directory
+-- import System.Directory
 import qualified Data.Map as Map
 -- import Debug.Trace
 
@@ -34,7 +34,7 @@ compIfToCase :: FilePath -> SimpPos -> SimpPos -> RefactGhc [ApplyRefacResult]
 compIfToCase fileName beginPos endPos = do
        parseSourceFileGhc fileName
        parsed <- getRefactParsed
-       oldAnns <- liftT getAnnsT
+       -- oldAnns <- liftT getAnnsT
        -- logm $ "Case.compIfToCase:parsed=" ++ (showAnnData oldAnns 0 parsed) -- ++AZ++
        let expr = locToExp beginPos endPos parsed
        case expr of

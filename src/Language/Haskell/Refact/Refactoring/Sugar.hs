@@ -17,7 +17,7 @@ compSugar fileName pos = do
   return [refRes]
 
 doSugaring :: SimpPos -> RefactGhc ()
-doSugaring pos = do
-  parsed <- getRefactParsed
+doSugaring _pos = do
+  -- parsed <- getRefactParsed
 
   return ()

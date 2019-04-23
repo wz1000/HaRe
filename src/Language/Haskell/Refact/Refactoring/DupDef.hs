@@ -23,7 +23,7 @@ import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Transform
 import Language.Haskell.GHC.ExactPrint.Utils
 
-import System.Directory
+-- import System.Directory
 
 -- ---------------------------------------------------------------------
 -- | This refactoring duplicates a definition (function binding or
@@ -279,6 +279,9 @@ doDuplicatingClient serverModName newPNames = do
 
 
 
+-- TODO:AZ: Why is this using RenamedSource?
+--          This is a duplicate of the one in MoveDef. Maybe move it to TypeUtils.
+
 --Check here:
 -- | get the module name or alias name by which the duplicated
 -- definition will be imported automatically.
@@ -306,3 +309,6 @@ willBeUnQualImportedBy modName (_,imps,_,_)
                  = if isJust as then (GHC.unLoc $ fromJust as)
 #endif
                                 else modName
+#if __GLASGOW_HASKELL__ >= 806
+               getModName (GHC.L _ (GHC.XImportDecl { })) = error "willBeUnQualImportedBy"
+#endif

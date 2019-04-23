@@ -8,7 +8,7 @@ extra-deps:
 - ./submodules/ghc-mod/core
 - ../haskell-ide-engine/hie-plugin-api
 
-- cabal-install-2.4.1.0
+# - cabal-install-2.4.1.0
 - cabal-plan-0.4.0.0
 - constrained-dynamic-0.1.0.0
 - cryptohash-sha256-0.11.101.0

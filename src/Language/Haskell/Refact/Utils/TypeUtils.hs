@@ -1546,39 +1546,39 @@ data Type
   = TyVarTy Var	-- ^ Vanilla type or kind variable (*never* a coercion variable)
 
   | AppTy         -- See Note [AppTy invariant]
-	Type
-	Type		-- ^ Type application to something other than a 'TyCon'. Parameters:
-	                --
+        Type
+        Type		-- ^ Type application to something other than a 'TyCon'. Parameters:
+                        --
                         --  1) Function: must /not/ be a 'TyConApp',
                         --     must be another 'AppTy', or 'TyVarTy'
-	                --
-	                --  2) Argument type
+                        --
+                        --  2) Argument type
 
   | TyConApp      -- See Note [AppTy invariant]
-	TyCon
-	[KindOrType]	-- ^ Application of a 'TyCon', including newtypes /and/ synonyms.
-	                -- Invariant: saturated appliations of 'FunTyCon' must
-	                -- use 'FunTy' and saturated synonyms must use their own
+        TyCon
+        [KindOrType]	-- ^ Application of a 'TyCon', including newtypes /and/ synonyms.
+                        -- Invariant: saturated appliations of 'FunTyCon' must
+                        -- use 'FunTy' and saturated synonyms must use their own
                         -- constructors. However, /unsaturated/ 'FunTyCon's
                         -- do appear as 'TyConApp's.
-	                -- Parameters:
-	                --
-	                -- 1) Type constructor being applied to.
-	                --
+                        -- Parameters:
+                        --
+                        -- 1) Type constructor being applied to.
+                        --
                         -- 2) Type arguments. Might not have enough type arguments
                         --    here to saturate the constructor.
                         --    Even type synonyms are not necessarily saturated;
                         --    for example unsaturated type synonyms
-	                --    can appear as the right hand side of a type synonym.
+                        --    can appear as the right hand side of a type synonym.
 
   | FunTy
-	Type
-	Type		-- ^ Special case of 'TyConApp': @TyConApp FunTyCon [t1, t2]@
-			-- See Note [Equality-constrained types]
+        Type
+        Type		-- ^ Special case of 'TyConApp': @TyConApp FunTyCon [t1, t2]@
+                        -- See Note [Equality-constrained types]
 
   | ForAllTy
-	Var         -- Type or kind variable
-	Type	        -- ^ A polymorphic type
+        Var         -- Type or kind variable
+        Type            -- ^ A polymorphic type
 
   | LitTy TyLit     -- ^ Type literals are simillar to type constructors.
 
@@ -1922,52 +1922,52 @@ The code
 
 results in
 
-          (GRHSs 
+          (GRHSs
            [
             ({ LiftToToplevel/D1.hs:(13,15)-(15,16) }
              Just (Ann (DP (0,-1)) [] [] [] Nothing Nothing)
-             (GRHS 
-              [] 
+             (GRHS
+              []
               ({ LiftToToplevel/D1.hs:13:17-43 }
                Just (Ann (DP (0,1)) [] [] [] Nothing Nothing)
-               (OpApp 
+               (OpApp
                 ({ LiftToToplevel/D1.hs:13:17-27 }
                  Just (Ann (DP (0,0)) [] [] [] Nothing Nothing)
-                 (HsApp 
+                 (HsApp
                   ({ LiftToToplevel/D1.hs:13:17-25 }
                    Just (Ann (DP (0,0)) [] [] [((G AnnOpenP),DP (0,0)),((G AnnCloseP),DP (0,0))] Nothing Nothing)
-                   (HsPar 
+                   (HsPar
                     ({ LiftToToplevel/D1.hs:13:18-24 }
                      Just (Ann (DP (0,0)) [] [] [] Nothing Nothing)
-                     (HsApp 
+                     (HsApp
                       ({ LiftToToplevel/D1.hs:13:18-19 }
                        Just (Ann (DP (0,0)) [] [] [((G AnnVal),DP (0,0))] Nothing Nothing)
-                       (HsVar 
-                        (Unqual {OccName: sq}))) 
+                       (HsVar
+                        (Unqual {OccName: sq})))
                       ({ LiftToToplevel/D1.hs:13:21-24 }
                        Just (Ann (DP (0,1)) [] [] [((G AnnVal),DP (0,0))] Nothing Nothing)
-                       (HsVar 
-                        (Unqual {OccName: bar2}))))))) 
+                       (HsVar
+                        (Unqual {OccName: bar2})))))))
                   ({ LiftToToplevel/D1.hs:13:27 }
                    Just (Ann (DP (0,1)) [] [] [((G AnnVal),DP (0,0))] Nothing Nothing)
-                   (HsVar 
-                    (Unqual {OccName: x}))))) 
+                   (HsVar
+                    (Unqual {OccName: x})))))
                 ({ LiftToToplevel/D1.hs:13:29 }
                  Just (Ann (DP (0,1)) [] [] [((G AnnVal),DP (0,0))] Nothing Nothing)
-                 (HsVar 
-                  (Unqual {OccName: +}))) 
-                (PlaceHolder) 
+                 (HsVar
+                  (Unqual {OccName: +})))
+                (PlaceHolder)
                 ({ LiftToToplevel/D1.hs:13:31-43 }
                  Just (Ann (DP (0,1)) [] [] [] Nothing Nothing)
-                 (HsApp 
+                 (HsApp
                   ({ LiftToToplevel/D1.hs:13:31-40 }
                    Just (Ann (DP (0,0)) [] [] [((G AnnVal),DP (0,0))] Nothing Nothing)
-                   (HsVar 
-                    (Unqual {OccName: sumSquares}))) 
+                   (HsVar
+                    (Unqual {OccName: sumSquares})))
                   ({ LiftToToplevel/D1.hs:13:42-43 }
                    Just (Ann (DP (0,1)) [] [] [((G AnnVal),DP (0,0))] Nothing Nothing)
-                   (HsVar 
-                    (Unqual {OccName: xs})))))))))] 
+                   (HsVar
+                    (Unqual {OccName: xs})))))))))]
 
 -}
 {-
@@ -2134,12 +2134,11 @@ rmDecl pn incSig t = do
     inModule (p :: GHC.ParsedSource)
       = doRmDeclList p
 
-#if __GLASGOW_HASKELL__ >= 804
     inMatch x@(((GHC.L _ (GHC.Match {}))):: (GHC.LMatch GhcPs (GHC.LHsExpr GhcPs)))
-#else
-    inMatch x@(((GHC.L _ (GHC.Match _ _ _ (GHC.GRHSs _ _localDecls)))):: (GHC.LMatch GhcPs (GHC.LHsExpr GhcPs)))
-#endif
       = doRmDeclList x
+#if __GLASGOW_HASKELL__ >= 806
+    inMatch x@(GHC.L _ (GHC.XMatch {})) = return x
+#endif
 
     inLet :: GHC.LHsExpr GhcPs -> RefactGhc (GHC.LHsExpr GhcPs)
 #if __GLASGOW_HASKELL__ >= 806
@@ -2225,12 +2224,11 @@ declsSybTransform transform = mt
        = transform modu
 
     inMatch :: GHC.LMatch GhcPs (GHC.LHsExpr GhcPs) -> RefactGhc (GHC.LMatch GhcPs (GHC.LHsExpr GhcPs))
-#if __GLASGOW_HASKELL__ >= 804
     inMatch x@(GHC.L _ (GHC.Match {}))
-#else
-    inMatch x@(GHC.L _ (GHC.Match _ _ _ (GHC.GRHSs _ _localDecls)))
-#endif
        = transform x
+#if __GLASGOW_HASKELL__ >= 806
+    inMatch x@(GHC.L _ (GHC.XMatch {})) = return x
+#endif
 
     inPatDecl ::GHC.LHsDecl GhcPs -> RefactGhc (GHC.LHsDecl GhcPs)
 #if __GLASGOW_HASKELL__ >= 806
@@ -2255,7 +2253,7 @@ declsSybTransform transform = mt
 doRmDecl :: [GHC.LHsDecl GhcPs] -> [GHC.LHsDecl GhcPs] -> RefactGhc [GHC.LHsDecl GhcPs]
 doRmDecl decls1 decls2
   = do
-  
+
       let decls2'      = gtail "doRmDecl 1" decls2
           declToRemove = head decls2
       -- logDataWithAnns "doRmDecl:(decls1,decls2)" (decls1,decls2)
@@ -2779,9 +2777,9 @@ renamePN oldPN newName useQual t = do
 #if __GLASGOW_HASKELL__ >= 806
     renameMatch _useQual (GHC.Match x mln pats    grhss) = do
 #elif __GLASGOW_HASKELL__ >= 804
-    renameMatch _useQual (GHC.Match mln pats    grhss) = do
+    renameMatch _useQual (GHC.Match   mln pats    grhss) = do
 #else
-    renameMatch _useQual (GHC.Match mln pats ty grhss) = do
+    renameMatch _useQual (GHC.Match   mln pats ty grhss) = do
 #endif
      -- logm $ "renamePN.renameMatch entered:"
      pats'  <- renameTransform _useQual pats
@@ -2825,7 +2823,9 @@ renamePN oldPN newName useQual t = do
 #else
      return (GHC.Match   mln' pats' ty' grhss')
 #endif
-
+#if __GLASGOW_HASKELL__ >= 806
+    renameMatch _useQual m@(GHC.XMatch _) = return m
+#endif
     -- ---------------------------------
 
     renameImportDecl :: HowToQual -> GHC.ImportDecl GhcPs -> RefactGhc (GHC.ImportDecl GhcPs)

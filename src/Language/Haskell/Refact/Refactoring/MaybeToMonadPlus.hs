@@ -24,7 +24,7 @@ import           Language.Haskell.GHC.ExactPrint.Parsers
 import           Language.Haskell.GHC.ExactPrint.Types
 import           Language.Haskell.GHC.ExactPrint.Utils
 import           Language.Haskell.Refact.API
-import           System.Directory
+-- import           System.Directory
 
 -- ---------------------------------------------------------------------
 
@@ -79,7 +79,7 @@ doMaybeToPlus pos argNum = do
           logm "Converting to Monad"
           doRewriteAsBind newBind funNm
         Nothing -> do
-          canReplaceConstructors <- isOutputType argNum pos funBind
+          canReplaceConstructors <- isOutputType argNum pos
           logm $ "Result of canReplaceConstructors: " ++ (show canReplaceConstructors)
           if canReplaceConstructors
             then do
@@ -93,8 +93,8 @@ doMaybeToPlus pos argNum = do
 -- true then the refactoring will just consist of replacing all RHS calls to the
 -- Maybe type with their MPlus equivalents. I need some way of checking if the
 -- type
-isOutputType :: Int -> SimpPos -> GHC.HsBind GhcPs -> RefactGhc Bool
-isOutputType argNum pos funBind = do
+isOutputType :: Int -> SimpPos -> RefactGhc Bool
+isOutputType argNum pos = do
   parsed <- getRefactParsed
   (Just name) <- locToName pos parsed
   (Just ty)   <- getTypeForName name
@@ -122,6 +122,9 @@ replaceConstructors pos funNm argNum = do
 
           runGRHSFun :: (Data a) => (a -> RefactGhc a) -> ParsedGRHSs -> RefactGhc ParsedGRHSs
           runGRHSFun fun grhss@(GHC.GRHSs {}) = SYB.everywhereM (SYB.mkM fun) grhss
+#if __GLASGOW_HASKELL__ >= 806
+          runGRHSFun _ grhss@(GHC.XGRHSs {}) = return grhss
+#endif
 
           mzeroOcc = GHC.mkVarOcc "mzero"
           returnOcc = GHC.mkVarOcc "return"
@@ -225,6 +228,9 @@ replaceGRHS funNm new_rhs lhs_name = do
           worker' (GHC.GRHSs {}) = do
             logm "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! worker'!!!!!!!!!!!!!!!!!!!!!!"
             return new_rhs
+#if __GLASGOW_HASKELL__ >= 806
+          worker' (GHC.XGRHSs {}) = error "MaybeToMonadPlus.worker"
+#endif
 
           fix_lhs :: ParsedMatchGroup -> RefactGhc ParsedMatchGroup
           fix_lhs mg = do
@@ -421,14 +427,14 @@ removeMatches :: SimpPos -> GHC.HsBind GhcPs -> [GHC.LMatch GhcPs (GHC.LHsExpr G
 removeMatches pos newBind matches = do
   parsed <- getRefactParsed
   let rdrNm = gfromJust "Couldn't get rdrName in removeMatch" $ locToRdrName pos parsed
-  newParsed <- SYB.everywhereM (SYB.mkM (replaceBind rdrNm)) parsed
+  newParsed <- SYB.everywhereM (SYB.mkM (replaceBind' rdrNm)) parsed
   mapM_ removeAnns matches
   putRefactParsed newParsed mempty
   return ()
-    where replaceBind :: GHC.Located GHC.RdrName -> GHC.HsBind GhcPs -> RefactGhc (GHC.HsBind GhcPs)
-          replaceBind rdrNm ((GHC.FunBind { GHC.fun_id = name }) :: GHC.HsBind GhcPs)
+    where replaceBind' :: GHC.Located GHC.RdrName -> GHC.HsBind GhcPs -> RefactGhc (GHC.HsBind GhcPs)
+          replaceBind' rdrNm ((GHC.FunBind { GHC.fun_id = name }) :: GHC.HsBind GhcPs)
             | name == rdrNm = return newBind
-          replaceBind _ a = return a
+          replaceBind' _ a = return a
 
 -- | This function is very specific to Maybe to MonadPlus refactoring. It rewrites
 --the type signature so that the calls to maybe will be replaced with type
@@ -458,7 +464,7 @@ fixType' funNm argPos = do
 #else
   newSig <- locate (GHC.SigD replacedMaybe)
 #endif
-  synthesizeAnns newSig
+  _ <- synthesizeAnns newSig
   addNewLines 2 newSig
   addNewKeyword ((G GHC.AnnDcolon), DP (0,1)) newSig
 
@@ -494,9 +500,9 @@ fixType' funNm argPos = do
                   worker var = return var
           fixTypeClass :: GHC.Sig GhcPs -> RefactGhc (GHC.Sig GhcPs)
 #if __GLASGOW_HASKELL__ >= 806
-          fixTypeClass sig@(GHC.TypeSig x names (GHC.HsWC wcs (GHC.HsIB a (GHC.L lt hsType)))) =
+          fixTypeClass (GHC.TypeSig x names (GHC.HsWC wcs (GHC.HsIB a (GHC.L lt hsType)))) =
             case hsType of
-              (GHC.HsQualTy x1 context ty) -> do
+              (GHC.HsQualTy _ context ty) -> do
                 newContext <- case context of
                                 (GHC.L _ []) -> do
                                   tyCls <- genMonadPlusClass
@@ -518,7 +524,7 @@ fixType' funNm argPos = do
                 liftT $ setPrecedingLinesT ty 0 1
                 liftT $ setPrecedingLinesT newForAll 0 1
                 return (GHC.TypeSig x names (GHC.HsWC wcs (GHC.HsIB a newForAll)))
-              (GHC.HsForAllTy x1 bndrs ty) -> do
+              (GHC.HsForAllTy _ _bndrs ty) -> do
                 newContext <- do
                                   tyCls <- genMonadPlusClass
                                   parTy <- locate (GHC.HsParTy GHC.noExt tyCls)
@@ -533,7 +539,7 @@ fixType' funNm argPos = do
                 liftT $ setPrecedingLinesT newForAll 0 1
                 -- return (GHC.TypeSig names newForAll p)
                 return (GHC.TypeSig x names (GHC.HsWC wcs (GHC.HsIB a newForAll)))
-              unexpected -> do
+              _unexpected -> do
                 logm "fixTypeClass:unexpected"
                 -- logDataWithAnns "fixTypeClass:unexpected" unexpected
                 newContext <- do
@@ -765,7 +771,7 @@ getSigD nm funNm = SYB.something (Nothing `SYB.mkQ` isSigD)
   where
     isSigD :: GHC.LHsDecl GhcPs -> Maybe (GHC.LHsDecl GhcPs)
 #if __GLASGOW_HASKELL__ >= 806
-    isSigD s@(GHC.L _ (GHC.SigD x sig)) = if isSig sig
+    isSigD s@(GHC.L _ (GHC.SigD _ sig)) = if isSig sig
 #else
     isSigD s@(GHC.L _ (GHC.SigD sig)) = if isSig sig
 #endif
@@ -776,7 +782,7 @@ getSigD nm funNm = SYB.something (Nothing `SYB.mkQ` isSigD)
     isSig :: GHC.Sig GhcPs -> Bool
     -- TODO:AZ: what about a shared signature, where the one we care about is not the first one?
 #if __GLASGOW_HASKELL__ >= 806
-    isSig sig@(GHC.TypeSig _ [ln] _) = (sameName nm ln funNm)
+    isSig (GHC.TypeSig _ [ln] _) = (sameName nm ln funNm)
 #elif __GLASGOW_HASKELL__ >= 800
     isSig sig@(GHC.TypeSig [ln] _) = (sameName nm ln funNm)
 #else
@@ -845,14 +851,14 @@ getInnerType = SYB.everything (<|>) (Nothing `SYB.mkQ` getTy)
 -- ---------------------------------------------------------------------
 
 replaceAtLocation :: (Data a) => GHC.SrcSpan -> GHC.Located a -> RefactGhc (GHC.ParsedSource)
-replaceAtLocation span new = do
-  logm $ "replaceAtLocation:Span: " ++ (show span)
+replaceAtLocation ss new = do
+  logm $ "replaceAtLocation:Span: " ++ (show ss)
   parsed <- getRefactParsed
   newParsed <- SYB.everywhereM (SYB.mkM findLoc) parsed
   return newParsed
     where --findLoc :: (forall b. (Data b) => GHC.Located b -> RefactGhc (GHC.Located b))
-          findLoc a@(GHC.L l s) = if l == span
+          findLoc a@(GHC.L l s) = if l == ss
                                   then do
-                                    removeAnns s
+                                    _ <- removeAnns s
                                     return new
                                   else return a

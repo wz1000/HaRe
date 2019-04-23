@@ -1,9 +1,9 @@
 module HughesListSpec (main, spec) where
 
 import Test.Hspec
-import System.Directory
-import TestUtils
-import Language.Haskell.Refact.Refactoring.HughesList
+-- import System.Directory
+-- import TestUtils
+-- import Language.Haskell.Refact.Refactoring.HughesList
 
 main :: IO ()
 main = do

@@ -4,17 +4,19 @@
 module Language.Haskell.Refact.Refactoring.GenApplicative
   (genApplicative, compGenApplicative) where
 
-import Language.Haskell.Refact.API
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..))
 import qualified GHC as GHC
-import qualified RdrName as GHC
-import System.Directory
-import FastString
-import Data.Generics as SYB
-import Data.List
-import Language.Haskell.GHC.ExactPrint
-import Language.Haskell.GHC.ExactPrint.Types
-import Language.Haskell.GHC.ExactPrint.Parsers
+-- import qualified RdrName as GHC
+
+import           Data.Generics as SYB
+import           Data.List
+-- import           FastString
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..))
+import           Language.Haskell.GHC.ExactPrint
+import           Language.Haskell.GHC.ExactPrint.Parsers
+import           Language.Haskell.GHC.ExactPrint.Types
+import           Language.Haskell.Refact.API
+
+-- ---------------------------------------------------------------------
 
 genApplicative :: RefactSettings -> HIE.Options -> FilePath -> SimpPos -> IO [FilePath]
 genApplicative settings cradle fileName pos = do
@@ -23,7 +25,7 @@ genApplicative settings cradle fileName pos = do
 
 compGenApplicative :: FilePath -> SimpPos -> RefactGhc [ApplyRefacResult]
 compGenApplicative fileName pos = do
-  (refRes@((_fp,ismod),_), ()) <- applyRefac (doGenApplicative fileName pos) (RSFile fileName)
+  (refRes@((_fp,ismod),_), ()) <- applyRefac (doGenApplicative pos) (RSFile fileName)
   case ismod of
     RefacUnmodifed -> error "Generalise to Applicative failed"
     RefacModified -> return ()
@@ -33,10 +35,10 @@ compGenApplicative fileName pos = do
 -- to an (OpApp :: HsExpr)
 -- The function begins by constructing the beginning of the applicative chain by looking at the construction of the return statement
 
-doGenApplicative :: FilePath -> SimpPos -> RefactGhc ()
-doGenApplicative fileName pos = do
+doGenApplicative :: SimpPos -> RefactGhc ()
+doGenApplicative pos = do
   parsed <- getRefactParsed
-  let (Just lrdr) = locToRdrName pos parsed
+  let (Just _lrdr) = locToRdrName pos parsed
 #if __GLASGOW_HASKELL__ >= 800
       funBind = case getHsBind pos parsed of
 #else
@@ -80,7 +82,7 @@ checkPreconditions retRhs doStmts boundVars = do
         lexprContainsVars :: [GHC.RdrName] -> ParsedLExpr -> Bool
         lexprContainsVars vars = SYB.everything (||) (False `SYB.mkQ` (\nm -> elem nm vars))
         varOrdering :: [GHC.RdrName] -> ParsedExpr -> [GHC.RdrName]
-        varOrdering boundVars = SYB.everything (++) ([] `SYB.mkQ` (\nm -> if (elem nm boundVars) then [nm] else []))
+        varOrdering boundVars' = SYB.everything (++) ([] `SYB.mkQ` (\nm -> if (elem nm boundVars') then [nm] else []))
         checkOrdering :: [GHC.RdrName] -> [GHC.ExprLStmt GhcPs] -> Bool
         checkOrdering [] [] = True
         checkOrdering [] ((GHC.L _ (GHC.BodyStmt _ _ _ _)):stmts) = checkOrdering [] stmts
@@ -116,7 +118,7 @@ processReturnStatement retExpr boundVars
               parseRes = parseExpr dFlags "hare" constr
           case parseRes of
             (Left (_, errMsg)) -> do
-              logm "processReturnStatement: error parsing tuple constructor"
+              logm $ "processReturnStatement: error parsing tuple constructor:errMsg=" ++ errMsg
               return Nothing
             (Right (anns, expr)) -> do
               mergeRefactAnns anns
@@ -126,7 +128,7 @@ processReturnStatement retExpr boundVars
           stripBoundVars lRet boundVars
       where stripBoundVars :: ParsedLExpr -> [GHC.RdrName] -> RefactGhc (Maybe ParsedLExpr)
 #if __GLASGOW_HASKELL__ >= 806
-            stripBoundVars le@(GHC.L l (GHC.HsVar _ (GHC.L _ nm))) names =
+            stripBoundVars le@(GHC.L _ (GHC.HsVar _ (GHC.L _ nm))) names =
 #elif __GLASGOW_HASKELL__ > 710
             stripBoundVars le@(GHC.L l (GHC.HsVar (GHC.L _ nm))) names =
 #else
@@ -164,11 +166,11 @@ getDoStmts :: GHC.HsBind GhcPs -> Maybe [GHC.ExprLStmt GhcPs]
 getDoStmts funBind = SYB.something (Nothing `SYB.mkQ` stmtLst) funBind
   where stmtLst :: GHC.HsExpr GhcPs -> Maybe [GHC.ExprLStmt GhcPs]
 #if __GLASGOW_HASKELL__ >= 806
-        stmtLst (GHC.HsDo _ _ (GHC.L _ stmtLst) ) = Just (init stmtLst)
+        stmtLst (GHC.HsDo _ _ (GHC.L _ stmts) ) = Just (init stmts)
 #elif __GLASGOW_HASKELL__ > 710
-        stmtLst (GHC.HsDo _ (GHC.L _ stmtLst) _) = Just (init stmtLst)
+        stmtLst (GHC.HsDo _ (GHC.L _ stmts) _) = Just (init stmts)
 #else
-        stmtLst (GHC.HsDo _ stmtLst _) = Just (init stmtLst)
+        stmtLst (GHC.HsDo _ stmts _) = Just (init stmts)
 #endif
         stmtLst _ = Nothing
 
@@ -234,14 +236,14 @@ constructAppChain retRhs lst = do
   case mPure of
     Nothing -> do
       return effects
-    (Just pure) -> do
-      setDP (DP (0,1)) pure
+    (Just pure') -> do
+      setDP (DP (0,1)) pure'
       lOp <- lInfixFmap
       addAnnVal lOp
 #if __GLASGOW_HASKELL__ >= 806
-      locate (GHC.OpApp GHC.noExt pure lOp effects)
+      locate (GHC.OpApp GHC.noExt pure' lOp effects)
 #else
-      locate (GHC.OpApp pure lOp GHC.PlaceHolder effects)
+      locate (GHC.OpApp pure' lOp GHC.PlaceHolder effects)
 #endif
   where
     buildChain :: [ParsedLExpr] -> RefactGhc ParsedLExpr
@@ -271,13 +273,13 @@ constructAppChain retRhs lst = do
 #endif
     buildSingleExpr :: [GHC.ExprLStmt GhcPs] -> RefactGhc ParsedLExpr
     buildSingleExpr [st] = return $ getStmtExpr st
-    buildSingleExpr lst@(st:stmts) = do
-      let (before,(bindSt:after)) = break isBindStmt lst
+    buildSingleExpr lst'@(_st:_stmts) = do
+      let (before,(bindSt:after)) = break isBindStmt lst'
       rOp <- rApp
       lOp <- lApp
       mLeftOfBnds <- buildApps rOp (map getStmtExpr before)
       mRightOfBnds <- buildApps lOp (map getStmtExpr after)
-      mapM_ (\ex -> (setDP (DP (0,1))) (getStmtExpr ex)) (tail lst)
+      mapM_ (\ex -> (setDP (DP (0,1))) (getStmtExpr ex)) (tail lst')
       lROp <- lRApp
       addAnnVal lROp
       lLOp <- lLApp
@@ -318,9 +320,9 @@ constructAppChain retRhs lst = do
       zeroDP expr
       wrapInParsWithDPs (DP (0,0)) (DP (0,0)) expr
     buildApps :: ParsedExpr -> [ParsedLExpr] -> RefactGhc (Maybe ParsedLExpr)
-    buildApps op [] = return Nothing
-    buildApps op [st] = return (Just st)
-    buildApps op (st:stmts) = do
+    buildApps _op [] = return Nothing
+    buildApps _op [st] = return (Just st)
+    buildApps  op (st:stmts) = do
       mRhs <- buildApps op stmts
       case mRhs of
         Nothing -> return (Just st)
@@ -334,10 +336,10 @@ constructAppChain retRhs lst = do
 #endif
           return (Just lExpr)
     clusterStmts :: [GHC.ExprLStmt GhcPs] -> [[GHC.ExprLStmt GhcPs]]
-    clusterStmts lst = let indices = findIndices isBindStmt lst
-                           clusters = cluster indices (length lst) 0 in
-                       map (\is -> map (\i -> lst !! i) is) clusters
-    cluster [i] l c = [[c..(l-1)]]
+    clusterStmts lst' = let indices = findIndices isBindStmt lst'
+                            clusters = cluster indices (length lst') 0 in
+                        map (\is -> map (\i -> lst' !! i) is) clusters
+    cluster [_i] l c = [[c..(l-1)]]
     cluster (i1:i2:is) l c = let b = i1 + ((i2-i1) `div` 2) in
       [c .. b]:(cluster (i2:is) l (b+1))
 
@@ -359,7 +361,7 @@ lFApp = fApp >>= locate
 fApp :: RefactGhc ParsedExpr
 fApp = hsVar "<*>"
 
-
+{-
 isFApp :: ParsedLExpr -> Bool
 #if __GLASGOW_HASKELL__ >= 806
 isFApp (GHC.L _ (GHC.HsVar _ (GHC.L _ rdrNm))) = (GHC.mkVarUnqual (fsLit "<*>")) == rdrNm
@@ -369,6 +371,7 @@ isFApp (GHC.L _ (GHC.HsVar (GHC.L _ rdrNm))) = (GHC.mkVarUnqual (fsLit "<*>")) =
 isFApp (GHC.L _ (GHC.HsVar rdrNm)) = (GHC.mkVarUnqual (fsLit "<*>")) == rdrNm
 #endif
 isFApp _ = False
+-}
 
 lLApp :: RefactGhc ParsedLExpr
 lLApp = lApp >>= locate

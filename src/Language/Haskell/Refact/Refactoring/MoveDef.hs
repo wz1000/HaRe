@@ -422,6 +422,10 @@ liftOneLevel' modName pn@(GHC.L _ n) = do
                  | (nonEmptyList (definingDeclsRdrNames nm [n] (getHsDecls ans ds) False False))
                     = Just (doLiftZ m (getHsDecls ans  ds))
                  | otherwise = Nothing
+#if __GLASGOW_HASKELL__ >= 806
+             liftToMatchQ _nm _ans (GHC.L _ (GHC.Match _ _ _ (GHC.XGRHSs _))) = Nothing
+             liftToMatchQ _nm _ans (GHC.L _ (GHC.XMatch _))                   = Nothing
+#endif
 
              -- ------------------------
 
@@ -486,6 +490,9 @@ liftOneLevel' modName pn@(GHC.L _ n) = do
 
                          decls' <- liftT $ hsDecls m
                          workerTop m decls' dd
+#if __GLASGOW_HASKELL__ >= 806
+                      wmatch (m@(GHC.L _ (GHC.XMatch _))) = return m
+#endif
 
                       wlet :: GHC.LHsExpr GhcPs -> RefactGhc (GHC.LHsExpr GhcPs)
 #if __GLASGOW_HASKELL__ >= 806
@@ -773,6 +780,9 @@ willBeUnQualImportedBy modName = do
                                            , GHC.ideclAs = as }))
         = if isJust as then simpModName (fromJust as)
                        else modName2
+#if __GLASGOW_HASKELL__ >= 806
+       getModName (GHC.L _ (GHC.XImportDecl {})) = error "willBeUnQualImportedBy"
+#endif
 
 #if __GLASGOW_HASKELL__ <= 800
        simpModName m = m
@@ -1036,6 +1046,9 @@ doDemoting  pn = do
                 else return match
               return match'
            else return match
+#if __GLASGOW_HASKELL__ >= 806
+       demoteInMatch match@(GHC.L _ (GHC.XMatch {})) = return match
+#endif
 
        --3. The demoted definition is a local decl in a pattern binding
 #if __GLASGOW_HASKELL__ >= 806
@@ -1370,6 +1383,9 @@ foldParams pns match@(GHC.L l (GHC.Match { GHC.m_grhss = rhs})) _decls demotedDe
        matchesInDecls _x = []
 
        patsInMatch (GHC.L _ (GHC.Match { GHC.m_pats = pats' })) = pats'
+#if __GLASGOW_HASKELL__ >= 806
+       patsInMatch (GHC.L _ (GHC.XMatch {})) = []
+#endif
 
        foldInDemotedDecls :: [GHC.Name]  -- ^The (list?) of names to be demoted
                           -> [GHC.Name]  -- ^Any names that clash
@@ -1539,6 +1555,9 @@ foldParams pns match@(GHC.L l (GHC.Match { GHC.m_grhss = rhs})) _decls demotedDe
 #else
                          return (GHC.Match mfn' pats' typ rhs1)
 #endif
+#if __GLASGOW_HASKELL__ >= 806
+                  worker m@(GHC.XMatch _) = return m
+#endif
 
        ----------remove parameters in the parent functions' rhs-------------------
        rmParamsInParent :: GHC.Name -> [GHC.HsExpr GhcPs]
@@ -1589,6 +1608,9 @@ foldParams pns match@(GHC.L l (GHC.Match { GHC.m_grhss = rhs})) _decls demotedDe
                                           then Just (gfromJust "mkSubst" $ patToNameRdr nm x,(ghead "mkSubst") y)
                                           else Nothing) pats1 params)
 
+#if __GLASGOW_HASKELL__ >= 806
+foldParams _ match@(GHC.L _ (GHC.XMatch {})) _ _ _ = return match
+#endif
 
 -- |substitute an old expression by new expression
 replaceExpWithUpdToks :: GHC.LHsBind GhcPs -> (GHC.Name, GHC.HsExpr GhcPs)

@@ -15,7 +15,7 @@ import Language.Haskell.GHC.ExactPrint.Parsers
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Utils
 import Language.Haskell.Refact.API
-import System.Directory
+-- import System.Directory
 
 import qualified FastString as GHC
 import qualified GHC        as GHC
@@ -65,7 +65,7 @@ hughesList settings cradle fileName funNm pos argNum = do
 
 compHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]
 compHughesList fileName funNm pos argNum = do
-  (refRes@((_fp,ismod),_), ()) <- applyRefac (doHughesList fileName funNm pos argNum fullStrs) (RSFile fileName)
+  (refRes@((_fp,ismod),_), ()) <- applyRefac (doHughesList funNm pos argNum fullStrs) (RSFile fileName)
   case ismod of
     RefacUnmodifed -> error "Introducing Hughes lists failed"
     RefacModified -> return ()
@@ -78,15 +78,15 @@ fastHughesList settings cradle fileName funNm pos argNum = do
 
 compFastHughesList :: FilePath -> String -> SimpPos -> Int -> RefactGhc [ApplyRefacResult]
 compFastHughesList fileName funNm pos argNum = do
-  (refRes@((_fp,ismod),_), ()) <- applyRefac (doHughesList fileName funNm pos argNum fastStrs) (RSFile fileName)
+  (refRes@((_fp,ismod),_), ()) <- applyRefac (doHughesList funNm pos argNum fastStrs) (RSFile fileName)
   case ismod of
     RefacUnmodifed -> error "Introducing Hughes lists failed"
     RefacModified -> return ()
   return [refRes]
 
 
-doHughesList :: FilePath -> String -> SimpPos -> Int -> IsoFuncStrings -> RefactGhc ()
-doHughesList fileName funNm pos argNum fStrs = do
+doHughesList :: String -> SimpPos -> Int -> IsoFuncStrings -> RefactGhc ()
+doHughesList funNm pos argNum fStrs = do
   logm $ "doHughesList:entered"
   let mqual = Just "DList"
   loadHList
@@ -96,8 +96,8 @@ doHughesList fileName funNm pos argNum fStrs = do
   let
     (Just lrdr) = locToRdrName pos parsed
     rdr = GHC.unLoc lrdr
-    dlistCon = getTyCon ty
-    newFType = resultTypeToDList dlistCon
+    -- dlistCon = getTyCon ty
+    -- newFType = resultTypeToDList dlistCon
     (Just funBind) = getHsBind pos parsed
     (Just tySig)   = getTypeSig pos funNm parsed
     newResTy = getResultType ty
@@ -124,7 +124,7 @@ loadHList = do
     modNm = GHC.mkModuleName modStr
   newTarget <- GHC.guessTarget "HughesList/DList.hs" Nothing
   GHC.addTarget newTarget
-  GHC.load (GHC.LoadUpTo modNm)
+  _ <- GHC.load (GHC.LoadUpTo modNm)
   logm "Done loading dlist"
   return ()
 
@@ -134,7 +134,7 @@ fixTypeSig argNum =  traverseTypeSig argNum replaceList
   where
     replaceList :: GHC.LHsType GhcPs -> RefactGhc (GHC.LHsType GhcPs)
 #if __GLASGOW_HASKELL__ >= 806
-    replaceList (GHC.L l (GHC.HsListTy _ innerTy)) = do
+    replaceList (GHC.L _ (GHC.HsListTy _ innerTy)) = do
 #else
     replaceList (GHC.L l (GHC.HsListTy innerTy)) = do
 #endif
@@ -231,11 +231,11 @@ applyAtCallPoint nm f = do
   putRefactParsed parsed' emptyAnns
     where
       stopCon :: GHC.HsBind GhcPs -> RefactGhc ParsedBind
-      stopCon b@(GHC.FunBind { GHC.fun_id = (GHC.L _ id) }) = if id == nm
+      stopCon b@(GHC.FunBind { GHC.fun_id = (GHC.L _ n) }) = if n == nm
 --If the bindings name is the function we are looking for then we succeed and the traversal should stop
                                                      then return b
                                                      else mzero
-      stopCon b = do
+      stopCon _ = do
          logm "Other binding constructor matched"
          mzero
       comp :: ParsedLExpr -> RefactGhc ParsedLExpr
@@ -304,6 +304,7 @@ wrapExpr nm e = do
   lE <- locate expr
   wrapInPars lE
 
+{-
 resultTypeToDList :: GHC.TyCon -> GHC.Type -> GHC.Type
 resultTypeToDList tc = modResultType f
   where f (GHC.TyConApp _ tys) = GHC.TyConApp tc tys
@@ -320,6 +321,7 @@ modResultType f (GHC.FunTy t1 t2) = let newT2 = comp t2 in
         comp ty = f ty
 #endif
 modResultType f ty = f ty
+-}
 
 -- | This function inserts a definition and grabs the DList type constructor
 --  from that definition's type then deletes the definition from the module
@@ -338,8 +340,8 @@ getDListTy mqual = do
   let mBind = getTypedHsBind (getOcc decl) typed
   ty <- case mBind of
           (Just (GHC.FunBind { GHC.fun_id = lid })) ->
-            do let id = GHC.unLoc lid
-               return $ GHC.idType id
+            do let n = GHC.unLoc lid
+               return $ GHC.idType n
           Nothing -> error "Could not retrieve DList type"
   rmFun (GHC.mkRdrUnqual (GHC.occName nm))
   return ty

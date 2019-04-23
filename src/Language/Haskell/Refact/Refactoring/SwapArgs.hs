@@ -216,4 +216,8 @@ doSwap n1 = do
                []  -> return [GHC.L x (GHC.Match mfn [] nothing rhs)]
 #endif
 
-
+#if __GLASGOW_HASKELL__ >= 806
+         updateMatches (m@(GHC.L _ (GHC.XMatch _)):matches) = do
+           matches' <- updateMatches matches
+           return (m:matches')
+#endif

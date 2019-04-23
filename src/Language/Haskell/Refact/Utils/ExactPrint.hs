@@ -220,17 +220,19 @@ setDP dp ast = do
   --   Nothing -> return ()
   --   Just v -> addAnn ast (v {annEntryDelta = dp})
 
---Resets the given AST chunk's delta position to zero.
+-- | Resets the given AST chunk's delta position to zero.
 zeroDP :: (SYB.Data a) => GHC.Located a -> RefactGhc ()
 zeroDP = setDP (DP (0,0))
 
---This just pulls out the successful result from an exact print parser or throws an error if the parse was unsuccessful.
+-- | This just pulls out the successful result from an exact print
+-- parser or throws an error if the parse was unsuccessful.
 handleParseResult :: String -> Either (GHC.SrcSpan, String) (Anns, a) -> RefactGhc (Anns, a)
 handleParseResult msg e = case e of
   (Left (_, errStr)) -> error $ "The parse from: " ++ msg ++ " with error: " ++ errStr
   (Right res) -> return res
 
--- This creates an empty annotation for every located item where an annotation does not already exist in the given AST chunk
+-- | This creates an empty annotation for every located item where an
+-- annotation does not already exist in the given AST chunk
 synthesizeAnns :: (SYB.Data a) => a -> RefactGhc a
 synthesizeAnns = generic `SYB.ext2M` located
   where generic :: SYB.Data a => a -> RefactGhc a

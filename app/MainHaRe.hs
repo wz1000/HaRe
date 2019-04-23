@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
 import           Control.Exception
-import           Control.Monad.Writer.Lazy
+-- import           Control.Monad.Writer.Lazy
 import           Data.List
 import           Data.Version
 import           Development.GitRev (gitCommitCount)
