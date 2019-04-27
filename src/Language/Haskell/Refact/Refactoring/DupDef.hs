@@ -16,7 +16,7 @@ import qualified RdrName       as GHC
 import Data.List
 import Data.Maybe
 
-import qualified Haskell.Ide.Engine.PluginApi as HIE
+import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..))
 import Language.Haskell.Refact.API
 
 import Language.Haskell.GHC.ExactPrint.Types
