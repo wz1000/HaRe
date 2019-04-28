@@ -18,7 +18,7 @@ import           Data.Generics as SYB
 
 import           Control.Applicative
 import           Data.Generics.Strafunski.StrategyLib.StrategyLib
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..))
 import           Language.Haskell.GHC.ExactPrint
 import           Language.Haskell.GHC.ExactPrint.Parsers
 import           Language.Haskell.GHC.ExactPrint.Types
@@ -28,7 +28,7 @@ import           Language.Haskell.Refact.API
 
 -- ---------------------------------------------------------------------
 
-maybeToMonadPlus :: RefactSettings -> HIE.Options -> FilePath -> SimpPos -> Int -> IO [FilePath]
+maybeToMonadPlus :: RefactSettings -> HIE.BiosOptions -> FilePath -> SimpPos -> Int -> IO [FilePath]
 maybeToMonadPlus settings cradle fileName pos argNum = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings cradle (compMaybeToMonadPlus absFileName pos argNum)

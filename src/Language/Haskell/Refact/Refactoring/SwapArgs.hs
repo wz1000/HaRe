@@ -8,7 +8,7 @@ import qualified Data.Generics.Aliases as SYB
 import qualified Name                  as GHC
 import qualified GHC
 
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..))
 import Language.Haskell.Refact.API
 
 import Data.Generics.Schemes
@@ -20,7 +20,7 @@ import Language.Haskell.GHC.ExactPrint.Utils
 
 
 -- TODO: replace args with specific parameters
-swapArgs :: RefactSettings -> HIE.Options -> [String] -> IO [FilePath]
+swapArgs :: RefactSettings -> HIE.BiosOptions -> [String] -> IO [FilePath]
 swapArgs settings opts args
   = do let fileName = args!!0
            row = (read (args!!1)::Int)

@@ -10,7 +10,7 @@ import qualified GHC as GHC
 import           Data.Generics as SYB
 import           Data.List
 -- import           FastString
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..))
 import           Language.Haskell.GHC.ExactPrint
 import           Language.Haskell.GHC.ExactPrint.Parsers
 import           Language.Haskell.GHC.ExactPrint.Types
@@ -18,7 +18,7 @@ import           Language.Haskell.Refact.API
 
 -- ---------------------------------------------------------------------
 
-genApplicative :: RefactSettings -> HIE.Options -> FilePath -> SimpPos -> IO [FilePath]
+genApplicative :: RefactSettings -> HIE.BiosOptions -> FilePath -> SimpPos -> IO [FilePath]
 genApplicative settings cradle fileName pos = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings cradle (compGenApplicative absFileName pos)

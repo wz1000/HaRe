@@ -9,12 +9,12 @@ import Control.Monad
 -- import Control.Monad.State
 import Language.Haskell.Refact.API
 import Data.Generics.Strafunski.StrategyLib.StrategyLib
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..),ModulePath(..))
 -- import System.Directory
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
 
-deleteDef :: RefactSettings -> HIE.Options -> FilePath -> SimpPos -> IO [FilePath]
+deleteDef :: RefactSettings -> HIE.BiosOptions -> FilePath -> SimpPos -> IO [FilePath]
 deleteDef settings cradle fileName (row,col) = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings cradle (compDeleteDef absFileName (row,col))

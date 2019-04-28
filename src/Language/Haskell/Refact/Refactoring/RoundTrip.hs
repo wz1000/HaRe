@@ -1,6 +1,6 @@
 module Language.Haskell.Refact.Refactoring.RoundTrip(roundTrip) where
 
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..))
 import Language.Haskell.Refact.API
 
 -- import System.Directory
@@ -8,7 +8,7 @@ import Language.Haskell.Refact.API
 -- ---------------------------------------------------------------------
 
 -- | Roundtrip the source code, to check that the infrastructure is solid
-roundTrip :: RefactSettings -> HIE.Options -> FilePath -> IO [FilePath]
+roundTrip :: RefactSettings -> HIE.BiosOptions -> FilePath -> IO [FilePath]
 roundTrip settings opts fileName = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (comp absFileName)

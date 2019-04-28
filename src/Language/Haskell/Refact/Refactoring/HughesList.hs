@@ -10,7 +10,7 @@ import Data.Generics.Strafunski.StrategyLib.StrategyLib
 -- import qualified Data.Map as M
 -- import Data.Maybe (fromMaybe)
 -- import Exception
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..))
 import Language.Haskell.GHC.ExactPrint.Parsers
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Utils
@@ -58,7 +58,7 @@ TODO: Figure out strategy for name conflicts. Probably need another optional arg
 
 
 
-hughesList :: RefactSettings -> HIE.Options -> FilePath -> String -> SimpPos -> Int -> IO [FilePath]
+hughesList :: RefactSettings -> HIE.BiosOptions -> FilePath -> String -> SimpPos -> Int -> IO [FilePath]
 hughesList settings cradle fileName funNm pos argNum = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings cradle (compHughesList absFileName funNm pos argNum)
@@ -71,7 +71,7 @@ compHughesList fileName funNm pos argNum = do
     RefacModified -> return ()
   return [refRes]
 
-fastHughesList :: RefactSettings -> HIE.Options -> FilePath -> String -> SimpPos -> Int -> IO [FilePath]
+fastHughesList :: RefactSettings -> HIE.BiosOptions -> FilePath -> String -> SimpPos -> Int -> IO [FilePath]
 fastHughesList settings cradle fileName funNm pos argNum = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings cradle (compFastHughesList absFileName funNm pos argNum)

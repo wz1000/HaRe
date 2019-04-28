@@ -12,10 +12,10 @@ import           Distribution.Text (display)
 import           Language.Haskell.Refact.API
 import           Language.Haskell.Refact.HaRe
 import           Options.Applicative.Simple
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),globalArgSpec)
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..),BiosLogLevel(..))
 import qualified Paths_HaRe as Meta
 
--- import           GhcMod.Options.Options
+-- ---------------------------------------------------------------------
 
 main :: IO ()
 main = do
@@ -117,7 +117,7 @@ data HareParams = DemoteCmd      FilePath Row Col
                 | Monadify       FilePath [(Row,Col)]
                deriving Show
 
-runCmd :: HareParams -> (RefactSettings,HIE.Options) -> IO ()
+runCmd :: HareParams -> (RefactSettings,HIE.BiosOptions) -> IO ()
 runCmd (DemoteCmd fileName r c) (opt, gOpt)
   = runFunc $ demote opt gOpt fileName (r,c)
 
@@ -348,8 +348,8 @@ monadifyOpts =
 -- ---------------------------------------------------------------------
 
 
-allOptsParser :: Parser (RefactSettings,HIE.Options)
-allOptsParser = (,) <$> globalOptsParser <*> HIE.globalArgSpec
+allOptsParser :: Parser (RefactSettings,HIE.BiosOptions)
+allOptsParser = (,) <$> globalOptsParser <*> globalArgSpec
 
 globalOptsParser :: Parser RefactSettings
 globalOptsParser = mkRefSet
@@ -359,6 +359,20 @@ globalOptsParser = mkRefSet
         <> help "Generate debug output" ))
   where
     mkRefSet v = RefSet v (True,True,True,True)
+
+-- ---------------------------------------------------------------------
+-- | An optparse-applicative @Parser@ sepcification for @Options@ so that
+-- applications making use of the ghc-mod API can have a consistent way of
+-- parsing global options.
+globalArgSpec :: Parser HIE.BiosOptions
+globalArgSpec = HIE.BiosOptions
+      <$> many ( strOption
+          (  long "ghcOpt"
+          <> long "ghc-option"
+          <> short 'g'
+          <> metavar "OPT"
+          <> help "Option to be passed to GHC"))
+      <*> pure HIE.BlWarning
 
 -- ---------------------------------------------------------------------
 

@@ -4,7 +4,7 @@ module Language.Haskell.Refact.Refactoring.Monadification
   (monadification,compMonadification) where
 
 import Language.Haskell.Refact.API
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..))
 import Data.Generics as SYB
 import qualified GHC as GHC
 import Control.Monad.State
@@ -12,7 +12,7 @@ import Language.Haskell.GHC.ExactPrint.Types
 import qualified Bag as GHC
 import qualified BasicTypes as GHC (RecFlag)
 
-monadification :: RefactSettings -> HIE.Options -> FilePath -> [SimpPos] -> IO [FilePath]
+monadification :: RefactSettings -> HIE.BiosOptions -> FilePath -> [SimpPos] -> IO [FilePath]
 monadification settings cradle fileName posLst = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings cradle (compMonadification absFileName posLst)

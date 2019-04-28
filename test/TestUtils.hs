@@ -55,7 +55,7 @@ import Language.Haskell.GHC.ExactPrint.Annotate
 import Language.Haskell.GHC.ExactPrint.Parsers
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint.Utils
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),defaultOptions,OutputOpts(..),LineSeparator(..),OutputStyle(..),GmLogLevel(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..),BiosLogLevel(..),defaultOptions)
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.MonadFunctions
 import Language.Haskell.Refact.Utils.Types
@@ -183,7 +183,7 @@ mkTokenCache forest = TK (Map.fromList [((TId 0),forest)]) (TId 0)
 
 -- ---------------------------------------------------------------------
 
-runTestInternal :: RefactGhc a -> RefactState -> HIE.Options
+runTestInternal :: RefactGhc a -> RefactState -> HIE.BiosOptions
                 -> IO (a, RefactState)
 runTestInternal comp st opts =
   runRefactGhc comp st opts
@@ -225,19 +225,27 @@ runRefactGhcStateLog comp logOn  = do
 
 -- ---------------------------------------------------------------------
 
-testOptions :: HIE.Options
--- testOptions = HIE.defaultOptions { HIE.ooptLogLevel = HIE.GmError }
+testOptions :: HIE.BiosOptions
 testOptions = HIE.defaultOptions {
-    HIE.optOutput     = HIE.OutputOpts {
-      HIE.ooptLogLevel       = HIE.GmError
-      -- HIE.ooptLogLevel       = HIE.GmDebug
-      -- HIE.ooptLogLevel       = HIE.GmVomit
-    , HIE.ooptStyle          = HIE.PlainStyle
-    , HIE.ooptLineSeparator  = HIE.LineSeparator "\0"
-    , HIE.ooptLinePrefix     = Nothing
+    HIE.boLogging   = HIE.BlError
+      -- HIE.boLoggingg       = HIE.BlDebug
+      -- HIE.boLoggingg       = HIE.BlVomit
+    -- , HIE.boGhcUserOptions = ["-v4", "-DDEBUG"]
     }
-    -- , HIE.optGhcUserOptions = ["-v4", "-DDEBUG"]
-    }
+
+
+-- -- testOptions = HIE.defaultOptions { HIE.ooptLogLevel = HIE.GmError }
+-- testOptions = HIE.defaultOptions {
+--     HIE.optOutput     = HIE.OutputOpts {
+--       HIE.ooptLogLevel       = HIE.GmError
+--       -- HIE.ooptLogLevel       = HIE.GmDebug
+--       -- HIE.ooptLogLevel       = HIE.GmVomit
+--     , HIE.ooptStyle          = HIE.PlainStyle
+--     , HIE.ooptLineSeparator  = HIE.LineSeparator "\0"
+--     , HIE.ooptLinePrefix     = Nothing
+--     }
+--     -- , HIE.optGhcUserOptions = ["-v4", "-DDEBUG"]
+--     }
 
 -- ---------------------------------------------------------------------
 

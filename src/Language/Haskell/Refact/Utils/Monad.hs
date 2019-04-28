@@ -54,7 +54,7 @@ import Data.IORef
 --import Data.Time.Clock
 import Distribution.Helper
 import Exception
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..),GmComponent(..),GmComponentType(..),GmModuleGraph(..),runIdeGhcMBare,IdeGhcM,HasGhcModuleCache(..),cabalModuleGraphs)
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..),ModulePath(..),GmComponent(..),GmComponentType(..),GmModuleGraph(..),runIdeGhcMBare,IdeGhcM,HasGhcModuleCache(..),cabalModuleGraphs)
 import Language.Haskell.Refact.Utils.Types
 import Language.Haskell.GHC.ExactPrint
 import Language.Haskell.GHC.ExactPrint.Types
@@ -219,7 +219,7 @@ instance Fail.MonadFail RefactGhc where
 -- runIdeGhcM :: GM.Options -> IdePlugins -> Maybe (Core.LspFuncs Config) -> TVar IdeState -> IdeGhcM a -> IO a
 
 runRefactGhc ::
-  RefactGhc a -> RefactState -> HIE.Options -> IO (a, RefactState)
+  RefactGhc a -> RefactState -> HIE.BiosOptions -> IO (a, RefactState)
 runRefactGhc comp initState opt =
     HIE.runIdeGhcMBare opt (runStateT (unRefactGhc comp) initState)
 

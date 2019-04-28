@@ -7,7 +7,7 @@ import qualified Data.Generics         as SYB
 
 import qualified GHC           as GHC
 
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..))
 import Language.Haskell.Refact.API
 
 -- To be moved into HaRe API
@@ -22,7 +22,7 @@ import Data.Maybe
 -- ---------------------------------------------------------------------
 
 -- | Convert an if expression to a case expression
-removeBracket :: RefactSettings -> HIE.Options -> FilePath -> SimpPos -> SimpPos -> IO [FilePath]
+removeBracket :: RefactSettings -> HIE.BiosOptions -> FilePath -> SimpPos -> SimpPos -> IO [FilePath]
 removeBracket settings opts fileName beginPos endPos = do
   absFileName <- normaliseFilePath fileName
   let applied = (:[]) . fst <$> applyRefac

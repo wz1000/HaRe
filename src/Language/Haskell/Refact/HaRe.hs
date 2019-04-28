@@ -6,8 +6,8 @@ module Language.Haskell.Refact.HaRe
  , VerboseLevel (..)
  , defaultSettings
  , SimpPos
- -- ** Re-exported from ghc-mod
- , HIE.Options(..)
+ -- ** Re-exported from hie-plugin-api
+ , HIE.BiosOptions(..)
  , HIE.defaultOptions
 
  -- * Refactorings
@@ -47,4 +47,4 @@ import Language.Haskell.Refact.Refactoring.Sugar
 import Language.Haskell.Refact.Refactoring.RoundTrip
 import Language.Haskell.Refact.Utils.Monad
 import Language.Haskell.Refact.Utils.Types
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),defaultOptions)
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..),defaultOptions)

@@ -16,7 +16,7 @@ import qualified RdrName       as GHC
 import Data.List
 import Data.Maybe
 
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..),ModulePath(..))
 import Language.Haskell.Refact.API
 
 import Language.Haskell.GHC.ExactPrint.Types
@@ -29,7 +29,7 @@ import Language.Haskell.GHC.ExactPrint.Utils
 -- | This refactoring duplicates a definition (function binding or
 -- simple pattern binding) at the same level with a new name provided by
 -- the user. The new name should not cause name clash/capture.
-duplicateDef :: RefactSettings -> HIE.Options -> FilePath -> String -> SimpPos -> IO [FilePath]
+duplicateDef :: RefactSettings -> HIE.BiosOptions -> FilePath -> String -> SimpPos -> IO [FilePath]
 duplicateDef settings opts fileName newName (row,col) = do
   absFileName <- normaliseFilePath fileName
   runRefacSession settings opts (compDuplicateDef absFileName newName (row,col))

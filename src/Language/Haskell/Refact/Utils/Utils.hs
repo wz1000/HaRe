@@ -48,7 +48,7 @@ import Language.Haskell.GHC.ExactPrint.Preprocess
 import Language.Haskell.GHC.ExactPrint.Print
 import Language.Haskell.GHC.ExactPrint.Utils
 
-import qualified Haskell.Ide.Engine.PluginApi as HIE (Options(..),ModulePath(..),GmModuleGraph(..),setTypecheckedModule,filePathToUri,ifCachedModule,CachedInfo(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..),ModulePath(..),GmModuleGraph(..),setTypecheckedModule,filePathToUri,ifCachedModule,CachedInfo(..))
 
 import Language.Haskell.Refact.Utils.GhcModuleGraph
 import Language.Haskell.Refact.Utils.GhcVersionSpecific
@@ -177,7 +177,7 @@ loadTypecheckedModule t = do
 --
 runRefacSession ::
        RefactSettings
-    -> HIE.Options                   -- ^ ghc-mod options
+    -> HIE.BiosOptions              -- ^ hie bios options
     -> RefactGhc [ApplyRefacResult] -- ^ The computation doing the
                                     -- refactoring. Normally created
                                     -- via 'applyRefac'
@@ -207,7 +207,7 @@ runRefacSession settings opt comp = do
 -- computations and runs all of them threading the state through all of the
 -- computations
 
-runMultRefacSession :: RefactSettings -> HIE.Options -> [RefactGhc [ApplyRefacResult]] -> IO [FilePath]
+runMultRefacSession :: RefactSettings -> HIE.BiosOptions -> [RefactGhc [ApplyRefacResult]] -> IO [FilePath]
 runMultRefacSession settings opt comps = do
   let
     initialState = RefSt
@@ -236,7 +236,7 @@ mergeRefResults lst = Map.elems $ mergeHelp lst Map.empty
 
 -- | Take an ordered list of refactorings and apply them in order, threading the
 -- state through all of them
-threadState :: HIE.Options -> RefactState -> [RefactGhc [ApplyRefacResult]]
+threadState :: HIE.BiosOptions -> RefactState -> [RefactGhc [ApplyRefacResult]]
             -> IO [([ApplyRefacResult], RefactState)]
 threadState _ _ [] = return []
 threadState opt currState (rGhc : rst) = do
