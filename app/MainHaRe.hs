@@ -5,6 +5,7 @@
 import           Control.Exception
 -- import           Control.Monad.Writer.Lazy
 import           Data.List
+import           Data.Monoid
 import           Data.Version
 import           Development.GitRev (gitCommitCount)
 import           Distribution.System (buildArch)

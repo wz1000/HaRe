@@ -442,10 +442,10 @@ getNamedExprByPos pos a = let res = SYB.something (Nothing `SYB.mkQ` comp) a in
 -- getParsedExprByPos :: (Data a) => GHC.SrcSpan -> a -> ParsedLExpr
 -- getParsedExprByPos = getParsedByPos
 
-getParsedBindByPos :: (Data a) => GHC.SrcSpan -> a -> GHC.LHsBind GHC.GhcPs
+getParsedBindByPos :: (Data a) => GHC.SrcSpan -> a -> GHC.LHsBind GhcPs
 getParsedBindByPos = getParsedByPos
 
-getParsedByPos :: (Data t) => GHC.SrcSpan -> t -> GHC.LHsBind GHC.GhcPs
+getParsedByPos :: (Data t) => GHC.SrcSpan -> t -> GHC.LHsBind GhcPs
 getParsedByPos pos a = let res = SYB.something (Nothing `SYB.mkQ` comp) a in
   gfromJust "getNamedExprByPos: No expression found." res
   where comp e@(GHC.L l _) = if l == pos
