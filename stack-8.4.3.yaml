@@ -10,7 +10,10 @@ extra-deps:
 - ./submodules/haskell-ide-engine/hie-plugin-api
 
 - cabal-plan-0.4.0.0
+- constrained-dynamic-0.1.0.0
 - ghc-exactprint-0.5.8.2
+- haskell-lsp-0.9.0.0
+- haskell-lsp-types-0.9.0.0
 - pretty-show-1.8.2
 - syz-0.2.0.0
 - temporary-1.2.1.1
