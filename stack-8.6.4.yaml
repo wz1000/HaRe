@@ -5,10 +5,12 @@ packages:
 
 extra-deps:
 - ./submodules/cabal-helper
-# - ./submodules/ghc-mod/core
-- ../haskell-ide-engine/hie-plugin-api
-- ../haskell-ide-engine/submodules/ghc-mod/core
-- ../haskell-ide-engine/submodules/ghc-mod/ghc-project-types
+- ./submodules/ghc-mod/core
+- ./submodules/ghc-mod/ghc-project-types
+- ./submodules/haskell-ide-engine/hie-plugin-api
+# - ../haskell-ide-engine/hie-plugin-api
+# - ../haskell-ide-engine/submodules/ghc-mod/core
+# - ../haskell-ide-engine/submodules/ghc-mod/ghc-project-types
 
 # - cabal-install-2.4.1.0
 - cabal-plan-0.4.0.0

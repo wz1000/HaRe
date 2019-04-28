@@ -6,6 +6,8 @@ packages:
 extra-deps:
 - ./submodules/cabal-helper
 - ./submodules/ghc-mod/core
+- ./submodules/ghc-mod/ghc-project-types
+- ./submodules/haskell-ide-engine/hie-plugin-api
 
 - cabal-install-2.4.0.0
 - cabal-plan-0.4.0.0
