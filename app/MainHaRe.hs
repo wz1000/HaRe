@@ -13,7 +13,7 @@ import           Distribution.Text (display)
 import           Language.Haskell.Refact.API
 import           Language.Haskell.Refact.HaRe
 import           Options.Applicative.Simple
-import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..),BiosLogLevel(..))
+import qualified Haskell.Ide.Engine.PluginApi as HIE (BiosOptions(..),BiosLogLevel(..), defaultOptions)
 import qualified Paths_HaRe as Meta
 
 -- ---------------------------------------------------------------------
@@ -366,14 +366,7 @@ globalOptsParser = mkRefSet
 -- applications making use of the ghc-mod API can have a consistent way of
 -- parsing global options.
 globalArgSpec :: Parser HIE.BiosOptions
-globalArgSpec = HIE.BiosOptions
-      <$> many ( strOption
-          (  long "ghcOpt"
-          <> long "ghc-option"
-          <> short 'g'
-          <> metavar "OPT"
-          <> help "Option to be passed to GHC"))
-      <*> pure HIE.BlWarning
+globalArgSpec = pure HIE.defaultOptions
 
 -- ---------------------------------------------------------------------
 
