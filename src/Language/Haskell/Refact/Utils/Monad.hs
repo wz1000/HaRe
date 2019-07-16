@@ -260,21 +260,6 @@ instance ExceptionMonad (StateT RefactState HIE.IdeGhcM) where
 cabalModuleGraphs :: RefactGhc [HIE.GmModuleGraph]
 cabalModuleGraphs = RefactGhc $ lift HIE.cabalModuleGraphs
 
-{-
-cabalModuleGraphs :: RefactGhc [HIE.GmModuleGraph]
-cabalModuleGraphs = RefactGhc $ lift doCabalModuleGraphs
-  where
-    doCabalModuleGraphs :: (HIE.IOish m) => HIE.GhcModT m [HIE.GmModuleGraph]
-    doCabalModuleGraphs = do
-      crdl <- HIE.cradle
-      case HIE.cradleCabalFile crdl of
-        Just _ -> do
-          mcs <- HIE.cabalResolvedComponents
-          let graph = map HIE.gmcHomeModuleGraph $ Map.elems mcs
-          return graph
-        Nothing -> return []
--}
-
 -- ---------------------------------------------------------------------
 
 canonicalizeGraph ::
